@@ -1,0 +1,7 @@
+{
+  "name": "FocinhoApp",
+  "description": "Uma plataforma completa para cuidar e proteger seu pet. Gerencie tags inteligentes, lembretes de saúde, passeios e ajude na adoção de animais.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
