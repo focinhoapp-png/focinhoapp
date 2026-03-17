@@ -1939,7 +1939,7 @@ export default function App() {
                     Proteja quem você <span className="text-orange-500">ama</span>
                   </h1>
                   <p className="text-gray-500 text-lg">
-                    Pingente inteligentes com QR Code para que seu pet nunca se perca. Simples, moderno e funcional.
+                    Pingentes inteligentes com QR Code para que seu pet nunca se perca. Simples, moderno e funcional.
                   </p>
                 </div>
                 <div className="w-full space-y-4 pt-4">
