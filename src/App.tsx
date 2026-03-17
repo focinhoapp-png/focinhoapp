@@ -1909,9 +1909,7 @@ export default function App() {
         {/* Header */}
         <header className="bg-white border-b border-gray-100 px-6 py-4 sticky top-0 z-50 flex justify-between items-center">
           <div className="flex items-center gap-2 cursor-pointer" onClick={() => setView(user ? 'dashboard' : 'home')}>
-            <div className="bg-orange-500 p-2 rounded-xl">
-              <Dog className="text-white w-6 h-6" />
-            </div>
+            <img src="./logo.png" alt="FocinhoApp Logo" className="w-10 h-10 object-cover rounded-xl" />
             <span className="text-xl font-bold tracking-tight">FocinhoApp</span>
           </div>
           {user && (
@@ -1941,7 +1939,7 @@ export default function App() {
                     Proteja quem você <span className="text-orange-500">ama</span>
                   </h1>
                   <p className="text-gray-500 text-lg">
-                    Tags inteligentes com QR Code para que seu pet nunca se perca. Simples, moderno e funcional.
+                    Pingente inteligentes com QR Code para que seu pet nunca se perca. Simples, moderno e funcional.
                   </p>
                 </div>
                 <div className="w-full space-y-4 pt-4">
