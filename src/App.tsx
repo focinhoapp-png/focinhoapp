@@ -1602,8 +1602,8 @@ export default function App() {
 
     setLoading(true);
     try {
-      if (file.size > 500000) {
-        setError('A logo é muito grande. Escolha uma foto menor que 500KB.');
+      if (file.size > 5000000) {
+        setError('A logo é muito grande. Escolha uma foto menor que 5MB.');
         return;
       }
       const reader = new FileReader();
@@ -1847,8 +1847,8 @@ export default function App() {
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 500000) { // 500KB limit for base64 in Firestore
-        setError('A imagem é muito grande. Escolha uma foto menor que 500KB.');
+      if (file.size > 5000000) { // 5MB limit for base64 in Firestore
+        setError('A imagem é muito grande. Escolha uma foto menor que 5MB.');
         return;
       }
       const reader = new FileReader();
@@ -1873,8 +1873,8 @@ export default function App() {
 
     Array.from(files).forEach(file => {
       const f = file as File;
-      if (f.size > 500000) {
-        setError('Uma das imagens é muito grande (>500KB).');
+      if (f.size > 5000000) {
+        setError('Uma das imagens é muito grande (>5MB).');
         return;
       }
       const reader = new FileReader();
@@ -1910,7 +1910,7 @@ export default function App() {
         <header className="bg-white border-b border-gray-100 px-6 py-4 sticky top-0 z-50 flex justify-between items-center">
           <div className="flex items-center gap-2 cursor-pointer" onClick={() => setView(user ? 'dashboard' : 'home')}>
             <img src="./logo.png" alt="FocinhoApp Logo" className="w-10 h-10 object-cover rounded-xl" />
-            <span className="text-xl font-bold tracking-tight">FocinhoApp</span>
+            <span translate="no" className="text-xl font-bold tracking-tight">FocinhoApp</span>
           </div>
           {user && (
             <button onClick={handleLogout} className="p-2 text-gray-400 hover:text-red-500 transition-colors">
@@ -2031,8 +2031,14 @@ export default function App() {
                     <Button onClick={() => {
                       setSelectedPet(null);
                       setView('activate');
-                    }} variant="outline" className="mx-auto">
+                    }} variant="outline" className="mx-auto block w-full mb-3">
                       Ativar minha primeira tag
+                    </Button>
+                    <Button onClick={() => {
+                      setSelectedPet(null);
+                      setView('profile');
+                    }} className="mx-auto block w-full">
+                      <Plus className="w-5 h-5 inline-block mr-2" /> Cadastrar Pet Sem Tag
                     </Button>
                   </div>
                 ) : (
@@ -4966,7 +4972,7 @@ export default function App() {
               className={`flex flex-col items-center gap-1 transition-colors flex-1 min-h-[44px] justify-center ${view === 'dashboard' ? 'text-orange-500' : 'text-gray-300'}`}
             >
               <Home className="w-7 h-7" />
-              <span className="text-[11px] font-bold uppercase">Início</span>
+              <span translate="no" className="text-[11px] font-bold uppercase">Início</span>
             </button>
 
             <button
