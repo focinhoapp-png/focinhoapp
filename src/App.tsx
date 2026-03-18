@@ -352,7 +352,7 @@ const Select = ({ label, value, onChange, options, icon: Icon }: any) => (
           const isObj = typeof opt === 'object';
           const val = isObj ? opt.value : opt;
           const lab = isObj ? opt.label : opt;
-          return <option key={val} value={val}>{lab}</option>;
+          return <option key={val} value={val} translate="no">{lab}</option>;
         })}
       </select>
       <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
@@ -2032,7 +2032,7 @@ export default function App() {
                       setSelectedPet(null);
                       setView('activate');
                     }} variant="outline" className="mx-auto block w-full mb-3">
-                      Ativar minha primeira tag
+                      Ativar meu primeiro pingente
                     </Button>
                     <Button onClick={() => {
                       setSelectedPet(null);
@@ -2892,10 +2892,10 @@ export default function App() {
 
                             <div className="flex flex-col gap-2">
                               <button
-                                onClick={() => window.open(`https://wa.me/${alert.contactPhone.replace(/\D/g, '')}`, '_blank')}
+                                onClick={() => window.open(`https://wa.me/55${alert.contactPhone.replace(/\D/g, '')}?text=${encodeURIComponent(`Olá! Queria falar sobre o alerta do animal perdido: ${alert.petName}`)}`, '_blank')}
                                 className="w-full py-5 bg-red-600 text-white text-lg font-black rounded-2xl hover:bg-red-700 transition-all shadow-xl shadow-red-200 flex items-center justify-center gap-3 active:scale-95"
                               >
-                                <Phone className="w-6 h-6" /> ENTRAR EM CONTATO
+                                <MessageCircle className="w-6 h-6" /> ENTRAR EM CONTATO
                               </button>
 
                               {user && alert.ownerId === user.id && (
@@ -4980,7 +4980,7 @@ export default function App() {
               className={`flex flex-col items-center gap-1 transition-colors flex-1 min-h-[44px] justify-center ${view === 'reminders' ? 'text-orange-500' : 'text-gray-300'}`}
             >
               <Bell className="w-7 h-7" />
-              <span className="text-[11px] font-bold uppercase">Lembretes</span>
+              <span translate="no" className="text-[11px] font-bold uppercase">Lembretes</span>
             </button>
 
             <button
@@ -4990,7 +4990,7 @@ export default function App() {
               <div className="w-16 h-16 bg-orange-500 rounded-full flex items-center justify-center shadow-lg shadow-orange-200 border-4 border-white active:scale-90 transition-transform">
                 <PawPrint className="w-8 h-8 text-white" />
               </div>
-              <span className="text-[11px] font-bold uppercase text-orange-500 mt-1">Passeio</span>
+              <span translate="no" className="text-[11px] font-bold uppercase text-orange-500 mt-1">Passeio</span>
             </button>
 
             <button
@@ -5001,7 +5001,7 @@ export default function App() {
               className={`flex flex-col items-center gap-1 transition-colors flex-1 min-h-[44px] justify-center relative ${view === 'lost_pets' ? 'text-orange-500' : 'text-gray-300'}`}
             >
               <Megaphone className={`w-7 h-7 ${hasNewUnreadSOS && view !== 'lost_pets' ? 'text-red-500 animate-pulse' : ''}`} />
-              <span className="text-[11px] font-bold uppercase">Animal Perdido</span>
+              <span translate="no" className="text-[11px] font-bold uppercase">Animal Perdido</span>
               {hasNewUnreadSOS && view !== 'lost_pets' && (
                 <span className="absolute top-1 right-1/2 translate-x-4 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white animate-bounce" />
               )}
@@ -5015,7 +5015,7 @@ export default function App() {
               className={`flex flex-col items-center gap-1 transition-colors flex-1 min-h-[44px] justify-center ${view === 'account' ? 'text-orange-500' : 'text-gray-300'}`}
             >
               <UserIcon className="w-7 h-7" />
-              <span className="text-[11px] font-bold uppercase">Conta</span>
+              <span translate="no" className="text-[11px] font-bold uppercase">Conta</span>
             </button>
           </nav>
         )}

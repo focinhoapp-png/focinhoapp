@@ -1,0 +1,17 @@
+{
+  "name": "FocinhoApp",
+  "short_name": "FocinhoApp",
+  "description": "Pingentes inteligentes com QR Code para que seu pet nunca se perca.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#f97316",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "192x192 512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
