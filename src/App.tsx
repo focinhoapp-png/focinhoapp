@@ -1809,7 +1809,7 @@ export default function App() {
       const { latitude, longitude } = position.coords;
       const mapsUrl = `https://www.google.com/maps?q=${latitude},${longitude}`;
       const message = `Olá! Encontrei seu pet ${finderPet?.name}. Minha localização atual é: ${mapsUrl}`;
-      const whatsappUrl = `https://wa.me/${finderPet.ownerPhone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
+      const whatsappUrl = `https://wa.me/55${finderPet.ownerPhone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
       window.open(whatsappUrl, '_blank');
     }, () => {
       alert('Por favor, permita o acesso à localização para ajudar o dono.');
@@ -4810,7 +4810,7 @@ export default function App() {
                         finderPet.ownerPhone ? (
                           <>
                             <Button
-                              onClick={() => window.open(`https://wa.me/${finderPet.ownerPhone.replace(/\D/g, '')}?text=${encodeURIComponent(`Olá! Encontrei seu pet ${finderPet.name}.`)}`, '_blank')}
+                              onClick={() => window.open(`https://wa.me/55${finderPet.ownerPhone!.replace(/\D/g, '')}?text=${encodeURIComponent(`Olá! Encontrei seu pet ${finderPet.name}.`)}`, '_blank')}
                               className="w-full py-5 text-lg bg-green-500 hover:bg-green-600 shadow-green-200"
                             >
                               <MessageCircle className="w-6 h-6" /> Falar com o Dono
