@@ -5,7 +5,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>FocinhoApp</title>
   </head>
-  <body>
+  <body oncontextmenu="return false;" onselectstart="return false;" ondragstart="return false;" style="user-select: none; -webkit-user-select: none; -ms-user-select: none; -moz-user-select: none;">
+    <!-- Prevent Right Click & Shortcuts -->
+    <script>
+      // Disable Context Menu
+      document.addEventListener('contextmenu', event => event.preventDefault());
+      
+      // Disable F12, Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+U
+      document.onkeydown = function(e) {
+        if(e.keyCode == 123) { return false; }
+        if(e.ctrlKey && e.shiftKey && e.keyCode == 'I'.charCodeAt(0)) { return false; }
+        if(e.ctrlKey && e.shiftKey && e.keyCode == 'C'.charCodeAt(0)) { return false; }
+        if(e.ctrlKey && e.shiftKey && e.keyCode == 'J'.charCodeAt(0)) { return false; }
+        if(e.ctrlKey && e.keyCode == 'U'.charCodeAt(0)) { return false; }
+        if(e.ctrlKey && e.keyCode == 'C'.charCodeAt(0)) { return false; }
+      }
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
