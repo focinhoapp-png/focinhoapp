@@ -773,7 +773,8 @@ export default function App() {
 
       // Filtrar alertas pela cidade do usuário (Geo-fencing)
       // Se userCity estiver vazio, mostramos todos por enquanto ou apenas os da região se detectado
-      const filteredAlerts = userCity
+      // Admins podem ver alertas de todas as cidades e países.
+      const filteredAlerts = userCity && !isAdmin
         ? allAlerts.filter(a => a.city.toLowerCase().includes(userCity.split(' - ')[0].toLowerCase()))
         : allAlerts;
 
@@ -789,7 +790,7 @@ export default function App() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'lost_alerts' }, fetchAlerts)
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [view, userCity]);
+  }, [view, userCity, isAdmin]);
 
   // Fetch Walk History
   useEffect(() => {
@@ -2030,15 +2031,15 @@ export default function App() {
                     <p className="text-gray-400">Você ainda não tem pets cadastrados.</p>
                     <Button onClick={() => {
                       setSelectedPet(null);
-                      setView('activate');
-                    }} variant="outline" className="mx-auto block w-full mb-3">
-                      Ativar meu primeiro pingente
+                      setView('profile');
+                    }} className="mx-auto block w-full mb-3">
+                      <Plus className="w-5 h-5 inline-block mr-2" /> Adicionar um novo pet
                     </Button>
                     <Button onClick={() => {
                       setSelectedPet(null);
-                      setView('profile');
-                    }} className="mx-auto block w-full">
-                      <Plus className="w-5 h-5 inline-block mr-2" /> Cadastrar Pet Sem Tag
+                      setView('activate');
+                    }} variant="outline" className="mx-auto block w-full">
+                      Ativar meu primeiro pingente
                     </Button>
                   </div>
                 ) : (
@@ -3287,7 +3288,7 @@ export default function App() {
                         <AnimatePresence mode="popLayout">
                           {partners
                             .filter(p => {
-                              if (!userCity || !p.location) return true;
+                              if (isAdmin || !userCity || !p.location) return true;
                               const baseCity = userCity.split('-')[0].split(',')[0].trim().toLowerCase();
                               return p.location.toLowerCase().includes(baseCity);
                             })
@@ -3329,7 +3330,7 @@ export default function App() {
                         </AnimatePresence>
                         {partners
                           .filter(p => {
-                            if (!userCity || !p.location) return true;
+                            if (isAdmin || !userCity || !p.location) return true;
                             const baseCity = userCity.split('-')[0].split(',')[0].trim().toLowerCase();
                             return p.location.toLowerCase().includes(baseCity);
                           })
