@@ -514,6 +514,7 @@ export default function App() {
   const [lastAltitude, setLastAltitude] = useState<number | null>(null);
   const [walkSpeeds, setWalkSpeeds] = useState<number[]>([]);
   const [walkSummary, setWalkSummary] = useState<Walk | null>(null);
+  const [selectedWalkPets, setSelectedWalkPets] = useState<string[]>([]);
   const [generatedWalkImage, setGeneratedWalkImage] = useState<string | null>(null);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [currentLocation, setCurrentLocation] = useState<[number, number] | null>(null);
@@ -1064,6 +1065,12 @@ export default function App() {
     setLastAltitude(null);
     setWalkSpeeds([]);
     setWalkStartTime(Date.now());
+    
+    // Se o usuário não selecionou nenhum pet explicitamente, mas tem pets, tenta usar o pet selecionado do dashboard
+    if (selectedWalkPets.length === 0 && userPets.length > 0) {
+      setSelectedWalkPets([userPets[currentPetIndex]?.id]);
+    }
+    
     setIsWalking(true);
     setWalkSummary(null);
     setGeneratedWalkImage(null);
@@ -1197,7 +1204,7 @@ export default function App() {
     const walkData: Walk = {
       id: generateId(),
       userId: user.id,
-      petId: userPets[currentPetIndex]?.id,
+      petId: selectedWalkPets.join(','),
       startTime: new Date(walkStartTime).toISOString(),
       endTime: new Date(endTime).toISOString(),
       duration,
@@ -2661,9 +2668,53 @@ export default function App() {
                           </Button>
                         </div>
                       ) : (
-                        <Button onClick={handleStartWalk} className="w-full py-6 text-xl rounded-[2rem] shadow-2xl shadow-orange-200">
-                          Iniciar Passeio
-                        </Button>
+                        <div className="space-y-4">
+                          <div className="bg-white p-6 rounded-[2.5rem] shadow-xl border border-gray-100 mb-6">
+                            <h3 className="font-bold text-gray-800 mb-4 ml-1">Quem vai passear hoje?</h3>
+                            <div className="flex flex-col gap-3">
+                              {userPets.map(pet => (
+                                <label key={pet.id} className="flex relative items-center justify-between p-4 rounded-2xl border border-gray-100 hover:bg-orange-50 hover:border-orange-200 cursor-pointer transition-all">
+                                  <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 rounded-[1rem] overflow-hidden bg-gray-100 border border-gray-200">
+                                      <img src={pet.photoUrl || 'https://picsum.photos/seed/pet/100/100'} alt={pet.name} className="w-full h-full object-cover" />
+                                    </div>
+                                    <div>
+                                      <span className="font-black text-gray-700 block">{pet.name}</span>
+                                      <span className="text-[10px] uppercase font-bold text-orange-400">{pet.breed}</span>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center justify-center w-6 h-6 mr-1">
+                                    <input 
+                                      type="checkbox" 
+                                      className="w-5 h-5 accent-orange-500 rounded cursor-pointer scale-125 transition-transform"
+                                      checked={selectedWalkPets.includes(pet.id)}
+                                      onChange={(e) => {
+                                        if (e.target.checked) {
+                                          setSelectedWalkPets([...selectedWalkPets, pet.id]);
+                                        } else {
+                                          setSelectedWalkPets(selectedWalkPets.filter(id => id !== pet.id));
+                                        }
+                                      }}
+                                    />
+                                  </div>
+                                </label>
+                              ))}
+                              {userPets.length === 0 && (
+                                <div className="text-center p-6 border-2 border-dashed border-gray-200 rounded-2xl">
+                                  <p className="text-sm font-medium text-gray-400">Nenhum pet cadastrado.</p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          
+                          <Button 
+                            onClick={handleStartWalk} 
+                            disabled={selectedWalkPets.length === 0 && userPets.length > 0}
+                            className="w-full py-6 text-xl rounded-[2rem] shadow-2xl shadow-orange-200"
+                          >
+                            Iniciar Passeio
+                          </Button>
+                        </div>
                       )}
                     </div>
                   </div>
