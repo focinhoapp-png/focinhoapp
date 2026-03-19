@@ -49,6 +49,7 @@ import 'leaflet/dist/leaflet.css';
 import { toPng } from 'html-to-image';
 import { supabase } from './supabase';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
+import QRScanner from './components/QRScanner';
 
 // Helper to generate random ID (replaces doc(collection()).id)
 const generateId = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
@@ -538,6 +539,83 @@ export default function App() {
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+
+  const [showScanner, setShowScanner] = useState(false);
+
+  const processScannedTag = async (id: string) => {
+    setLoading(true);
+    try {
+      // 1. Try tags table first
+      const { data: tagData } = await supabase.from('tags').select('*').eq('id', id).maybeSingle();
+      let petId: string | null = tagData?.petId || null;
+
+      // 2. Fallback: search pets table
+      if (!petId) {
+        const { data: petData } = await supabase.from('pets').select('id').eq('tagId', id).maybeSingle();
+        if (petData) petId = petData.id;
+      }
+
+      if (petId) {
+        const { data: petSnap } = await supabase.from('pets').select('*').eq('id', petId).maybeSingle();
+        if (petSnap) {
+          const { data: ownerData } = await supabase.from('owners').select('*').eq('uid', petSnap.ownerId).maybeSingle();
+          if (ownerData) {
+            petSnap.ownerPhone = ownerData.phone || petSnap.ownerPhone;
+            petSnap.ownerAddress = ownerData.address || petSnap.ownerAddress;
+            petSnap.ownerName = ownerData.name || '';
+            if (ownerData.privacySettings) {
+              petSnap.privacySettings = { ...(petSnap.privacySettings || {}), ...ownerData.privacySettings };
+            }
+          }
+
+          if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(async (pos) => {
+              try {
+                await supabase.from('scan_history').insert({
+                  tag_id: id,
+                  pet_id: petId,
+                  latitude: pos.coords.latitude,
+                  longitude: pos.coords.longitude
+                });
+              } catch(e) { console.error("Error saving scan location", e); }
+            }, () => {
+              supabase.from('scan_history').insert({ tag_id: id, pet_id: petId }).then();
+            });
+          } else {
+             supabase.from('scan_history').insert({ tag_id: id, pet_id: petId }).then();
+          }
+
+          setFinderPet(petSnap as PetProfile);
+          setView('finder');
+          setLoading(false);
+          return;
+        }
+      }
+
+      setTagIdToActivate(id);
+      setView('activate');
+    } catch (err) {
+      console.error('Error processing scanned tag:', err);
+      alert('Erro ao processar o QR Code. Tente novamente.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleScan = (data: string) => {
+    let tagId = data;
+    try {
+      const url = new URL(data);
+      tagId = url.searchParams.get('tag') || url.searchParams.get('p') || data;
+    } catch (e) {
+      // ignore
+    }
+    
+    const finalTagId = tagId.replace(/[^a-zA-Z0-9-]/g, '').toUpperCase();
+    if (finalTagId) {
+      processScannedTag(finalTagId);
+    }
+  };
 
   useEffect(() => {
     const checkReminders = () => {
@@ -2020,7 +2098,7 @@ export default function App() {
                   </div>
                   <div className="flex gap-2">
                     <button
-                      onClick={() => setView('activate')}
+                      onClick={() => setShowScanner(true)}
                       className="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center text-orange-600 hover:bg-orange-200 transition-colors"
                     >
                       <QrCode className="w-5 h-5" />
@@ -5198,6 +5276,15 @@ export default function App() {
                 );
               })}
             </motion.div>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {showScanner && (
+            <QRScanner
+              onScan={handleScan}
+              onClose={() => setShowScanner(false)}
+            />
           )}
         </AnimatePresence>
 
