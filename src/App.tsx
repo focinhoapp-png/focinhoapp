@@ -2568,49 +2568,51 @@ export default function App() {
                   </div>
                 ) : !walkSummary ? (
                   <div className="flex-1 flex flex-col gap-4 relative">
-                    <div className="flex-1 bg-white rounded-[2.5rem] overflow-hidden border border-gray-100 shadow-sm relative z-0">
+                    <div className="flex-1 bg-white rounded-[2.5rem] overflow-hidden border border-gray-100 shadow-sm relative z-0 min-h-[300px]">
                       {currentLocation ? (
-                        <MapContainer
-                          center={currentLocation}
-                          zoom={16}
-                          style={{ height: '100%', width: '100%' }}
-                          zoomControl={false}
-                        >
-                          <TileLayer
-                            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                          />
-                          <MapUpdater center={currentLocation} />
-
-                          {/* Current Location Marker */}
-                          <Marker position={currentLocation}>
-                            <Popup>Você está aqui</Popup>
-                          </Marker>
-
-                          {/* Path Line */}
-                          {walkPath.length > 1 && (
-                            <Polyline
-                              positions={walkPath.map(p => [p.lat, p.lng])}
-                              color="#f97316"
-                              weight={5}
-                              opacity={0.8}
+                        <div className="absolute inset-0">
+                          <MapContainer
+                            center={currentLocation}
+                            zoom={16}
+                            style={{ height: '100%', width: '100%' }}
+                            zoomControl={false}
+                          >
+                            <TileLayer
+                              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                             />
-                          )}
+                            <MapUpdater center={currentLocation} />
 
-                          {/* Markers */}
-                          {walkMarkers.map((m, i) => (
-                            <Marker
-                              key={i}
-                              position={[m.lat, m.lng]}
-                              icon={L.divIcon({
-                                className: 'custom-div-icon',
-                                html: `<div style="font-size: 24px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2))">${m.type === 'water' ? '💧' : '💩'}</div>`,
-                                iconSize: [30, 30],
-                                iconAnchor: [15, 15]
-                              })}
-                            />
-                          ))}
-                        </MapContainer>
+                            {/* Current Location Marker */}
+                            <Marker position={currentLocation}>
+                              <Popup>Você está aqui</Popup>
+                            </Marker>
+
+                            {/* Path Line */}
+                            {walkPath.length > 1 && (
+                              <Polyline
+                                positions={walkPath.map(p => [p.lat, p.lng])}
+                                color="#f97316"
+                                weight={5}
+                                opacity={0.8}
+                              />
+                            )}
+
+                            {/* Markers */}
+                            {walkMarkers.map((m, i) => (
+                              <Marker
+                                key={i}
+                                position={[m.lat, m.lng]}
+                                icon={L.divIcon({
+                                  className: 'custom-div-icon',
+                                  html: `<div style="font-size: 24px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2))">${m.type === 'water' ? '💧' : '💩'}</div>`,
+                                  iconSize: [30, 30],
+                                  iconAnchor: [15, 15]
+                                })}
+                              />
+                            ))}
+                          </MapContainer>
+                        </div>
                       ) : (
                         <div className="h-full w-full flex flex-col items-center justify-center gap-4 bg-gray-50">
                           <Loader2 className="w-8 h-8 text-orange-500 animate-spin" />
