@@ -40,7 +40,9 @@ import {
   Settings,
   HeartHandshake,
   CheckCircle2,
-  Briefcase
+  Briefcase,
+  Navigation,
+  Globe
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap } from 'react-leaflet';
@@ -440,7 +442,10 @@ export default function App() {
   const lastUserIdRef = useRef<string | null | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState('dashboard'); // home, dashboard, reminders, walk, lost_pets, account, activate, profile, finder
-  const [userCity, setUserCity] = useState<string>('');
+  const [userCity, setUserCity] = useState<string>('');          // GPS auto-detected city (City - State)
+  const [selectedCity, setSelectedCity] = useState<string>(() => localStorage.getItem('focinho_selected_city') || ''); // user-selected city for filtering
+  const [showCityPicker, setShowCityPicker] = useState(false);
+  const [cityInputTemp, setCityInputTemp] = useState('');
   const [accountSubView, setAccountSubView] = useState('menu'); // menu, profile, pets, support, store, admin, partners
   const [activePartnerFilter, setActivePartnerFilter] = useState('Todos');
   const [selectedPet, setSelectedPet] = useState<PetProfile | null>(null);
@@ -772,7 +777,17 @@ export default function App() {
         const city = data.address.city || data.address.town || data.address.village || data.address.suburb || "";
         const state = data.address.state || "";
         const locationString = city ? `${city}${state ? ` - ${state}` : ''}` : "";
-        if (locationString) setUserCity(locationString);
+        if (locationString) {
+          setUserCity(locationString);
+          // Only auto-set selectedCity if the user hasn't chosen one yet
+          setSelectedCity(prev => {
+            if (!prev) {
+              localStorage.setItem('focinho_selected_city', locationString);
+              return locationString;
+            }
+            return prev;
+          });
+        }
       } catch (err) {
         console.error("Error detecting user city:", err);
       }
@@ -844,32 +859,35 @@ export default function App() {
     fetchAdminData();
   }, [isAdmin, accountSubView]);
 
-  // Fetch SOS Alerts
+  // Fetch SOS Alerts — channel is stable; filter re-applies whenever selectedCity or isAdmin changes
   useEffect(() => {
     const fetchAlerts = async () => {
       const { data } = await supabase.from('lost_alerts').select('*');
       const allAlerts = (data || []) as LostAlert[];
 
-      // Filtrar alertas pela cidade do usuário (Geo-fencing)
-      // Se userCity estiver vazio, mostramos todos por enquanto ou apenas os da região se detectado
-      // Admins podem ver alertas de todas as cidades e países.
-      const filteredAlerts = userCity && !isAdmin
-        ? allAlerts.filter(a => a.city.toLowerCase().includes(userCity.split(' - ')[0].toLowerCase()))
+      // City-level filter: extract "City" part from "City - State"
+      const cityName = selectedCity ? selectedCity.split(' - ')[0].trim().toLowerCase() : '';
+      const filteredAlerts = cityName && !isAdmin
+        ? allAlerts.filter(a => a.city.toLowerCase().includes(cityName))
         : allAlerts;
 
-      // Detecção de novos alertas (piscar no dashboard) apenas se for na cidade do usuário
-      if (lastLostAlertsCount.current !== 0 && filteredAlerts.length > lastLostAlertsCount.current && view !== 'lost_pets') {
-        setHasNewUnreadSOS(true);
-      }
+      setHasNewUnreadSOS(prev => {
+        if (lastLostAlertsCount.current !== 0 && filteredAlerts.length > lastLostAlertsCount.current) return true;
+        return prev;
+      });
       lastLostAlertsCount.current = filteredAlerts.length;
       setLostAlerts(filteredAlerts);
     };
+
     fetchAlerts();
-    const channel = supabase.channel('lost-alerts')
+
+    const channel = supabase.channel('lost-alerts-stable')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'lost_alerts' }, fetchAlerts)
       .subscribe();
+
     return () => { supabase.removeChannel(channel); };
-  }, [view, userCity, isAdmin]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCity, isAdmin]);
 
   // Fetch Walk History
   useEffect(() => {
@@ -2097,6 +2115,14 @@ export default function App() {
                     <p className="text-gray-400 text-sm">Bem-vindo de volta ao FocinhoApp</p>
                   </div>
                   <div className="flex gap-2">
+                    {/* City Selector Button */}
+                    <button
+                      onClick={() => { setCityInputTemp(selectedCity); setShowCityPicker(true); }}
+                      className="flex items-center gap-1.5 bg-orange-50 hover:bg-orange-100 border border-orange-200 text-orange-600 rounded-xl px-3 py-2 transition-colors"
+                    >
+                      <MapPin className="w-4 h-4" />
+                      <span className="text-xs font-bold max-w-[100px] truncate">{selectedCity ? selectedCity.split(' - ')[0] : 'Cidade'}</span>
+                    </button>
                     <button
                       onClick={() => setShowScanner(true)}
                       className="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center text-orange-600 hover:bg-orange-200 transition-colors"
@@ -2935,12 +2961,21 @@ export default function App() {
               <motion.div key="lost_pets" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
                 <div className="flex justify-between items-center">
                   <h2 className="text-2xl font-bold">Animal Perdido</h2>
-                  <button
-                    onClick={() => setIsAddingSOS(true)}
-                    className="p-2 bg-red-100 text-red-600 rounded-xl hover:bg-red-200 transition-colors"
-                  >
-                    <Plus className="w-5 h-5" />
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => { setCityInputTemp(selectedCity); setShowCityPicker(true); }}
+                      className="flex items-center gap-1.5 bg-orange-50 hover:bg-orange-100 border border-orange-200 text-orange-600 rounded-xl px-3 py-2 transition-colors"
+                    >
+                      <MapPin className="w-4 h-4" />
+                      <span className="text-xs font-bold max-w-[80px] truncate">{selectedCity ? selectedCity.split(' - ')[0] : 'Cidade'}</span>
+                    </button>
+                    <button
+                      onClick={() => setIsAddingSOS(true)}
+                      className="p-2 bg-red-100 text-red-600 rounded-xl hover:bg-red-200 transition-colors"
+                    >
+                      <Plus className="w-5 h-5" />
+                    </button>
+                  </div>
                 </div>
 
                 <div className="bg-red-600 p-8 rounded-[3rem] shadow-2xl shadow-red-200 border border-red-400 text-center space-y-6 text-white relative overflow-hidden">
@@ -2993,7 +3028,14 @@ export default function App() {
                 </div>
 
                 <div className="space-y-4">
-                  <h3 className="font-bold text-gray-800 ml-1">Alertas na Região</h3>
+                  <div className="flex items-center justify-between ml-1">
+                    <h3 className="font-bold text-gray-800">Alertas na Região</h3>
+                    {selectedCity && !isAdmin && (
+                      <span className="text-xs text-orange-500 font-bold bg-orange-50 px-3 py-1 rounded-full border border-orange-200">
+                        📍 {selectedCity.split(' - ')[0]}
+                      </span>
+                    )}
+                  </div>
                   {lostAlerts.length > 0 ? (
                     <div className="grid grid-cols-1 gap-6">
                       {lostAlerts.map((alert) => (
@@ -3399,6 +3441,13 @@ export default function App() {
                         <p className="text-sm text-gray-500 font-medium leading-relaxed max-w-xs mx-auto">
                           Empresas e profissionais que apoiam a proteção e o bem-estar dos animais junto com o FocinhoApp.
                         </p>
+                        <button
+                          onClick={() => { setCityInputTemp(selectedCity); setShowCityPicker(true); }}
+                          className="mt-2 inline-flex items-center gap-1.5 bg-orange-50 hover:bg-orange-100 border border-orange-200 text-orange-600 rounded-xl px-4 py-2 transition-colors"
+                        >
+                          <MapPin className="w-4 h-4" />
+                          <span className="text-xs font-bold">{selectedCity ? selectedCity.split(' - ')[0] : 'Selecionar cidade'}</span>
+                        </button>
                       </div>
 
                       {/* Filters */}
@@ -3419,9 +3468,9 @@ export default function App() {
                         <AnimatePresence mode="popLayout">
                           {partners
                             .filter(p => {
-                              if (isAdmin || !userCity || !p.location) return true;
-                              const baseCity = userCity.split('-')[0].split(',')[0].trim().toLowerCase();
-                              return p.location.toLowerCase().includes(baseCity);
+                              if (isAdmin || !selectedCity || !p.location) return true;
+                              const cityName = selectedCity.split(' - ')[0].trim().toLowerCase();
+                              return p.location.toLowerCase().includes(cityName);
                             })
                             .filter(p => activePartnerFilter === 'Todos' || p.category === activePartnerFilter)
                             .map(partner => (
@@ -3461,9 +3510,9 @@ export default function App() {
                         </AnimatePresence>
                         {partners
                           .filter(p => {
-                            if (isAdmin || !userCity || !p.location) return true;
-                            const baseCity = userCity.split('-')[0].split(',')[0].trim().toLowerCase();
-                            return p.location.toLowerCase().includes(baseCity);
+                            if (isAdmin || !selectedCity || !p.location) return true;
+                            const cityName = selectedCity.split(' - ')[0].trim().toLowerCase();
+                            return p.location.toLowerCase().includes(cityName);
                           })
                           .filter(p => activePartnerFilter === 'Todos' || p.category === activePartnerFilter).length === 0 && (
                           <div className="text-center py-8 text-gray-400 font-medium">
@@ -3757,6 +3806,14 @@ export default function App() {
                         </div>
                         <h3 className="font-bold text-xl">Adoção Responsável</h3>
                       </div>
+                      {/* City selector for adoption */}
+                      <button
+                        onClick={() => { setCityInputTemp(selectedCity); setShowCityPicker(true); }}
+                        className="inline-flex items-center gap-1.5 bg-orange-50 hover:bg-orange-100 border border-orange-200 text-orange-600 rounded-xl px-4 py-2 text-xs font-bold transition-colors"
+                      >
+                        <MapPin className="w-3.5 h-3.5" />
+                        <span>{selectedCity ? selectedCity.split(' - ')[0] : 'Selecionar cidade'}</span>
+                      </button>
 
                       <div className="bg-gradient-to-r from-pink-500 to-rose-500 p-5 rounded-2xl text-center shadow-lg shadow-pink-100">
                         <p className="text-white font-black text-sm">Mude uma vida! 💖</p>
@@ -3768,7 +3825,14 @@ export default function App() {
                         <div className="space-y-4">
                           <h4 className="font-black text-xs text-gray-400 uppercase tracking-widest ml-1">Pets Disponíveis</h4>
                           <div className="grid grid-cols-1 gap-6">
-                            {adoptionPets.filter(p => p.status !== 'adopted').length > 0 ? adoptionPets.filter(p => p.status !== 'adopted').map((pet, i) => (
+                            {(() => {
+                              const cityName = selectedCity && !isAdmin ? selectedCity.split(' - ')[0].trim().toLowerCase() : '';
+                              const visiblePets = adoptionPets.filter(p => {
+                                if (p.status === 'adopted') return false;
+                                if (!cityName) return true;
+                                return (p.location || '').toLowerCase().includes(cityName) || (p.city || '').toLowerCase().includes(cityName);
+                              });
+                              return visiblePets.length > 0 ? visiblePets.map((pet, i) => (
                               <div key={i} className="bg-gray-50 p-6 rounded-[2.5rem] border border-gray-100 space-y-4">
                                 <div className="aspect-video bg-white rounded-3xl overflow-hidden relative cursor-pointer" onClick={() => setLightboxImage(pet.gallery && pet.gallery.length > 0 ? pet.gallery[0] : pet.photoUrl || '')}>
                                   {pet.gallery && pet.gallery.length > 1 ? (
@@ -3842,10 +3906,19 @@ export default function App() {
                                 </div>
                               </div>
                             )) : (
-                              <div className="py-12 text-center bg-gray-50/50 rounded-[2.5rem] border border-dashed border-gray-200">
-                                <p className="text-gray-400 text-sm">Nenhum pet disponível no momento.</p>
-                              </div>
-                            )}
+                                <div className="bg-gray-50 border-2 border-dashed border-gray-200 rounded-[2rem] p-8 text-center">
+                                  <p className="text-gray-400 text-sm font-medium">Nenhum pet disponível para adoção {selectedCity && !isAdmin ? `em ${selectedCity.split(' - ')[0]}` : ''} no momento.</p>
+                                  {selectedCity && !isAdmin && (
+                                    <button
+                                      onClick={() => { setCityInputTemp(''); setSelectedCity(''); localStorage.removeItem('focinho_selected_city'); }}
+                                      className="mt-3 text-xs font-bold text-orange-500 underline"
+                                    >
+                                      Ver de todas as cidades
+                                    </button>
+                                  )}
+                                </div>
+                              );
+                            })()}
                           </div>
                         </div>
 
@@ -5276,6 +5349,89 @@ export default function App() {
                 );
               })}
             </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* City Picker Modal */}
+        <AnimatePresence>
+          {showCityPicker && (
+            <div className="fixed inset-0 z-[200] flex items-end justify-center">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setShowCityPicker(false)}
+                className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+              />
+              <motion.div
+                initial={{ y: 100, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: 100, opacity: 0 }}
+                transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+                className="relative bg-white w-full max-w-lg rounded-t-[3rem] p-8 shadow-2xl z-10 space-y-6 pb-safe-bottom"
+              >
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h3 className="text-xl font-black text-gray-900">Selecionar Cidade</h3>
+                    <p className="text-xs text-gray-400 font-medium mt-0.5">Filtra alertas, adoções e parceiros por cidade</p>
+                  </div>
+                  <button onClick={() => setShowCityPicker(false)} className="p-2 bg-gray-100 rounded-full hover:bg-gray-200 transition-colors">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="relative">
+                    <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-orange-500" />
+                    <input
+                      type="text"
+                      placeholder="Ex: Guapimirim, Santo Aleixo..."
+                      value={cityInputTemp}
+                      onChange={e => setCityInputTemp(e.target.value)}
+                      className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-medium focus:outline-none focus:border-orange-400 transition-all"
+                      autoFocus
+                    />
+                  </div>
+
+                  {userCity && userCity !== cityInputTemp && (
+                    <button
+                      onClick={() => setCityInputTemp(userCity)}
+                      className="w-full flex items-center gap-3 p-4 bg-orange-50 border border-orange-200 rounded-2xl hover:bg-orange-100 transition-colors text-left"
+                    >
+                      <Navigation className="w-5 h-5 text-orange-500 shrink-0" />
+                      <div>
+                        <p className="text-xs text-gray-400 font-bold uppercase tracking-wide">Minha locação atual</p>
+                        <p className="text-sm font-bold text-gray-800">{userCity.split(' - ')[0]}</p>
+                      </div>
+                    </button>
+                  )}
+
+                  {selectedCity && (
+                    <button
+                      onClick={() => { setSelectedCity(''); localStorage.removeItem('focinho_selected_city'); setCityInputTemp(''); setShowCityPicker(false); }}
+                      className="w-full flex items-center gap-3 p-4 bg-gray-50 border border-gray-200 rounded-2xl hover:bg-gray-100 transition-colors text-left"
+                    >
+                      <Globe className="w-5 h-5 text-gray-400 shrink-0" />
+                      <span className="text-sm font-bold text-gray-500">Ver de todas as cidades</span>
+                    </button>
+                  )}
+                </div>
+
+                <button
+                  onClick={() => {
+                    const trimmed = cityInputTemp.trim();
+                    const newCity = trimmed || '';
+                    setSelectedCity(newCity);
+                    if (newCity) localStorage.setItem('focinho_selected_city', newCity);
+                    else localStorage.removeItem('focinho_selected_city');
+                    setShowCityPicker(false);
+                  }}
+                  className="w-full py-4 bg-orange-500 text-white font-black text-lg rounded-2xl hover:bg-orange-600 transition-all shadow-xl shadow-orange-200 active:scale-[0.98]"
+                >
+                  Aplicar Filtro
+                </button>
+              </motion.div>
+            </div>
           )}
         </AnimatePresence>
 
