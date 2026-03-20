@@ -1477,6 +1477,7 @@ export default function App() {
 
           if (!data.session) {
             setAuthError('Conta criada! Verifique seu email para confirmar o cadastro.');
+            setAuthLoading(false);
             return; // stop here if email confirmation is required
           }
         }
@@ -1486,7 +1487,6 @@ export default function App() {
       }
     } catch (err: any) {
       setAuthError(err.message || 'Erro ao fazer login. Tente novamente.');
-    } finally {
       setAuthLoading(false);
     }
   };
