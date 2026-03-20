@@ -156,6 +156,7 @@ interface AdoptionPet {
   photoUrl: string;
   gallery?: string[];
   contactPhone: string;
+  city?: string; // Newly added adoption city
   status: 'available' | 'adopted';
   createdAt: any;
 }
@@ -501,7 +502,7 @@ export default function App() {
   const [adoptionPets, setAdoptionPets] = useState<AdoptionPet[]>([]);
   const [isAddingAdoptionPet, setIsAddingAdoptionPet] = useState(false);
   const [newAdoptionPet, setNewAdoptionPet] = useState<Partial<AdoptionPet>>({
-    name: '', animalType: 'Cachorro', breed: '', color: '', gender: 'Macho', description: '', photoUrl: '', contactPhone: '', status: 'available'
+    name: '', animalType: 'Cachorro', breed: '', color: '', gender: 'Macho', description: '', photoUrl: '', contactPhone: '', status: 'available', city: ''
   });
   const [hasNewAdoption, setHasNewAdoption] = useState(false);
   const [lastAdoptedPetName, setLastAdoptedPetName] = useState<string | null>(null);
@@ -542,6 +543,11 @@ export default function App() {
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+  const [authName, setAuthName] = useState('');
+  const [authGender, setAuthGender] = useState('');
+  const [authBirthday, setAuthBirthday] = useState('');
+  const [authPhone, setAuthPhone] = useState('');
+  const [authAddress, setAuthAddress] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
@@ -996,7 +1002,7 @@ export default function App() {
       }
       setIsAddingAdoptionPet(false);
       setEditingAdoptionPetId(null);
-      setNewAdoptionPet({ name: '', animalType: 'Cachorro', breed: '', color: '', gender: 'Macho', description: '', photoUrl: '', gallery: [], contactPhone: '', status: 'available' });
+      setNewAdoptionPet({ name: '', animalType: 'Cachorro', breed: '', color: '', gender: 'Macho', description: '', photoUrl: '', gallery: [], contactPhone: '', status: 'available', city: '' });
       const { data } = await supabase.from('adoption_pets').select('*');
       setAdoptionPets((data || []) as AdoptionPet[]);
     } catch (err) {
@@ -1445,10 +1451,38 @@ export default function App() {
     setAuthError(null);
     try {
       if (authMode === 'register') {
-        const { error, data } = await supabase.auth.signUp({ email: authEmail, password: authPassword });
+        if (!authName || !authGender || !authBirthday || !authPhone || !authAddress) {
+          throw new Error('Por favor, preencha todos os campos do perfil.');
+        }
+
+        const { error, data } = await supabase.auth.signUp({ 
+          email: authEmail, 
+          password: authPassword,
+          options: {
+            data: {
+              full_name: authName
+            }
+          }
+        });
         if (error) throw error;
-        if (data.user && !data.session) {
-          setAuthError('Conta criada! Verifique seu email para confirmar o cadastro.');
+        
+        if (data.user) {
+          // Immediately create owner profile
+          const ownerPayload: OwnerProfile = {
+            uid: data.user.id,
+            name: authName,
+            gender: authGender,
+            birthday: authBirthday,
+            phone: authPhone,
+            address: authAddress,
+            updatedAt: new Date().toISOString()
+          };
+          await supabase.from('owners').upsert(ownerPayload);
+
+          if (!data.session) {
+            setAuthError('Conta criada! Verifique seu email para confirmar o cadastro.');
+            return; // stop here if email confirmation is required
+          }
         }
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email: authEmail, password: authPassword });
@@ -2048,6 +2082,44 @@ export default function App() {
                 </div>
                 <div className="w-full space-y-4 pt-4">
                   <div className="space-y-3 w-full">
+                    {authMode === 'register' && (
+                      <div className="space-y-3 pt-2 pb-4 border-b border-gray-100 mb-4">
+                        <p className="text-sm font-bold text-gray-800 text-left px-1">Seus Dados (só preenche uma vez!)</p>
+                        <Input
+                          label="Nome Completo"
+                          value={authName}
+                          onChange={setAuthName}
+                          placeholder="Seu nome"
+                          icon={UserIcon}
+                        />
+                        <Select
+                          label="Sexo"
+                          value={authGender}
+                          onChange={setAuthGender}
+                          options={['Masculino', 'Feminino', 'Outro', 'Prefiro não informar']}
+                        />
+                        <Input
+                          label="Data de Nascimento"
+                          type="date"
+                          value={authBirthday}
+                          onChange={setAuthBirthday}
+                        />
+                        <Input
+                          label="Telefone (WhatsApp)"
+                          placeholder="(00) 00000-0000"
+                          value={authPhone}
+                          onChange={(v) => setAuthPhone(formatPhoneMask(v))}
+                          icon={Phone}
+                        />
+                        <Input
+                          label="Endereço (para devolução do pet)"
+                          value={authAddress}
+                          onChange={setAuthAddress}
+                          placeholder="Rua, Número, Bairro, Cidade"
+                          icon={MapPin}
+                        />
+                      </div>
+                    )}
                     <Input
                       label="Email"
                       type="email"
@@ -2063,7 +2135,7 @@ export default function App() {
                       placeholder="••••••••"
                     />
                     {authError && (
-                      <p className="text-sm text-red-500 text-center px-1">{authError}</p>
+                      <p className="text-sm text-red-500 text-center px-1 font-medium">{authError}</p>
                     )}
                   </div>
                   <Button onClick={handleLogin} className="w-full py-4 text-lg" loading={authLoading}>
@@ -2071,7 +2143,7 @@ export default function App() {
                   </Button>
                   <button
                     onClick={() => { setAuthMode(m => m === 'login' ? 'register' : 'login'); setAuthError(null); }}
-                    className="w-full text-sm text-gray-500 hover:text-orange-500 transition-colors py-1"
+                    className="w-full text-sm text-gray-500 hover:text-orange-500 transition-colors py-1 font-medium"
                   >
                     {authMode === 'login' ? 'Não tem conta? Criar uma agora' : 'Já tem conta? Fazer login'}
                   </button>
@@ -4037,6 +4109,13 @@ export default function App() {
                                 value={newAdoptionPet.contactPhone}
                                 onChange={(v: string) => setNewAdoptionPet(prev => ({ ...prev, contactPhone: formatPhoneMask(v) }))}
                                 icon={Phone}
+                              />
+                              <Input
+                                label="Cidade do Pet"
+                                placeholder="Sua cidade - UF"
+                                value={newAdoptionPet.city || selectedCity || userCity || ''}
+                                onChange={(v: string) => setNewAdoptionPet(prev => ({ ...prev, city: v }))}
+                                icon={MapPin}
                               />
 
                               <div className="flex flex-col gap-1.5">
