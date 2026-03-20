@@ -544,8 +544,6 @@ export default function App() {
   const [authPassword, setAuthPassword] = useState('');
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [authName, setAuthName] = useState('');
-  const [authGender, setAuthGender] = useState('');
-  const [authBirthday, setAuthBirthday] = useState('');
   const [authPhone, setAuthPhone] = useState('');
   const [authAddress, setAuthAddress] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
@@ -1451,7 +1449,7 @@ export default function App() {
     setAuthError(null);
     try {
       if (authMode === 'register') {
-        if (!authName || !authGender || !authBirthday || !authPhone || !authAddress) {
+        if (!authName || !authPhone || !authAddress) {
           throw new Error('Por favor, preencha todos os campos do perfil.');
         }
 
@@ -1471,8 +1469,6 @@ export default function App() {
           const ownerPayload: OwnerProfile = {
             uid: data.user.id,
             name: authName,
-            gender: authGender,
-            birthday: authBirthday,
             phone: authPhone,
             address: authAddress,
             updatedAt: new Date().toISOString()
@@ -2084,25 +2080,13 @@ export default function App() {
                   <div className="space-y-3 w-full">
                     {authMode === 'register' && (
                       <div className="space-y-3 pt-2 pb-4 border-b border-gray-100 mb-4">
-                        <p className="text-sm font-bold text-gray-800 text-left px-1">Seus Dados (só preenche uma vez!)</p>
+                        <p className="text-sm font-bold text-gray-800 text-center px-1">Seus Dados</p>
                         <Input
                           label="Nome Completo"
                           value={authName}
                           onChange={setAuthName}
                           placeholder="Seu nome"
                           icon={UserIcon}
-                        />
-                        <Select
-                          label="Sexo"
-                          value={authGender}
-                          onChange={setAuthGender}
-                          options={['Masculino', 'Feminino', 'Outro', 'Prefiro não informar']}
-                        />
-                        <Input
-                          label="Data de Nascimento"
-                          type="date"
-                          value={authBirthday}
-                          onChange={setAuthBirthday}
                         />
                         <Input
                           label="Telefone (WhatsApp)"
