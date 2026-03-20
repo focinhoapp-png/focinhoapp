@@ -451,6 +451,7 @@ export default function App() {
   const [activePartnerFilter, setActivePartnerFilter] = useState('Todos');
   const [selectedPet, setSelectedPet] = useState<PetProfile | null>(null);
   const [userPets, setUserPets] = useState<PetProfile[]>([]);
+  const [isFetchingUserPets, setIsFetchingUserPets] = useState(true);
   const [allPets, setAllPets] = useState<PetProfile[]>([]); // Admin only
   const [isFetchingAllPets, setIsFetchingAllPets] = useState(false); // Admin only
   const [allTags, setAllTags] = useState<any[]>([]); // Admin only
@@ -467,6 +468,7 @@ export default function App() {
   const [storeMessage, setStoreMessage] = useState<string | null>(null); // Admin only
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const [ownerProfile, setOwnerProfile] = useState<OwnerProfile | null>(null);
+  const [isFetchingOwnerProfile, setIsFetchingOwnerProfile] = useState(true);
   const [currentPetIndex, setCurrentPetIndex] = useState(0);
 
   // SOS State
@@ -740,10 +742,12 @@ export default function App() {
 
   // Fetch User Pets
   useEffect(() => {
-    if (!user) { setUserPets([]); return; }
+    if (!user) { setUserPets([]); setIsFetchingUserPets(false); return; }
+    setIsFetchingUserPets(true);
     const fetchPets = async () => {
       const { data } = await supabase.from('pets').select('*').eq('ownerId', user.id).neq('deleted', true);
       setUserPets((data || []) as PetProfile[]);
+      setIsFetchingUserPets(false);
     };
     fetchPets();
     const channel = supabase.channel('pets-' + user.id)
@@ -754,7 +758,8 @@ export default function App() {
 
   // Fetch Owner Profile
   useEffect(() => {
-    if (!user) { setOwnerProfile(null); return; }
+    if (!user) { setOwnerProfile(null); setIsFetchingOwnerProfile(false); return; }
+    setIsFetchingOwnerProfile(true);
     const fetchOwner = async () => {
       const { data } = await supabase.from('owners').select('*').eq('uid', user.id).maybeSingle();
       if (data) {
@@ -762,6 +767,7 @@ export default function App() {
       } else {
         setOwnerProfile({ uid: user.id, gender: '', birthday: '', phone: '', address: '', photoUrl: '' });
       }
+      setIsFetchingOwnerProfile(false);
     };
     fetchOwner();
     const channel = supabase.channel('owner-' + user.id)
@@ -2165,7 +2171,14 @@ export default function App() {
                 animate={{ opacity: 1 }}
                 className="space-y-6"
               >
-                <div className="flex justify-between items-end">
+                {(isFetchingOwnerProfile || isFetchingUserPets) ? (
+                  <div className="flex flex-col items-center justify-center py-32 opacity-50">
+                    <Loader2 className="w-8 h-8 text-orange-500 animate-spin mb-4" />
+                    <p className="text-gray-500 font-medium">Sincronizando seus dados...</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex justify-between items-end">
                   <div>
                     <h2 className="text-2xl font-bold">Olá, {ownerProfile?.name?.split(' ')[0] || user.user_metadata?.full_name?.split(' ')[0] || user.email?.split('@')[0]}!</h2>
                     <p className="text-gray-400 text-sm">Bem-vindo de volta ao FocinhoApp</p>
@@ -2354,6 +2367,8 @@ export default function App() {
                     </div>
                     <div className="h-20" /> {/* Spacer to avoid bottom nav overlap */}
                   </div>
+                )}
+                  </>
                 )}
               </motion.div>
             )}
