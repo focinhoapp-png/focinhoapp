@@ -42,7 +42,9 @@ import {
   CheckCircle2,
   Briefcase,
   Navigation,
-  Globe
+  Globe,
+  Users,
+  Copy
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap } from 'react-leaflet';
@@ -561,6 +563,14 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
+  // Family State
+  const [userFamilies, setUserFamilies] = useState<any[]>([]);
+  const [familyMembersInfo, setFamilyMembersInfo] = useState<any[]>([]);
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [inviteCodeInput, setInviteCodeInput] = useState('');
+  const [creatingFamily, setCreatingFamily] = useState(false);
+  const [joiningFamily, setJoiningFamily] = useState(false);
+
   const [showScanner, setShowScanner] = useState(false);
 
   const processScannedTag = async (id: string) => {
@@ -755,13 +765,26 @@ export default function App() {
     if (!user) { setUserPets([]); setIsFetchingUserPets(false); return; }
     setIsFetchingUserPets(true);
     const fetchPets = async () => {
-      const { data } = await supabase.from('pets').select('*').eq('ownerId', user.id).neq('deleted', true);
+      // Find user's families
+      const { data: memberships } = await supabase.from('family_members').select('family_id').eq('user_id', user.id);
+      let ownerIds = [user.id];
+      if (memberships && memberships.length > 0) {
+        const familyIds = memberships.map(m => m.family_id);
+        const { data: allMembers } = await supabase.from('family_members').select('user_id').in('family_id', familyIds);
+        if (allMembers) {
+          allMembers.forEach(m => ownerIds.push(m.user_id));
+        }
+      }
+      ownerIds = Array.from(new Set(ownerIds)); // unique IDs
+
+      const { data } = await supabase.from('pets').select('*').in('ownerId', ownerIds).neq('deleted', true);
       setUserPets((data || []) as PetProfile[]);
       setIsFetchingUserPets(false);
     };
     fetchPets();
+    // Subscrbe to pet changes (without filter to catch family pets, or keep simple)
     const channel = supabase.channel('pets-' + user.id)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pets', filter: `ownerId=eq.${user.id}` }, fetchPets)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pets' }, fetchPets)
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [user]);
@@ -1530,6 +1553,128 @@ export default function App() {
     setAuthPassword('');
     setView('home');
   };
+
+  // --- Family Functions ---
+  const fetchFamilies = async () => {
+    if (!user) return;
+    try {
+      const { data: memberships } = await supabase.from('family_members').select('family_id').eq('user_id', user.id);
+      if (memberships && memberships.length > 0) {
+        const familyIds = memberships.map((m: any) => m.family_id);
+        const { data: families } = await supabase.from('families').select('*').in('id', familyIds);
+        setUserFamilies(families || []);
+
+        const { data: allMembers } = await supabase.from('family_members').select('*').in('family_id', familyIds);
+        if (allMembers && allMembers.length > 0) {
+          const uids = allMembers.map((m: any) => m.user_id);
+          const { data: owners } = await supabase.from('owners').select('uid, name, photoUrl').in('uid', uids);
+          
+          const combined = allMembers.map((m: any) => {
+            const owner = owners?.find((o: any) => o.uid === m.user_id);
+            return {
+              ...m,
+              name: owner?.name || 'Usuário',
+              photoUrl: owner?.photoUrl
+            };
+          });
+          setFamilyMembersInfo(combined);
+        } else {
+          setFamilyMembersInfo([]);
+        }
+      } else {
+        setUserFamilies([]);
+        setFamilyMembersInfo([]);
+      }
+    } catch(err) {
+      console.error(err);
+    }
+  };
+
+  useEffect(() => {
+    if (user && accountSubView === 'family') {
+      fetchFamilies();
+    }
+  }, [user, accountSubView]);
+
+  const handleCreateFamily = async () => {
+    if (!user) return;
+    setCreatingFamily(true);
+    try {
+      const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+      const familyName = ownerProfile?.name ? `${ownerProfile.name.split(' ')[0]}'s family` : 'Minha Família';
+      
+      const { data: newFamily, error: familyError } = await supabase.from('families').insert({
+        name: familyName,
+        owner_id: user.id,
+        invite_code: inviteCode
+      }).select().single();
+      
+      if (familyError) throw familyError;
+      
+      const { error: memberError } = await supabase.from('family_members').insert({
+        family_id: newFamily.id,
+        user_id: user.id
+      });
+      if (memberError) throw memberError;
+      
+      await fetchFamilies();
+      window.location.reload(); 
+    } catch (err: any) {
+      alert(err.message || 'Erro ao criar família');
+    } finally {
+      setCreatingFamily(false);
+    }
+  };
+
+  const regenerateFamilyCode = async (familyId: string) => {
+    try {
+      const newCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+      const { error } = await supabase.from('families').update({ invite_code: newCode }).eq('id', familyId);
+      if (error) throw error;
+      await fetchFamilies();
+      alert('Código refeito com sucesso!');
+    } catch (err: any) {
+      alert('Erro ao refazer código.');
+    }
+  };
+
+  const handleJoinFamily = async () => {
+    if (!user || !inviteCodeInput) return;
+    setJoiningFamily(true);
+    try {
+      const code = inviteCodeInput.trim().toUpperCase();
+      const { data: familyToJoin, error: findError } = await supabase.from('families').select('*').eq('invite_code', code).maybeSingle();
+      if (findError || !familyToJoin) {
+        alert('Código de família não encontrado.');
+        setJoiningFamily(false);
+        return;
+      }
+      
+      const { data: existing } = await supabase.from('family_members').select('*').eq('family_id', familyToJoin.id).eq('user_id', user.id).maybeSingle();
+      if (existing) {
+        alert('Você já é membro desta família!');
+        setJoiningFamily(false);
+        return;
+      }
+
+      const { error: joinError } = await supabase.from('family_members').insert({
+        family_id: familyToJoin.id,
+        user_id: user.id
+      });
+      if (joinError) throw joinError;
+
+      alert('Entrou para a família com sucesso!');
+      setInviteCodeInput('');
+      await fetchFamilies();
+      setShowInviteModal(false);
+      window.location.reload(); 
+    } catch (err: any) {
+      alert(err.message || 'Erro ao entrar na família');
+    } finally {
+      setJoiningFamily(false);
+    }
+  };
+  // --- End Family Functions ---
 
   const handleActivateTag = async () => {
     if (!tagIdToActivate) return;
@@ -3365,6 +3510,20 @@ export default function App() {
                     </button>
 
                     <button
+                      onClick={() => setAccountSubView('family')}
+                      className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 flex items-center gap-4 hover:border-orange-200 transition-all text-left mb-4"
+                    >
+                      <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center">
+                        <Users className="w-6 h-6 text-indigo-500" />
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-bold text-gray-800">Minha Família</h4>
+                        <p className="text-xs text-gray-400">Gerenciar membros e convites</p>
+                      </div>
+                      <ChevronRight className="text-gray-300" />
+                    </button>
+
+                    <button
                       onClick={() => setAccountSubView('adoption')}
                       className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 flex items-center gap-4 hover:border-orange-200 transition-all text-left"
                     >
@@ -3437,6 +3596,191 @@ export default function App() {
                     )}
                     <div className="h-20" /> {/* Spacer to avoid bottom nav overlap */}
                   </div>
+                )}
+
+                {accountSubView === 'family' && (
+                  <motion.div
+                    key="family"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                  >
+                    <div className="flex items-center gap-4 mb-6">
+                      <button onClick={() => setAccountSubView('menu')} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+                        <ChevronLeft className="w-6 h-6 text-gray-600" />
+                      </button>
+                      <h2 className="text-2xl font-bold text-gray-800">Minha Família Criada</h2>
+                    </div>
+
+                    <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100 space-y-6 pb-24">
+                      {userFamilies.length === 0 ? (
+                        <div className="text-center py-8">
+                          <Users className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                          <h3 className="text-lg font-bold text-gray-800 mb-2">Você ainda não tem uma família</h3>
+                          <p className="text-sm text-gray-500 mb-6">Crie uma família para compartilhar pets com outros membros, ou entre em uma família existente.</p>
+                          <div className="space-y-4">
+                            <Button onClick={handleCreateFamily} className="w-full py-3" loading={creatingFamily}>Criar Nova Família</Button>
+                            <div className="relative">
+                              <div className="absolute inset-x-0 top-1/2 h-px bg-gray-200" />
+                              <span className="relative bg-white px-4 text-xs font-medium text-gray-400">OU</span>
+                            </div>
+                            <div className="flex gap-2">
+                              <Input
+                                placeholder="Código da Família (Ex: RBYMJO)"
+                                value={inviteCodeInput}
+                                onChange={setInviteCodeInput}
+                              />
+                              <Button onClick={handleJoinFamily} variant="secondary" loading={joiningFamily}>Entrar</Button>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="divide-y divide-gray-100">
+                            <div className="flex justify-between items-center py-4">
+                              <span className="text-gray-600">Nome da Família</span>
+                              <span className="font-medium text-gray-800">{userFamilies[0].name}</span>
+                            </div>
+                            <div className="flex justify-between items-center py-4">
+                              <span className="text-gray-600">Animais</span>
+                              <span className="font-medium text-gray-800">{userPets.length > 0 ? userPets.map(p => p.name).join(', ') : 'Nenhum'}</span>
+                            </div>
+                          </div>
+
+                          <div className="mt-8">
+                            <h4 className="text-sm font-semibold text-gray-400 mb-4 px-2">Membros da Família</h4>
+                            <div className="space-y-2">
+                              {/* Invite Item */}
+                              <button onClick={() => setShowInviteModal(true)} className="w-full flex items-center gap-4 py-3 px-2 hover:bg-gray-50 rounded-xl transition-colors">
+                                <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center">
+                                  <Plus className="w-5 h-5 text-blue-600" />
+                                </div>
+                                <span className="font-medium text-blue-600 flex-1 text-left">Convidar Membros</span>
+                              </button>
+
+                              {/* Members List */}
+                              {familyMembersInfo.map((member, idx) => (
+                                <div key={idx} className="flex items-center gap-4 py-3 px-2">
+                                  <div className="w-10 h-10 rounded-full bg-gray-100 overflow-hidden shrink-0 flex items-center justify-center border border-gray-200">
+                                    {member.photoUrl ? (
+                                      <img src={member.photoUrl} alt="Foto" className="w-full h-full object-cover" />
+                                    ) : (
+                                      <UserIcon className="w-5 h-5 text-gray-400" />
+                                    )}
+                                  </div>
+                                  <span className="font-medium text-gray-800 flex-1">{member.name} {member.user_id === user.id && '(Você)'}</span>
+                                  {userFamilies[0].owner_id === member.user_id && (
+                                    <span className="text-xs text-gray-400">Proprietário</span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Invite Modal Overlay */}
+                          <AnimatePresence>
+                            {showInviteModal && userFamilies.length > 0 && (
+                              <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                className="fixed inset-0 z-[100] bg-white pt-12 px-6 pb-6 overflow-y-auto"
+                              >
+                                <div className="flex items-center gap-4 mb-8">
+                                  <button onClick={() => setShowInviteModal(false)} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+                                    <ChevronLeft className="w-6 h-6 text-gray-600" />
+                                  </button>
+                                  <h2 className="text-2xl font-bold text-gray-800">Convidar Membros</h2>
+                                </div>
+
+                                <div className="text-center mb-8">
+                                  <div className="w-48 h-32 mx-auto bg-indigo-50 rounded-[2rem] mb-6 flex items-center justify-center relative overflow-hidden">
+                                    <div className="absolute inset-0 bg-blue-100 rotate-12 scale-150 origin-bottom-left" />
+                                    <div className="relative z-10 w-24 h-16 bg-white shadow-sm rounded-xl flex items-center justify-center">
+                                      <span className="font-bold text-blue-600 text-sm whitespace-pre-line">Invite\nMembers</span>
+                                    </div>
+                                    <div className="absolute bottom-0 w-full h-1/3 bg-red-400 opacity-90 z-20" />
+                                  </div>
+                                  <h3 className="font-bold text-xl text-gray-800 mb-2">{userFamilies[0].name}</h3>
+                                  <p className="text-gray-500 text-sm px-4">Gerencie seus animais com membros da família e amigos</p>
+                                </div>
+
+                                <div className="bg-[#fcf8ef] p-6 rounded-3xl mb-6 shadow-sm border border-[#f5eeda]">
+                                  <div className="flex justify-between items-center mb-6">
+                                    <span className="font-medium text-gray-800">Código da Família</span>
+                                    <button onClick={() => regenerateFamilyCode(userFamilies[0].id)} className="text-[#0a327d] font-medium text-sm">Refazer</button>
+                                  </div>
+                                  <div className="flex justify-center items-center gap-3 mb-6">
+                                    <span className="text-3xl font-mono tracking-[0.3em] text-gray-800 font-bold ml-3">{userFamilies[0].invite_code.split('').join(' ')}</span>
+                                    <button 
+                                      onClick={() => {
+                                        navigator.clipboard.writeText(userFamilies[0].invite_code);
+                                        alert('Código copiado!');
+                                      }} 
+                                      className="p-2 text-[#0a327d] hover:bg-blue-50 rounded-lg transition-colors"
+                                    >
+                                      <Copy className="w-5 h-5" />
+                                    </button>
+                                  </div>
+                                  <Button onClick={() => {
+                                    if (navigator.share) {
+                                      navigator.share({
+                                        title: 'Entrar na minha Família no FocinhoApp',
+                                        text: `Use o código ${userFamilies[0].invite_code} para gerenciar nossos pets juntos no FocinhoApp!`,
+                                      });
+                                    }
+                                  }} className="w-full py-4 bg-[#0a327d] hover:bg-[#072459] text-white border-0 text-lg">
+                                    Convidar
+                                  </Button>
+                                </div>
+
+                                <div className="bg-[#fcf8ef] p-6 rounded-3xl shadow-sm border border-[#f5eeda] mb-8">
+                                  <h4 className="font-medium text-gray-500 mb-6">Como Funciona</h4>
+                                  <div className="space-y-8">
+                                    <div>
+                                      <p className="text-sm text-gray-600 mb-4 leading-relaxed font-medium">1. Envie o código da família para amigos por email, mensagem ou outros meios.</p>
+                                      <div className="w-32 h-24 mx-auto relative flex justify-center items-center">
+                                        <div className="absolute w-20 h-20 bg-[#fed15c] rounded-full -left-2 opacity-80" />
+                                        <div className="absolute w-20 h-20 bg-[#4db5ff] rounded-full -right-2 opacity-80" />
+                                        <Share2 className="w-8 h-8 text-white relative z-10 stroke-2" />
+                                      </div>
+                                    </div>
+                                    <div>
+                                      <p className="text-sm text-gray-600 mb-4 leading-relaxed font-medium">2. Baixe o aplicativo, registre-se e entre na família. Insira o código da família para solicitar a entrada.</p>
+                                      <div className="w-32 h-24 mx-auto relative flex justify-center items-end pb-2">
+                                        <div className="w-16 h-20 bg-[#4e8dd6] rounded-xl relative z-10 flex flex-col justify-between p-2">
+                                          <div className="flex justify-between"><div className="w-3 h-3 bg-white rounded-full opacity-50 block"/><div className="w-3 h-3 bg-white rounded-full block"/></div>
+                                          <div className="flex justify-between"><div className="w-3 h-3 bg-white rounded-full block"/><div className="w-3 h-3 bg-white rounded-full opacity-50 block"/></div>
+                                        </div>
+                                        <div className="absolute bottom-0 w-24 h-12 flex justify-between px-1 z-20">
+                                          <div className="w-4 h-8 bg-[#fed15c] rounded-t-lg rotate-12" />
+                                          <div className="w-4 h-8 bg-[#fed15c] rounded-t-lg -rotate-12" />
+                                        </div>
+                                      </div>
+                                    </div>
+                                    <div>
+                                      <p className="text-sm text-gray-600 mb-4 leading-relaxed font-medium">3. Após entrar na família, visualize colaborativamente as atividades dos pets e gerencie os animais juntos.</p>
+                                      <div className="w-32 h-28 mx-auto relative flex justify-center items-center">
+                                        <div className="w-14 h-24 bg-white border border-[#4e8dd6] rounded-xl overflow-hidden shadow-sm flex flex-col">
+                                          <div className="h-6 bg-[#4e8dd6] w-full" />
+                                          <div className="p-1 space-y-1 mt-1">
+                                            <div className="w-3 h-3 bg-gray-200 rounded-full" />
+                                            <div className="w-full h-1 bg-gray-100 rounded" />
+                                            <div className="w-full h-1 bg-gray-100 rounded" />
+                                          </div>
+                                        </div>
+                                        <div className="absolute w-full h-[1px] bg-gray-200 top-1/2 -z-10 rotate-12" />
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </>
+                      )}
+                    </div>
+                  </motion.div>
                 )}
 
                 {accountSubView === 'profile' && (
