@@ -1674,6 +1674,32 @@ export default function App() {
       setJoiningFamily(false);
     }
   };
+
+  const handleRemoveMember = async (familyId: string, memberId: string) => {
+    if (!window.confirm('Tem certeza que deseja remover este membro da família?')) return;
+    try {
+      const { error } = await supabase.from('family_members').delete().eq('family_id', familyId).eq('user_id', memberId);
+      if (error) throw error;
+      await fetchFamilies();
+      alert('Membro removido com sucesso!');
+    } catch (err: any) {
+      alert('Erro ao remover membro.');
+      console.error(err);
+    }
+  };
+
+  const handleDeleteFamily = async (familyId: string) => {
+    if (!window.confirm('Tem certeza que deseja exluir a família? Todos os membros perderão acesso.')) return;
+    try {
+      const { error } = await supabase.from('families').delete().eq('id', familyId);
+      if (error) throw error;
+      await fetchFamilies();
+      alert('Família excluída com sucesso!');
+    } catch (err: any) {
+      alert('Erro ao excluir família.');
+      console.error(err);
+    }
+  };
   // --- End Family Functions ---
 
   const handleActivateTag = async () => {
@@ -3669,12 +3695,32 @@ export default function App() {
                                     )}
                                   </div>
                                   <span className="font-medium text-gray-800 flex-1">{member.name} {member.user_id === user.id && '(Você)'}</span>
-                                  {userFamilies[0].owner_id === member.user_id && (
-                                    <span className="text-xs text-gray-400">Proprietário</span>
+                                  {userFamilies[0].owner_id === member.user_id ? (
+                                    <span className="text-xs text-gray-400 font-medium bg-gray-100 px-3 py-1 rounded-full">Proprietário</span>
+                                  ) : (
+                                    userFamilies[0].owner_id === user?.id && (
+                                      <button 
+                                        onClick={() => handleRemoveMember(userFamilies[0].id, member.user_id)}
+                                        className="p-2 text-red-500 hover:bg-red-50 rounded-full transition-colors flex items-center justify-center relative -mr-2"
+                                        title="Remover Membro"
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </button>
+                                    )
                                   )}
                                 </div>
                               ))}
                             </div>
+
+                            {userFamilies[0].owner_id === user?.id && (
+                              <button 
+                                onClick={() => handleDeleteFamily(userFamilies[0].id)}
+                                className="w-full mt-8 py-4 border-2 border-red-100 text-red-600 rounded-2xl font-bold hover:bg-red-50 transition-colors flex justify-center items-center gap-2"
+                              >
+                                <Trash2 className="w-5 h-5" />
+                                Excluir Família
+                              </button>
+                            )}
                           </div>
 
                           {/* Invite Modal Overlay */}
