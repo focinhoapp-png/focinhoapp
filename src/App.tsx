@@ -477,6 +477,7 @@ export default function App() {
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const [ownerProfile, setOwnerProfile] = useState<OwnerProfile | null>(null);
   const [isFetchingOwnerProfile, setIsFetchingOwnerProfile] = useState(true);
+  const [showSplash, setShowSplash] = useState(false);
   const [currentPetIndex, setCurrentPetIndex] = useState(0);
 
   // SOS State
@@ -785,6 +786,23 @@ export default function App() {
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [user]);
+
+  // Splash screen: show on mobile only, minimum 1.5s display time
+  useEffect(() => {
+    const isMobile = window.innerWidth < 768;
+    if (!isMobile || (!isFetchingOwnerProfile && !isFetchingUserPets)) return;
+    if (isFetchingOwnerProfile || isFetchingUserPets) {
+      setShowSplash(true);
+      return;
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (!showSplash) return;
+    if (isFetchingOwnerProfile || isFetchingUserPets) return;
+    const timer = setTimeout(() => setShowSplash(false), 1500);
+    return () => clearTimeout(timer);
+  }, [isFetchingOwnerProfile, isFetchingUserPets, showSplash]);
 
   // Auto-detect User City for Geo-fencing
   useEffect(() => {
@@ -2225,11 +2243,24 @@ export default function App() {
                 animate={{ opacity: 1 }}
                 className="space-y-6"
               >
-                {(isFetchingOwnerProfile || isFetchingUserPets) ? (
-                  <div className="flex flex-col items-center justify-center py-32 opacity-50">
-                    <Loader2 className="w-8 h-8 text-orange-500 animate-spin mb-4" />
-                    <p className="text-gray-500 font-medium">Sincronizando seus dados...</p>
-                  </div>
+                {showSplash ? (
+                  <motion.div
+                    key="splash"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.5 }}
+                    className="fixed inset-0 z-[200] flex items-center justify-center overflow-hidden md:hidden"
+                  >
+                    <motion.img
+                      src="/splash.jpg"
+                      alt="FocinhoApp"
+                      initial={{ scale: 1.08, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      transition={{ duration: 0.7, ease: 'easeOut' }}
+                      className="w-full h-full object-cover"
+                    />
+                  </motion.div>
                 ) : (
                   <>
                     <div className="flex justify-between items-end">
