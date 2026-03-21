@@ -122,6 +122,8 @@ interface OwnerProfile {
   gender?: string;
   birthday?: string;
   phone?: string;
+  state?: string;
+  city?: string;
   address?: string;
   privacySettings?: {
     showAddress?: boolean;
@@ -341,6 +343,10 @@ const COLORS = ['Branco', 'Preto', 'Marrom', 'Cinza', 'Dourado', 'Creme', 'Malha
 
 const PARTNER_CATEGORIES = ['Todos', 'Pet Shops', 'Clínicas Veterinárias', 'ONGs', 'Adestradores', 'Hotéis para Pets', 'Casas de Ração', 'Marcas Pet'];
 
+const ESTADOS_BR = [
+  'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'
+];
+
 const Select = ({ label, value, onChange, options, icon: Icon }: any) => (
   <div className="flex flex-col gap-1.5 w-full">
     {label && <label className="text-sm font-bold text-gray-700 ml-1">{label}</label>}
@@ -547,6 +553,8 @@ export default function App() {
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [authName, setAuthName] = useState('');
   const [authPhone, setAuthPhone] = useState('');
+  const [authState, setAuthState] = useState('');
+  const [authCity, setAuthCity] = useState('');
   const [authAddress, setAuthAddress] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
@@ -1455,7 +1463,7 @@ export default function App() {
     setAuthError(null);
     try {
       if (authMode === 'register') {
-        if (!authName || !authPhone || !authAddress) {
+        if (!authName || !authPhone || !authState || !authCity || !authAddress) {
           throw new Error('Por favor, preencha todos os campos do perfil.');
         }
 
@@ -1476,6 +1484,8 @@ export default function App() {
             uid: data.user.id,
             name: authName,
             phone: authPhone,
+            state: authState,
+            city: authCity,
             address: authAddress,
             updatedAt: new Date().toISOString()
           };
@@ -1778,6 +1788,13 @@ export default function App() {
       });
       if (error) throw error;
       setOwnerProfile(prev => prev ? { ...prev, privacySettings: fullPrivacySettings } : prev);
+      
+      if (ownerProfile.city && ownerProfile.state) {
+        const locationString = `${ownerProfile.city} - ${ownerProfile.state}`;
+        setSelectedCity(locationString);
+        localStorage.setItem('focinho_selected_city', locationString);
+      }
+
       setError(null);
       setSuccessMessage('Configurações salvas com sucesso!');
       setTimeout(() => setSuccessMessage(null), 3000);
@@ -2101,11 +2118,29 @@ export default function App() {
                           onChange={(v) => setAuthPhone(formatPhoneMask(v))}
                           icon={Phone}
                         />
+                        <div className="flex gap-2 w-full">
+                          <div className="w-1/3">
+                            <Select
+                              label="Estado"
+                              value={authState}
+                              onChange={setAuthState}
+                              options={ESTADOS_BR}
+                            />
+                          </div>
+                          <div className="w-2/3">
+                            <Input
+                              label="Cidade"
+                              placeholder="Sua cidade"
+                              value={authCity}
+                              onChange={setAuthCity}
+                            />
+                          </div>
+                        </div>
                         <Input
-                          label="Endereço (para devolução do pet)"
+                          label="Endereço"
                           value={authAddress}
                           onChange={setAuthAddress}
-                          placeholder="Rua, Número, Bairro, Cidade"
+                          placeholder="Rua, Número, Bairro"
                           icon={MapPin}
                         />
                       </div>
@@ -2184,14 +2219,7 @@ export default function App() {
                     <p className="text-gray-400 text-sm">Bem-vindo de volta ao FocinhoApp</p>
                   </div>
                   <div className="flex gap-2">
-                    {/* City Selector Button */}
-                    <button
-                      onClick={() => { setCityInputTemp(selectedCity); setShowCityPicker(true); }}
-                      className="flex items-center gap-1.5 bg-orange-50 hover:bg-orange-100 border border-orange-200 text-orange-600 rounded-xl px-3 py-2 transition-colors"
-                    >
-                      <MapPin className="w-4 h-4" />
-                      <span className="text-xs font-bold max-w-[100px] truncate">{selectedCity ? selectedCity.split(' - ')[0] : 'Cidade'}</span>
-                    </button>
+                    {/* City Selector Button Removed */}
                     <button
                       onClick={() => setShowScanner(true)}
                       className="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center text-orange-600 hover:bg-orange-200 transition-colors"
@@ -3033,13 +3061,7 @@ export default function App() {
                 <div className="flex justify-between items-center">
                   <h2 className="text-2xl font-bold">Animal Perdido</h2>
                   <div className="flex gap-2">
-                    <button
-                      onClick={() => { setCityInputTemp(selectedCity); setShowCityPicker(true); }}
-                      className="flex items-center gap-1.5 bg-orange-50 hover:bg-orange-100 border border-orange-200 text-orange-600 rounded-xl px-3 py-2 transition-colors"
-                    >
-                      <MapPin className="w-4 h-4" />
-                      <span className="text-xs font-bold max-w-[80px] truncate">{selectedCity ? selectedCity.split(' - ')[0] : 'Cidade'}</span>
-                    </button>
+
                     <button
                       onClick={() => setIsAddingSOS(true)}
                       className="p-2 bg-red-100 text-red-600 rounded-xl hover:bg-red-200 transition-colors"
@@ -3469,9 +3491,27 @@ export default function App() {
                           onChange={(v: string) => setOwnerProfile(prev => ({ ...prev, phone: formatPhoneMask(v) } as any))}
                           icon={Phone}
                         />
-                        <LocationInput
-                          label="Endereço de Devolução"
-                          placeholder="Rua, Número, Bairro, Cidade..."
+                        <div className="flex gap-2 w-full">
+                          <div className="w-1/3">
+                            <Select
+                              label="Estado"
+                              value={ownerProfile?.state || ''}
+                              onChange={(v: string) => setOwnerProfile(prev => ({ ...prev, state: v } as any))}
+                              options={ESTADOS_BR}
+                            />
+                          </div>
+                          <div className="w-2/3">
+                            <Input
+                              label="Cidade"
+                              placeholder="Sua cidade"
+                              value={ownerProfile?.city || ''}
+                              onChange={(v: string) => setOwnerProfile(prev => ({ ...prev, city: v } as any))}
+                            />
+                          </div>
+                        </div>
+                        <Input
+                          label="Endereço"
+                          placeholder="Rua, Número, Bairro..."
                           value={ownerProfile?.address || ''}
                           onChange={(v: string) => setOwnerProfile(prev => ({ ...prev, address: v } as any))}
                           icon={MapPin}
@@ -3512,13 +3552,7 @@ export default function App() {
                         <p className="text-sm text-gray-500 font-medium leading-relaxed max-w-xs mx-auto">
                           Empresas e profissionais que apoiam a proteção e o bem-estar dos animais junto com o FocinhoApp.
                         </p>
-                        <button
-                          onClick={() => { setCityInputTemp(selectedCity); setShowCityPicker(true); }}
-                          className="mt-2 inline-flex items-center gap-1.5 bg-orange-50 hover:bg-orange-100 border border-orange-200 text-orange-600 rounded-xl px-4 py-2 transition-colors"
-                        >
-                          <MapPin className="w-4 h-4" />
-                          <span className="text-xs font-bold">{selectedCity ? selectedCity.split(' - ')[0] : 'Selecionar cidade'}</span>
-                        </button>
+
                       </div>
 
                       {/* Filters */}
@@ -3877,14 +3911,7 @@ export default function App() {
                         </div>
                         <h3 className="font-bold text-xl">Adoção Responsável</h3>
                       </div>
-                      {/* City selector for adoption */}
-                      <button
-                        onClick={() => { setCityInputTemp(selectedCity); setShowCityPicker(true); }}
-                        className="inline-flex items-center gap-1.5 bg-orange-50 hover:bg-orange-100 border border-orange-200 text-orange-600 rounded-xl px-4 py-2 text-xs font-bold transition-colors"
-                      >
-                        <MapPin className="w-3.5 h-3.5" />
-                        <span>{selectedCity ? selectedCity.split(' - ')[0] : 'Selecionar cidade'}</span>
-                      </button>
+
 
                       <div className="bg-gradient-to-r from-pink-500 to-rose-500 p-5 rounded-2xl text-center shadow-lg shadow-pink-100">
                         <p className="text-white font-black text-sm">Mude uma vida! 💖</p>
