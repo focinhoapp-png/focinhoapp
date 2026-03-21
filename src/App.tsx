@@ -158,7 +158,9 @@ interface AdoptionPet {
   photoUrl: string;
   gallery?: string[];
   contactPhone: string;
-  city?: string; // Newly added adoption city
+  city?: string;
+  state?: string;
+  address?: string;
   status: 'available' | 'adopted';
   createdAt: any;
 }
@@ -510,7 +512,7 @@ export default function App() {
   const [adoptionPets, setAdoptionPets] = useState<AdoptionPet[]>([]);
   const [isAddingAdoptionPet, setIsAddingAdoptionPet] = useState(false);
   const [newAdoptionPet, setNewAdoptionPet] = useState<Partial<AdoptionPet>>({
-    name: '', animalType: 'Cachorro', breed: '', color: '', gender: 'Macho', description: '', photoUrl: '', contactPhone: '', status: 'available', city: ''
+    name: '', animalType: 'Cachorro', breed: '', color: '', gender: 'Macho', description: '', photoUrl: '', contactPhone: '', status: 'available', state: '', city: '', address: ''
   });
   const [hasNewAdoption, setHasNewAdoption] = useState(false);
   const [lastAdoptedPetName, setLastAdoptedPetName] = useState<string | null>(null);
@@ -1014,7 +1016,7 @@ export default function App() {
       }
       setIsAddingAdoptionPet(false);
       setEditingAdoptionPetId(null);
-      setNewAdoptionPet({ name: '', animalType: 'Cachorro', breed: '', color: '', gender: 'Macho', description: '', photoUrl: '', gallery: [], contactPhone: '', status: 'available', city: '' });
+      setNewAdoptionPet({ name: '', animalType: 'Cachorro', breed: '', color: '', gender: 'Macho', description: '', photoUrl: '', gallery: [], contactPhone: '', status: 'available', state: '', city: '', address: '' });
       const { data } = await supabase.from('adoption_pets').select('*');
       setAdoptionPets((data || []) as AdoptionPet[]);
     } catch (err) {
@@ -4055,127 +4057,6 @@ export default function App() {
                       </div>
                     </div>
 
-                    {/* Add Adoption Pet Modal */}
-                    <AnimatePresence>
-                      {isAddingAdoptionPet && (
-                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 overflow-y-auto">
-                          <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            onClick={() => { setIsAddingAdoptionPet(false); setEditingAdoptionPetId(null); }}
-                            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-                          />
-                          <motion.div
-                            initial={{ scale: 0.9, opacity: 0, y: 20 }}
-                            animate={{ scale: 1, opacity: 1, y: 0 }}
-                            exit={{ scale: 0.9, opacity: 0, y: 20 }}
-                            className="bg-white w-full max-w-md rounded-[2.5rem] p-6 md:p-8 shadow-2xl relative z-10 space-y-6 my-8 overflow-y-auto max-h-[90vh]"
-                          >
-                            <div className="flex justify-between items-center">
-                              <h3 className="text-xl font-bold">{editingAdoptionPetId ? 'Editar Pet' : 'Divulgar Pet'}</h3>
-                              <button onClick={() => { setIsAddingAdoptionPet(false); setEditingAdoptionPetId(null); }} className="p-2 hover:bg-gray-100 rounded-full">
-                                <X className="w-5 h-5" />
-                              </button>
-                            </div>
-
-                            <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2 scrollbar-hide">
-                              <Input
-                                label="Nome do Pet"
-                                value={newAdoptionPet.name}
-                                onChange={(v: string) => setNewAdoptionPet(prev => ({ ...prev, name: v }))}
-                              />
-                              <Select
-                                label="Tipo"
-                                value={newAdoptionPet.animalType}
-                                onChange={(v: string) => setNewAdoptionPet(prev => ({ ...prev, animalType: v }))}
-                                options={['Cachorro', 'Gato', 'Outro']}
-                              />
-                              <Select
-                                label="Raça"
-                                value={newAdoptionPet.breed}
-                                onChange={(v: string) => setNewAdoptionPet(prev => ({ ...prev, breed: v }))}
-                                options={newAdoptionPet.animalType === 'Cachorro' ? DOG_BREEDS : newAdoptionPet.animalType === 'Gato' ? CAT_BREEDS : ['Outro']}
-                              />
-                              <Select
-                                label="Cor Predominante"
-                                value={newAdoptionPet.color}
-                                onChange={(v: string) => setNewAdoptionPet(prev => ({ ...prev, color: v }))}
-                                options={COLORS}
-                              />
-                              <Select
-                                label="Porte"
-                                value={newAdoptionPet.size || ''}
-                                onChange={(v: string) => setNewAdoptionPet(prev => ({ ...prev, size: v }))}
-                                options={['Pequeno', 'Médio', 'Grande']}
-                              />
-                              <Select
-                                label="Sexo"
-                                value={newAdoptionPet.gender}
-                                onChange={(v: string) => setNewAdoptionPet(prev => ({ ...prev, gender: v }))}
-                                options={['Macho', 'Fêmea']}
-                              />
-                              <Input
-                                label="Idade (opcional)"
-                                value={newAdoptionPet.age}
-                                onChange={(v: string) => setNewAdoptionPet(prev => ({ ...prev, age: v }))}
-                              />
-                              <div className="flex flex-col gap-1.5">
-                                <label className="text-sm font-medium text-gray-600 ml-1">Descrição / História</label>
-                                <textarea
-                                  className="w-full bg-gray-50 border border-gray-200 rounded-2xl p-4 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all min-h-[100px]"
-                                  value={newAdoptionPet.description}
-                                  onChange={(e) => setNewAdoptionPet(prev => ({ ...prev, description: e.target.value }))}
-                                  placeholder="Conte um pouco sobre o pet..."
-                                />
-                              </div>
-                              <Input
-                                label="WhatsApp de Contato"
-                                placeholder="(00) 00000-0000"
-                                value={newAdoptionPet.contactPhone}
-                                onChange={(v: string) => setNewAdoptionPet(prev => ({ ...prev, contactPhone: formatPhoneMask(v) }))}
-                                icon={Phone}
-                              />
-                              <Input
-                                label="Cidade do Pet"
-                                placeholder="Sua cidade - UF"
-                                value={newAdoptionPet.city || selectedCity || userCity || ''}
-                                onChange={(v: string) => setNewAdoptionPet(prev => ({ ...prev, city: v }))}
-                                icon={MapPin}
-                              />
-
-                              <div className="flex flex-col gap-1.5">
-                                <label className="text-sm font-medium text-gray-600 ml-1">Fotos do Pet (até 5)</label>
-                                <div className="grid grid-cols-3 gap-2">
-                                  {newAdoptionPet.gallery?.map((url, idx) => (
-                                    <div key={idx} className="aspect-square rounded-2xl overflow-hidden relative group">
-                                      <img src={url} className="w-full h-full object-cover" />
-                                      <button
-                                        onClick={() => setNewAdoptionPet(prev => ({ ...prev, gallery: prev.gallery?.filter((_, i) => i !== idx) }))}
-                                        className="absolute top-1 right-1 p-1 bg-black/50 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                                      >
-                                        <X className="w-3 h-3" />
-                                      </button>
-                                    </div>
-                                  ))}
-                                  {(newAdoptionPet.gallery?.length || 0) < 5 && (
-                                    <label className="aspect-square bg-gray-50 rounded-2xl flex flex-col items-center justify-center border-2 border-dashed border-gray-200 hover:border-orange-300 transition-all cursor-pointer">
-                                      <input type="file" accept="image/*" multiple className="hidden" onChange={handleAdoptionPhotoUpload} />
-                                      <Camera className="w-6 h-6 text-gray-300" />
-                                      <span className="text-[8px] text-gray-400 font-bold uppercase mt-1">Adicionar</span>
-                                    </label>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-
-                            <Button onClick={handleSaveAdoptionPet} loading={loading} className="w-full">
-                              Publicar para Adoção
-                            </Button>
-                          </motion.div>
-                        </div>
-                      )}
-                    </AnimatePresence>
                     <div className="h-20" /> {/* Spacer to avoid bottom nav overlap */}
                   </div>
                 )}
@@ -4663,12 +4544,215 @@ export default function App() {
                         </div>
                       </div>
 
+                      {/* Adoption Management */}
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between mb-4">
+                          <h4 className="font-bold text-gray-800 flex items-center gap-2">
+                            <Heart className="w-5 h-5 text-gray-400" /> Pets para Adoção ({adoptionPets.length})
+                          </h4>
+                          <Button
+                            onClick={() => setIsAddingAdoptionPet(true)}
+                            variant="secondary"
+                            className="!px-4 !py-2 text-xs"
+                          >
+                            <Plus className="w-4 h-4" /> Divulgar Pet
+                          </Button>
+                        </div>
+                        <div className="bg-gray-50/50 border border-gray-100 rounded-[2rem] p-4">
+                           <div className="flex flex-col gap-3">
+                             {adoptionPets.map(pet => (
+                               <div key={pet.id} className="bg-white p-4 rounded-3xl border border-gray-200 flex justify-between items-center shadow-sm">
+                                 <div className="flex items-center gap-3 w-full pr-2 overflow-hidden">
+                                   {pet.gallery && pet.gallery.length > 0 ? (
+                                      <img src={pet.gallery[0]} className="w-10 h-10 rounded-lg object-cover border border-gray-100 shrink-0" />
+                                   ) : (
+                                      <div className="w-10 h-10 rounded-lg bg-gray-50 border border-gray-100 flex items-center justify-center shrink-0">
+                                        <Heart className="w-4 h-4 text-gray-300" />
+                                      </div>
+                                   )}
+                                   <div className="min-w-0 flex-1">
+                                     <h5 className="font-bold text-gray-900 truncate text-sm">{pet.name}</h5>
+                                     <p className="text-[10px] text-gray-500 font-bold truncate">
+                                       {pet.animalType} • {pet.breed} {pet.city && '\u2022 ' + pet.city}
+                                     </p>
+                                   </div>
+                                 </div>
+                                 <div className="flex gap-2 shrink-0">
+                                   <button 
+                                     onClick={() => {
+                                        setEditingAdoptionPetId(pet.id);
+                                        setNewAdoptionPet(pet);
+                                        setIsAddingAdoptionPet(true);
+                                     }} 
+                                     className="p-2.5 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-colors"
+                                   >
+                                     <Edit2 className="w-4 h-4" />
+                                   </button>
+                                   <button 
+                                     onClick={async () => {
+                                        if(window.confirm('Excluir ' + pet.name + ' para adoção?')) {
+                                            await supabase.from('adoption_pets').delete().eq('id', pet.id);
+                                            setAdoptionPets(prev => prev.filter(p => p.id !== pet.id));
+                                        }
+                                     }} 
+                                     className="p-2.5 bg-red-50 text-red-500 rounded-xl hover:bg-red-100 transition-colors"
+                                   >
+                                     <Trash2 className="w-4 h-4" />
+                                   </button>
+                                 </div>
+                               </div>
+                             ))}
+                             {adoptionPets.length === 0 && <p className="text-center text-xs text-gray-400 font-medium py-4">Nenhum pet para adoção.</p>}
+                           </div>
+                        </div>
+                      </div>
+
+
                     </div>
                     <div className="h-20" />
                   </div>
                 )}
               </motion.div>
             )}
+                    {/* Add Adoption Pet Modal */}
+                    <AnimatePresence>
+                      {isAddingAdoptionPet && (
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 overflow-y-auto">
+                          <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => { setIsAddingAdoptionPet(false); setEditingAdoptionPetId(null); }}
+                            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+                          />
+                          <motion.div
+                            initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                            animate={{ scale: 1, opacity: 1, y: 0 }}
+                            exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                            className="bg-white w-full max-w-md rounded-[2.5rem] p-6 md:p-8 shadow-2xl relative z-10 space-y-6 my-8 overflow-y-auto max-h-[90vh]"
+                          >
+                            <div className="flex justify-between items-center">
+                              <h3 className="text-xl font-bold">{editingAdoptionPetId ? 'Editar Pet' : 'Divulgar Pet'}</h3>
+                              <button onClick={() => { setIsAddingAdoptionPet(false); setEditingAdoptionPetId(null); }} className="p-2 hover:bg-gray-100 rounded-full">
+                                <X className="w-5 h-5" />
+                              </button>
+                            </div>
+
+                            <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2 scrollbar-hide">
+                              <Input
+                                label="Nome do Pet"
+                                value={newAdoptionPet.name}
+                                onChange={(v: string) => setNewAdoptionPet(prev => ({ ...prev, name: v }))}
+                              />
+                              <Select
+                                label="Tipo"
+                                value={newAdoptionPet.animalType}
+                                onChange={(v: string) => setNewAdoptionPet(prev => ({ ...prev, animalType: v }))}
+                                options={['Cachorro', 'Gato', 'Outro']}
+                              />
+                              <Select
+                                label="Raça"
+                                value={newAdoptionPet.breed}
+                                onChange={(v: string) => setNewAdoptionPet(prev => ({ ...prev, breed: v }))}
+                                options={newAdoptionPet.animalType === 'Cachorro' ? DOG_BREEDS : newAdoptionPet.animalType === 'Gato' ? CAT_BREEDS : ['Outro']}
+                              />
+                              <Select
+                                label="Cor Predominante"
+                                value={newAdoptionPet.color}
+                                onChange={(v: string) => setNewAdoptionPet(prev => ({ ...prev, color: v }))}
+                                options={COLORS}
+                              />
+                              <Select
+                                label="Porte"
+                                value={newAdoptionPet.size || ''}
+                                onChange={(v: string) => setNewAdoptionPet(prev => ({ ...prev, size: v }))}
+                                options={['Pequeno', 'Médio', 'Grande']}
+                              />
+                              <Select
+                                label="Sexo"
+                                value={newAdoptionPet.gender}
+                                onChange={(v: string) => setNewAdoptionPet(prev => ({ ...prev, gender: v }))}
+                                options={['Macho', 'Fêmea']}
+                              />
+                              <Input
+                                label="Idade (opcional)"
+                                value={newAdoptionPet.age}
+                                onChange={(v: string) => setNewAdoptionPet(prev => ({ ...prev, age: v }))}
+                              />
+                              <div className="flex flex-col gap-1.5">
+                                <label className="text-sm font-medium text-gray-600 ml-1">Descrição / História</label>
+                                <textarea
+                                  className="w-full bg-gray-50 border border-gray-200 rounded-2xl p-4 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all min-h-[100px]"
+                                  value={newAdoptionPet.description}
+                                  onChange={(e) => setNewAdoptionPet(prev => ({ ...prev, description: e.target.value }))}
+                                  placeholder="Conte um pouco sobre o pet..."
+                                />
+                              </div>
+                                <Input
+                                  label="WhatsApp de Contato"
+                                  placeholder="(00) 00000-0000"
+                                  value={newAdoptionPet.contactPhone}
+                                  onChange={(v: string) => setNewAdoptionPet(prev => ({ ...prev, contactPhone: formatPhoneMask(v) }))}
+                                  icon={Phone}
+                                />
+                                <div className="flex gap-2 w-full">
+                                  <div className="w-1/3">
+                                    <Select
+                                      label="Estado"
+                                      value={newAdoptionPet.state || ''}
+                                      onChange={(v: string) => setNewAdoptionPet(prev => ({ ...prev, state: v }))}
+                                      options={ESTADOS_BR}
+                                    />
+                                  </div>
+                                  <div className="w-2/3">
+                                    <Input
+                                      label="Cidade"
+                                      placeholder="Sua cidade"
+                                      value={newAdoptionPet.city || ''}
+                                      onChange={(v: string) => setNewAdoptionPet(prev => ({ ...prev, city: v }))}
+                                    />
+                                  </div>
+                                </div>
+                                <Input
+                                  label="Endereço"
+                                  placeholder="Rua, Bairro..."
+                                  value={newAdoptionPet.address || ''}
+                                  onChange={(v: string) => setNewAdoptionPet(prev => ({ ...prev, address: v }))}
+                                  icon={MapPin}
+                                />
+
+                              <div className="flex flex-col gap-1.5">
+                                <label className="text-sm font-medium text-gray-600 ml-1">Fotos do Pet (até 5)</label>
+                                <div className="grid grid-cols-3 gap-2">
+                                  {newAdoptionPet.gallery?.map((url, idx) => (
+                                    <div key={idx} className="aspect-square rounded-2xl overflow-hidden relative group">
+                                      <img src={url} className="w-full h-full object-cover" />
+                                      <button
+                                        onClick={() => setNewAdoptionPet(prev => ({ ...prev, gallery: prev.gallery?.filter((_, i) => i !== idx) }))}
+                                        className="absolute top-1 right-1 p-1 bg-black/50 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                                      >
+                                        <X className="w-3 h-3" />
+                                      </button>
+                                    </div>
+                                  ))}
+                                  {(newAdoptionPet.gallery?.length || 0) < 5 && (
+                                    <label className="aspect-square bg-gray-50 rounded-2xl flex flex-col items-center justify-center border-2 border-dashed border-gray-200 hover:border-orange-300 transition-all cursor-pointer">
+                                      <input type="file" accept="image/*" multiple className="hidden" onChange={handleAdoptionPhotoUpload} />
+                                      <Camera className="w-6 h-6 text-gray-300" />
+                                      <span className="text-[8px] text-gray-400 font-bold uppercase mt-1">Adicionar</span>
+                                    </label>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            <Button onClick={handleSaveAdoptionPet} loading={loading} className="w-full">
+                              Publicar para Adoção
+                            </Button>
+                          </motion.div>
+                        </div>
+                      )}
+                    </AnimatePresence>
 
             {/* Activate Tag */}
             {view === 'activate' && (
