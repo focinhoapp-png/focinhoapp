@@ -996,20 +996,34 @@ export default function App() {
     if (!newAdoptionPet.name || !newAdoptionPet.description) return;
     setLoading(true);
     try {
+      const petPayload = {
+        name: newAdoptionPet.name || '',
+        animalType: newAdoptionPet.animalType || 'Cachorro',
+        breed: newAdoptionPet.breed || '',
+        color: newAdoptionPet.color || '',
+        size: newAdoptionPet.size || null,
+        gender: newAdoptionPet.gender || 'Macho',
+        age: newAdoptionPet.age || null,
+        description: newAdoptionPet.description || '',
+        photoUrl: newAdoptionPet.photoUrl || '',
+        gallery: newAdoptionPet.gallery || [],
+        contactPhone: newAdoptionPet.contactPhone || '',
+        state: newAdoptionPet.state || null,
+        city: newAdoptionPet.city || null,
+        address: newAdoptionPet.address || null,
+        status: newAdoptionPet.status || 'available',
+      };
+
       if (editingAdoptionPetId) {
         // Edit mode: update existing pet
-        const { error } = await supabase.from('adoption_pets').update({
-          ...newAdoptionPet,
-        }).eq('id', editingAdoptionPetId);
+        const { error } = await supabase.from('adoption_pets').update(petPayload).eq('id', editingAdoptionPetId);
         if (error) throw error;
       } else {
         // Create mode: insert new pet
         const petId = generateId();
         const { error } = await supabase.from('adoption_pets').insert({
-          ...newAdoptionPet,
+          ...petPayload,
           id: petId,
-          status: 'available',
-          gallery: newAdoptionPet.gallery || [],
           createdAt: new Date().toISOString()
         });
         if (error) throw error;
@@ -1511,6 +1525,9 @@ export default function App() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
+    setAuthLoading(false);
+    setAuthEmail('');
+    setAuthPassword('');
     setView('home');
   };
 
