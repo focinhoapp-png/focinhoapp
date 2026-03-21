@@ -2253,7 +2253,7 @@ export default function App() {
                     className="fixed inset-0 z-[200] flex items-center justify-center overflow-hidden md:hidden"
                   >
                     <motion.img
-                      src="/splash.jpg"
+                      src="/splash.png"
                       alt="FocinhoApp"
                       initial={{ scale: 1.08, opacity: 0 }}
                       animate={{ scale: 1, opacity: 1 }}
