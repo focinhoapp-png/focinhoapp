@@ -544,6 +544,8 @@ export default function App() {
   const [customBgImage, setCustomBgImage] = useState<string | null>(null);
   const [isGeneratingShareImage, setIsGeneratingShareImage] = useState(false);
   const [generatedShareImage, setGeneratedShareImage] = useState<string | null>(null);
+  const [statsScale, setStatsScale] = useState(1);
+  const photoCardRef = useRef<HTMLDivElement>(null);
   const [currentLocation, setCurrentLocation] = useState<[number, number] | null>(null);
   const [walkTimer, setWalkTimer] = useState(0);
   const [walkHistory, setWalkHistory] = useState<Walk[]>([]);
@@ -1337,104 +1339,18 @@ export default function App() {
     }
   };
 
-  const generatePhotoPostImage = async (bgDataUrl: string): Promise<string | null> => {
-    if (!walkSummary) return null;
+  const capturePhotoPostImage = async () => {
+    const element = document.getElementById('walk-post-photo-card');
+    if (!element) return null;
     setIsGeneratingShareImage(true);
     try {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return null;
-
-      const bg = new Image();
-      await new Promise((resolve) => { bg.onload = resolve; bg.src = bgDataUrl; });
-
-      // Fixed output size 1080x1080
-      const SIZE = 1080;
-      canvas.width = SIZE;
-      canvas.height = SIZE;
-
-      // Background photo (cover)
-      const scale = Math.max(SIZE / bg.width, SIZE / bg.height);
-      const sw = SIZE / scale;
-      const sh = SIZE / scale;
-      const sx = (bg.width - sw) / 2;
-      const sy = (bg.height - sh) / 2;
-      ctx.drawImage(bg, sx, sy, sw, sh, 0, 0, SIZE, SIZE);
-
-      // Dark gradient overlay bottom 45%
-      const grad = ctx.createLinearGradient(0, SIZE * 0.45, 0, SIZE);
-      grad.addColorStop(0, 'rgba(0,0,0,0)');
-      grad.addColorStop(0.4, 'rgba(0,0,0,0.7)');
-      grad.addColorStop(1, 'rgba(0,0,0,0.92)');
-      ctx.fillStyle = grad;
-      ctx.fillRect(0, 0, SIZE, SIZE);
-
-      // Pet name + date at top of overlay band
-      const pets = walkSummary.petId
-        ? walkSummary.petId.split(',').map((id) => {
-            const p = userPets.find((up) => up.id === id);
-            return p ? p.name : id;
-          }).join(' & ')
-        : 'Pet';
-
-      const walkDate = new Date(walkSummary.startTime).toLocaleDateString('pt-BR', {
-        weekday: 'long', day: 'numeric', month: 'long'
-      });
-
-      const pace = formatPace(walkSummary.duration, walkSummary.distance);
-      const durationStr = `${Math.floor(walkSummary.duration / 60)}m ${walkSummary.duration % 60}s`;
-
-      // Pet name
-      ctx.fillStyle = '#ffffff';
-      ctx.font = `bold ${SIZE * 0.075}px Inter, sans-serif`;
-      ctx.textAlign = 'left';
-      ctx.fillText(`🐾 ${pets}`, SIZE * 0.07, SIZE * 0.62);
-
-      // Date
-      ctx.fillStyle = 'rgba(255,255,255,0.72)';
-      ctx.font = `${SIZE * 0.038}px Inter, sans-serif`;
-      ctx.fillText(walkDate, SIZE * 0.07, SIZE * 0.67);
-
-      // Stats row 1 — Distance | Time
-      const labelStyle = 'rgba(255,255,255,0.6)';
-      const valueStyle = '#ffffff';
-      const statY1label = SIZE * 0.755;
-      const statY1value = SIZE * 0.808;
-      const col1x = SIZE * 0.07;
-      const col2x = SIZE * 0.4;
-
-      ctx.fillStyle = labelStyle;
-      ctx.font = `bold ${SIZE * 0.03}px Inter, sans-serif`;
-      ctx.fillText('DISTÂNCIA', col1x, statY1label);
-      ctx.fillText('TEMPO', col2x, statY1label);
-
-      ctx.fillStyle = valueStyle;
-      ctx.font = `bold ${SIZE * 0.072}px Inter, sans-serif`;
-      ctx.fillText(`${walkSummary.distance} km`, col1x, statY1value);
-      ctx.fillText(durationStr, col2x, statY1value);
-
-      // Stats row 2 — Pace
-      const statY2label = SIZE * 0.865;
-      const statY2value = SIZE * 0.922;
-      ctx.fillStyle = labelStyle;
-      ctx.font = `bold ${SIZE * 0.03}px Inter, sans-serif`;
-      ctx.fillText('RITMO', col1x, statY2label);
-
-      ctx.fillStyle = '#f97316';
-      ctx.font = `bold ${SIZE * 0.072}px Inter, sans-serif`;
-      ctx.fillText(`${pace} min/km`, col1x, statY2value);
-
-      // Watermark
-      ctx.fillStyle = 'rgba(249,115,22,0.65)';
-      ctx.font = `bold ${SIZE * 0.038}px Inter, sans-serif`;
-      ctx.textAlign = 'right';
-      ctx.fillText('FocinhoApp', SIZE - SIZE * 0.05, SIZE * 0.96);
-
-      const final = canvas.toDataURL('image/png');
-      setGeneratedShareImage(final);
-      return final;
+      // Small delay to ensure motion drag finishes settling if user just released
+      await new Promise(resolve => setTimeout(resolve, 100));
+      const dataUrl = await toPng(element, { cacheBust: true, pixelRatio: 3 });
+      setGeneratedShareImage(dataUrl);
+      return dataUrl;
     } catch (err) {
-      console.error('generatePhotoPostImage error', err);
+      console.error('capturePhotoPostImage error', err);
       setError('Erro ao gerar imagem com foto.');
       return null;
     } finally {
@@ -1442,8 +1358,8 @@ export default function App() {
     }
   };
 
-  const handleDownloadShareImage = async () => {
-    let img = generatedShareImage;
+  const handleDownloadShareImage = async (imgParam?: string) => {
+    let img = imgParam || generatedShareImage;
     if (!img) return;
     try {
       const res = await fetch(img);
@@ -1470,8 +1386,8 @@ export default function App() {
     }
   };
 
-  const handleSharePostImage = async () => {
-    let img = generatedShareImage;
+  const handleSharePostImage = async (imgParam?: string) => {
+    let img = imgParam || generatedShareImage;
     if (!img) return;
     try {
       const res = await fetch(img);
@@ -1480,10 +1396,10 @@ export default function App() {
       if (navigator.share && navigator.canShare({ files: [file] })) {
         await navigator.share({ files: [file], title: 'Meu Passeio no FocinhoApp' });
       } else {
-        handleDownloadShareImage();
+        handleDownloadShareImage(img);
       }
     } catch {
-      handleDownloadShareImage();
+      handleDownloadShareImage(img);
     }
   };
 
@@ -3365,8 +3281,8 @@ export default function App() {
                     ) : (
                       <div id="walk-summary-card" className="bg-white p-8 rounded-[3rem] shadow-xl border border-gray-100 space-y-8">
                         <div className="text-center space-y-2">
-                          <div className="w-20 h-20 bg-orange-100 rounded-[2rem] flex items-center justify-center mx-auto mb-4">
-                            <PawPrint className="w-10 h-10 text-orange-500" />
+                          <div className="w-20 h-20 rounded-[2rem] flex items-center justify-center mx-auto mb-4 overflow-hidden border-2 border-orange-100 shadow-sm">
+                            <img src="./pwa-512x512.png" alt="FocinhoApp" className="w-full h-full object-cover bg-orange-50" />
                           </div>
                           <h3 className="text-3xl font-black text-gray-900">Resumo do Passeio</h3>
                           <p className="text-gray-400 font-medium">
@@ -3374,28 +3290,7 @@ export default function App() {
                           </p>
                         </div>
 
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                          <div className="bg-gray-50 p-6 rounded-[2rem] text-center border border-gray-100">
-                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">Distância</p>
-                            <p className="text-3xl font-black text-orange-500">{walkSummary.distance} km</p>
-                          </div>
-                          <div className="bg-gray-50 p-6 rounded-[2rem] text-center border border-gray-100">
-                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">Duração</p>
-                            <p className="text-3xl font-black text-gray-800">
-                              {Math.floor(walkSummary.duration / 60)}m {walkSummary.duration % 60}s
-                            </p>
-                          </div>
-                          <div className="bg-gray-50 p-4 md:p-6 rounded-[2rem] text-center border border-gray-100 flex flex-col justify-center">
-                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">Vel Média</p>
-                            <p className="text-xl md:text-3xl font-black text-gray-800">{walkSummary.averageSpeed?.toFixed(1) || '0.0'} km/h</p>
-                          </div>
-                          <div className="bg-gray-50 p-4 md:p-6 rounded-[2rem] text-center border border-gray-100 flex flex-col justify-center">
-                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">Elevação</p>
-                            <p className="text-xl md:text-3xl font-black text-gray-800">{walkSummary.altitudeGain?.toFixed(0) || '0'} m</p>
-                          </div>
-                        </div>
-
-                        <div className="h-64 bg-gray-50 rounded-[2.5rem] overflow-hidden border border-gray-100 relative">
+                        <div className="h-64 bg-gray-50 rounded-[2.5rem] overflow-hidden border border-gray-100 relative shadow-inner">
                           <MapContainer
                             center={walkSummary.path[0] ? [walkSummary.path[0].lat, walkSummary.path[0].lng] : currentLocation || [0, 0]}
                             zoom={15}
@@ -3425,6 +3320,28 @@ export default function App() {
                           </MapContainer>
                         </div>
 
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                          <div className="bg-gray-50 p-6 rounded-[2rem] text-center border border-gray-100 shadow-sm">
+                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">Distância</p>
+                            <p className="text-3xl font-black text-orange-500">{walkSummary.distance} km</p>
+                          </div>
+                          <div className="bg-gray-50 p-6 rounded-[2rem] text-center border border-gray-100 shadow-sm">
+                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">Duração</p>
+                            <p className="text-3xl font-black text-gray-800">
+                              {Math.floor(walkSummary.duration / 60)}m {walkSummary.duration % 60}s
+                            </p>
+                          </div>
+                          <div className="bg-gray-50 p-4 md:p-6 rounded-[2rem] text-center border border-gray-100 shadow-sm flex flex-col justify-center">
+                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">Vel Média</p>
+                            <p className="text-xl md:text-3xl font-black text-gray-800">{walkSummary.averageSpeed?.toFixed(1) || '0.0'} km/h</p>
+                          </div>
+                          <div className="bg-gray-50 p-4 md:p-6 rounded-[2rem] text-center border border-gray-100 shadow-sm flex flex-col justify-center">
+                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">Elevação</p>
+                            <p className="text-xl md:text-3xl font-black text-gray-800">{walkSummary.altitudeGain?.toFixed(0) || '0'} m</p>
+                          </div>
+                        </div>
+
+
                         <div className="flex justify-center gap-8">
                           <div className="flex items-center gap-2">
                             <span className="text-2xl">💧</span>
@@ -3443,9 +3360,10 @@ export default function App() {
                       <Button
                         onClick={() => {
                           setShowShareModal(true);
-                          setShareMode(null);
+                          setShareMode('photo');
                           setGeneratedShareImage(null);
                           setCustomBgImage(null);
+                          setStatsScale(1);
                         }}
                         variant="outline"
                         className="w-full py-4 flex items-center justify-center gap-2 border-2 border-orange-200 text-orange-600 font-bold hover:bg-orange-50 mb-3"
@@ -3628,7 +3546,6 @@ export default function App() {
                                 reader.onloadend = () => {
                                   const result = reader.result as string;
                                   setCustomBgImage(result);
-                                  generatePhotoPostImage(result);
                                 };
                                 reader.readAsDataURL(file);
                               }}
@@ -3649,7 +3566,6 @@ export default function App() {
                                 reader.onloadend = () => {
                                   const result = reader.result as string;
                                   setCustomBgImage(result);
-                                  generatePhotoPostImage(result);
                                 };
                                 reader.readAsDataURL(file);
                               }}
@@ -3658,6 +3574,100 @@ export default function App() {
                               <ImageIcon className="w-5 h-5" /> Galeria
                             </div>
                           </label>
+                        </div>
+                      )}
+
+                      {/* Interactive Photo Editor */}
+                      {shareMode === 'photo' && customBgImage && !generatedShareImage && !isGeneratingShareImage && (
+                        <div className="flex flex-col gap-4">
+                          <div className="relative w-full flex justify-center items-center">
+                            <div
+                              id="walk-post-photo-card"
+                              ref={photoCardRef}
+                              className="relative inline-block max-w-[500px] w-full rounded-[1.5rem] overflow-hidden bg-black max-h-[60vh] border border-white/20 shadow-2xl"
+                            >
+                              <img src={customBgImage} alt="Fundo" className="block w-full max-h-[60vh] h-auto object-contain" />
+                              
+                              {/* Draggable Stats Overlay */}
+                              <motion.div
+                                drag
+                                dragConstraints={photoCardRef}
+                                dragElastic={0}
+                                dragMomentum={false}
+                                style={{ scale: statsScale }}
+                                className="absolute bottom-6 left-4 p-4 min-w-[260px] cursor-move touch-none drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]"
+                              >
+                                <div className="flex flex-col gap-2">
+                                  {/* Pet & Date */}
+                                  <div className="text-white">
+                                    <div className="font-black tracking-tight text-xl flex items-center gap-2 leading-none">
+                                      <PawPrint className="w-5 h-5 text-white" />
+                                      {walkSummary.petId ? walkSummary.petId.split(',').map(id => { const p = userPets.find(up => up.id === id); return p ? p.name : id; }).join(' & ') : 'Pet'}
+                                    </div>
+                                    <div className="text-white/90 text-[11px] font-bold mt-1 shadow-sm">
+                                      {new Date(walkSummary.startTime).toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
+                                    </div>
+                                  </div>
+                                  {/* Stats */}
+                                  <div className="flex items-center gap-6 mt-2">
+                                    <div>
+                                      <div className="text-[9px] text-white/90 font-black tracking-widest uppercase">Distância</div>
+                                      <div className="font-black text-lg text-white leading-tight">{walkSummary.distance} km</div>
+                                    </div>
+                                    <div>
+                                      <div className="text-[9px] text-white/90 font-black tracking-widest uppercase">Tempo</div>
+                                      <div className="font-black text-lg text-white leading-tight">{Math.floor(walkSummary.duration / 60)}m {walkSummary.duration % 60}s</div>
+                                    </div>
+                                  </div>
+                                  <div className="mt-1">
+                                      <div className="text-[9px] text-orange-400 font-black tracking-widest uppercase">Ritmo Média</div>
+                                      <div className="font-black text-lg text-orange-500 leading-tight">{formatPace(walkSummary.duration, walkSummary.distance)} min/km</div>
+                                  </div>
+                                  {/* Watermark integrado no bloco */}
+                                  <div className="flex justify-start mt-2 pt-2 border-t border-white/10">
+                                    <span className="font-black text-white text-base tracking-wider drop-shadow-md">FocinhoApp</span>
+                                  </div>
+                                </div>
+                              </motion.div>
+                            </div>
+                          </div>
+
+                          {/* Direct Action Buttons */}
+                          <div className="flex flex-col gap-3 mt-2">
+                            <div className="flex gap-3">
+                              <Button
+                                onClick={async () => {
+                                  const img = await capturePhotoPostImage();
+                                  if (img) {
+                                    handleDownloadShareImage(img);
+                                    setShowShareModal(false);
+                                  }
+                                }}
+                                className="flex-1 py-4 flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 border-none text-white font-bold rounded-[1.5rem]"
+                              >
+                                <Download className="w-5 h-5" /> Salvar
+                              </Button>
+                              <Button
+                                onClick={async () => {
+                                  const img = await capturePhotoPostImage();
+                                  if (img) {
+                                    handleSharePostImage(img);
+                                    setShowShareModal(false);
+                                  }
+                                }}
+                                variant="secondary"
+                                className="flex-1 py-4 flex items-center justify-center gap-2 border-transparent text-white bg-white/10 hover:bg-white/20 font-bold rounded-[1.5rem]"
+                              >
+                                <Share2 className="w-5 h-5" /> Compartilhar
+                              </Button>
+                            </div>
+                            <button
+                              onClick={() => { setGeneratedShareImage(null); setShareMode(null); setCustomBgImage(null); setShowShareModal(false); }}
+                              className="w-full text-white/60 text-sm py-2 hover:text-white transition-colors"
+                            >
+                              ← Escolher outro estilo
+                            </button>
+                          </div>
                         </div>
                       )}
 
