@@ -1325,6 +1325,8 @@ export default function App() {
     if (!element || !walkSummary) return null;
     setIsGeneratingShareImage(true);
     try {
+      // Safari warmup pass forces CSS/SVG layout calculation
+      await toPng(element, { skipFonts: true, imagePlaceholder: '' }).catch(() => {});
       // Wait for map tiles to load
       await new Promise((r) => setTimeout(r, 1200));
       const base = await toPng(element, { cacheBust: true, pixelRatio: 2, backgroundColor: '#ffffff' });
@@ -1346,8 +1348,10 @@ export default function App() {
     setIsGeneratingShareImage(true);
     try {
       // Small delay to ensure motion drag finishes settling if user just released
-      await new Promise(resolve => setTimeout(resolve, 100));
-      const dataUrl = await toPng(element, { cacheBust: true, pixelRatio: 3 });
+      await new Promise(resolve => setTimeout(resolve, 300));
+      // Safari warmup pass forces CSS layout calculation
+      await toPng(element, { skipFonts: true, imagePlaceholder: '' }).catch(() => {});
+      const dataUrl = await toPng(element, { cacheBust: true, pixelRatio: 2 });
       setGeneratedShareImage(dataUrl);
       return dataUrl;
     } catch (err) {
