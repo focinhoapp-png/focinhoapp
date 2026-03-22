@@ -1373,12 +1373,24 @@ export default function App() {
     setShowShareModal(false);
   };
 
+  const dataURLtoBlob = (dataurl: string) => {
+    const arr = dataurl.split(',');
+    const mimeMatch = arr[0].match(/:(.*?);/);
+    const mime = mimeMatch ? mimeMatch[1] : 'image/png';
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while (n--) {
+      u8arr[n] = bstr.charCodeAt(n);
+    }
+    return new Blob([u8arr], { type: mime });
+  };
+
   const handleDownloadShareImage = async (imgParam?: string) => {
     let img = imgParam || generatedShareImage;
     if (!img) return;
     try {
-      const res = await fetch(img);
-      const blob = await res.blob();
+      const blob = img.startsWith('data:') ? dataURLtoBlob(img) : await (await fetch(img)).blob();
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -1407,8 +1419,7 @@ export default function App() {
     let img = imgParam || generatedShareImage;
     if (!img) return;
     try {
-      const res = await fetch(img);
-      const blob = await res.blob();
+      const blob = img.startsWith('data:') ? dataURLtoBlob(img) : await (await fetch(img)).blob();
       const file = new File([blob], `post-passeio-${Date.now()}.png`, { type: 'image/png' });
       if (navigator.share && navigator.canShare({ files: [file] })) {
         await navigator.share({ files: [file], title: 'Meu Passeio no FocinhoApp' });
@@ -1430,8 +1441,7 @@ export default function App() {
     }
 
     try {
-      const res = await fetch(imgToDownload);
-      const blob = await res.blob();
+      const blob = imgToDownload.startsWith('data:') ? dataURLtoBlob(imgToDownload) : await (await fetch(imgToDownload)).blob();
       const url = URL.createObjectURL(blob);
 
       const link = document.createElement('a');
@@ -1462,8 +1472,7 @@ export default function App() {
     }
 
     try {
-      const res = await fetch(imgToShare);
-      const blob = await res.blob();
+      const blob = imgToShare.startsWith('data:') ? dataURLtoBlob(imgToShare) : await (await fetch(imgToShare)).blob();
       const file = new File([blob], `passeio-${new Date().getTime()}.png`, { type: 'image/png' });
 
       if (navigator.share && navigator.canShare({ files: [file] })) {
