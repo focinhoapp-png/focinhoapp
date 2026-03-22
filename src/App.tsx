@@ -538,6 +538,12 @@ export default function App() {
   const [selectedWalkPets, setSelectedWalkPets] = useState<string[]>([]);
   const [generatedWalkImage, setGeneratedWalkImage] = useState<string | null>(null);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+  // Walk Post Creator
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [shareMode, setShareMode] = useState<'map' | 'photo' | null>(null);
+  const [customBgImage, setCustomBgImage] = useState<string | null>(null);
+  const [isGeneratingShareImage, setIsGeneratingShareImage] = useState(false);
+  const [generatedShareImage, setGeneratedShareImage] = useState<string | null>(null);
   const [currentLocation, setCurrentLocation] = useState<[number, number] | null>(null);
   const [walkTimer, setWalkTimer] = useState(0);
   const [walkHistory, setWalkHistory] = useState<Walk[]>([]);
@@ -1282,6 +1288,202 @@ export default function App() {
       return null;
     } finally {
       setIsGeneratingImage(false);
+    }
+  };
+
+  // ─── Walk Post Creator helpers ───────────────────────────────────────────
+
+  const formatPace = (durationSec: number, distanceKm: number): string => {
+    if (!distanceKm || distanceKm === 0) return '--:--';
+    const paceMin = durationSec / 60 / distanceKm;
+    const mins = Math.floor(paceMin);
+    const secs = Math.round((paceMin - mins) * 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const addWatermark = async (dataUrl: string): Promise<string> => {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const img = new Image();
+    await new Promise((resolve) => { img.onload = resolve; img.src = dataUrl; });
+    canvas.width = img.width;
+    canvas.height = img.height;
+    if (!ctx) return dataUrl;
+    ctx.drawImage(img, 0, 0);
+    ctx.font = `bold ${Math.round(img.width * 0.045)}px Inter, sans-serif`;
+    ctx.fillStyle = 'rgba(249,115,22,0.55)';
+    ctx.textAlign = 'right';
+    ctx.fillText('FocinhoApp', canvas.width - 32, canvas.height - 28);
+    return canvas.toDataURL('image/png');
+  };
+
+  const generateMapPostImage = async (): Promise<string | null> => {
+    const element = document.getElementById('walk-post-map-card');
+    if (!element || !walkSummary) return null;
+    setIsGeneratingShareImage(true);
+    try {
+      // Wait for map tiles to load
+      await new Promise((r) => setTimeout(r, 1200));
+      const base = await toPng(element, { cacheBust: true, pixelRatio: 2, backgroundColor: '#ffffff' });
+      const final = await addWatermark(base);
+      setGeneratedShareImage(final);
+      return final;
+    } catch (err) {
+      console.error('generateMapPostImage error', err);
+      setError('Não foi possível gerar a imagem do mapa.');
+      return null;
+    } finally {
+      setIsGeneratingShareImage(false);
+    }
+  };
+
+  const generatePhotoPostImage = async (bgDataUrl: string): Promise<string | null> => {
+    if (!walkSummary) return null;
+    setIsGeneratingShareImage(true);
+    try {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return null;
+
+      const bg = new Image();
+      await new Promise((resolve) => { bg.onload = resolve; bg.src = bgDataUrl; });
+
+      // Fixed output size 1080x1080
+      const SIZE = 1080;
+      canvas.width = SIZE;
+      canvas.height = SIZE;
+
+      // Background photo (cover)
+      const scale = Math.max(SIZE / bg.width, SIZE / bg.height);
+      const sw = SIZE / scale;
+      const sh = SIZE / scale;
+      const sx = (bg.width - sw) / 2;
+      const sy = (bg.height - sh) / 2;
+      ctx.drawImage(bg, sx, sy, sw, sh, 0, 0, SIZE, SIZE);
+
+      // Dark gradient overlay bottom 45%
+      const grad = ctx.createLinearGradient(0, SIZE * 0.45, 0, SIZE);
+      grad.addColorStop(0, 'rgba(0,0,0,0)');
+      grad.addColorStop(0.4, 'rgba(0,0,0,0.7)');
+      grad.addColorStop(1, 'rgba(0,0,0,0.92)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, SIZE, SIZE);
+
+      // Pet name + date at top of overlay band
+      const pets = walkSummary.petId
+        ? walkSummary.petId.split(',').map((id) => {
+            const p = userPets.find((up) => up.id === id);
+            return p ? p.name : id;
+          }).join(' & ')
+        : 'Pet';
+
+      const walkDate = new Date(walkSummary.startTime).toLocaleDateString('pt-BR', {
+        weekday: 'long', day: 'numeric', month: 'long'
+      });
+
+      const pace = formatPace(walkSummary.duration, walkSummary.distance);
+      const durationStr = `${Math.floor(walkSummary.duration / 60)}m ${walkSummary.duration % 60}s`;
+
+      // Pet name
+      ctx.fillStyle = '#ffffff';
+      ctx.font = `bold ${SIZE * 0.075}px Inter, sans-serif`;
+      ctx.textAlign = 'left';
+      ctx.fillText(`🐾 ${pets}`, SIZE * 0.07, SIZE * 0.62);
+
+      // Date
+      ctx.fillStyle = 'rgba(255,255,255,0.72)';
+      ctx.font = `${SIZE * 0.038}px Inter, sans-serif`;
+      ctx.fillText(walkDate, SIZE * 0.07, SIZE * 0.67);
+
+      // Stats row 1 — Distance | Time
+      const labelStyle = 'rgba(255,255,255,0.6)';
+      const valueStyle = '#ffffff';
+      const statY1label = SIZE * 0.755;
+      const statY1value = SIZE * 0.808;
+      const col1x = SIZE * 0.07;
+      const col2x = SIZE * 0.4;
+
+      ctx.fillStyle = labelStyle;
+      ctx.font = `bold ${SIZE * 0.03}px Inter, sans-serif`;
+      ctx.fillText('DISTÂNCIA', col1x, statY1label);
+      ctx.fillText('TEMPO', col2x, statY1label);
+
+      ctx.fillStyle = valueStyle;
+      ctx.font = `bold ${SIZE * 0.072}px Inter, sans-serif`;
+      ctx.fillText(`${walkSummary.distance} km`, col1x, statY1value);
+      ctx.fillText(durationStr, col2x, statY1value);
+
+      // Stats row 2 — Pace
+      const statY2label = SIZE * 0.865;
+      const statY2value = SIZE * 0.922;
+      ctx.fillStyle = labelStyle;
+      ctx.font = `bold ${SIZE * 0.03}px Inter, sans-serif`;
+      ctx.fillText('RITMO', col1x, statY2label);
+
+      ctx.fillStyle = '#f97316';
+      ctx.font = `bold ${SIZE * 0.072}px Inter, sans-serif`;
+      ctx.fillText(`${pace} min/km`, col1x, statY2value);
+
+      // Watermark
+      ctx.fillStyle = 'rgba(249,115,22,0.65)';
+      ctx.font = `bold ${SIZE * 0.038}px Inter, sans-serif`;
+      ctx.textAlign = 'right';
+      ctx.fillText('FocinhoApp', SIZE - SIZE * 0.05, SIZE * 0.96);
+
+      const final = canvas.toDataURL('image/png');
+      setGeneratedShareImage(final);
+      return final;
+    } catch (err) {
+      console.error('generatePhotoPostImage error', err);
+      setError('Erro ao gerar imagem com foto.');
+      return null;
+    } finally {
+      setIsGeneratingShareImage(false);
+    }
+  };
+
+  const handleDownloadShareImage = async () => {
+    let img = generatedShareImage;
+    if (!img) return;
+    try {
+      const res = await fetch(img);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `post-passeio-${Date.now()}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      setSuccessMessage('Imagem salva com sucesso!');
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } catch {
+      const link = document.createElement('a');
+      link.href = img;
+      link.download = `post-passeio-${Date.now()}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setSuccessMessage('Imagem salva com sucesso!');
+      setTimeout(() => setSuccessMessage(null), 3000);
+    }
+  };
+
+  const handleSharePostImage = async () => {
+    let img = generatedShareImage;
+    if (!img) return;
+    try {
+      const res = await fetch(img);
+      const blob = await res.blob();
+      const file = new File([blob], `post-passeio-${Date.now()}.png`, { type: 'image/png' });
+      if (navigator.share && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: 'Meu Passeio no FocinhoApp' });
+      } else {
+        handleDownloadShareImage();
+      }
+    } catch {
+      handleDownloadShareImage();
     }
   };
 
@@ -3237,6 +3439,20 @@ export default function App() {
                     )}
 
                     <div className="space-y-3">
+                      {/* NEW: Criar Post button */}
+                      <Button
+                        onClick={() => {
+                          setShowShareModal(true);
+                          setShareMode(null);
+                          setGeneratedShareImage(null);
+                          setCustomBgImage(null);
+                        }}
+                        variant="outline"
+                        className="w-full py-4 flex items-center justify-center gap-2 border-2 border-orange-200 text-orange-600 font-bold hover:bg-orange-50 mb-3"
+                      >
+                        <span className="text-lg">✨</span> Criar Post
+                      </Button>
+
                       <div className="flex gap-3">
                         <Button
                           onClick={handleDownloadWalkImage}
@@ -3277,6 +3493,231 @@ export default function App() {
                     </div>
                   </div>
                 )}
+              </motion.div>
+            )}
+
+            {/* ═══ WALK POST CREATOR MODAL ═══ */}
+            {showShareModal && walkSummary && (
+              <motion.div
+                key="share-modal"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 z-50 flex flex-col"
+                style={{ backgroundColor: 'rgba(0,0,0,0.85)' }}
+              >
+                {/* Hidden off-screen card for map image capture */}
+                <div
+                  id="walk-post-map-card"
+                  style={{
+                    position: 'absolute',
+                    left: '-9999px',
+                    top: 0,
+                    width: '540px',
+                    backgroundColor: '#ffffff',
+                    borderRadius: '24px',
+                    padding: '32px',
+                    fontFamily: 'Inter, sans-serif',
+                  }}
+                >
+                  {/* Header: Logo Only */}
+                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '24px' }}>
+                    <img src="./pwa-512x512.png" alt="FocinhoApp" style={{ width: 64, height: 64, borderRadius: 16, objectFit: 'cover' }} />
+                  </div>
+
+                  {/* Map First */}
+                  <div style={{ height: 280, borderRadius: 20, overflow: 'hidden', border: '2px solid #f3f4f6', marginBottom: 20, position: 'relative' }}>
+                    <MapContainer
+                      center={walkSummary.path[0] ? [walkSummary.path[0].lat, walkSummary.path[0].lng] : currentLocation || [0, 0]}
+                      zoom={15}
+                      style={{ height: '100%', width: '100%' }}
+                      zoomControl={false} dragging={false} scrollWheelZoom={false} touchZoom={false}
+                    >
+                      <TileLayer url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png" crossOrigin="anonymous" />
+                      <Polyline positions={walkSummary.path.map(p => [p.lat, p.lng] as [number, number])} color="#f97316" weight={6} />
+                    </MapContainer>
+                  </div>
+
+                  {/* Context Info (Pet Name & Date) under the Map */}
+                  <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+                    <div style={{ fontWeight: 900, fontSize: 22, color: '#111' }}>
+                      {walkSummary.petId
+                        ? walkSummary.petId.split(',').map(id => { const p = userPets.find(up => up.id === id); return p ? p.name : id; }).join(' & ')
+                        : 'Meu Pet'}
+                    </div>
+                    <div style={{ fontSize: 13, color: '#999', marginTop: 4 }}>
+                      {new Date(walkSummary.startTime).toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
+                    </div>
+                  </div>
+
+                  {/* Stats grid */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+                    {[
+                      { label: 'DISTÂNCIA', value: `${walkSummary.distance} km`, color: '#f97316' },
+                      { label: 'TEMPO', value: `${Math.floor(walkSummary.duration / 60)}m ${walkSummary.duration % 60}s`, color: '#111' },
+                      { label: 'RITMO', value: `${formatPace(walkSummary.duration, walkSummary.distance)} min/km`, color: '#111' },
+                    ].map(s => (
+                      <div key={s.label} style={{ background: '#f9fafb', borderRadius: 16, padding: '16px 12px', textAlign: 'center' }}>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: '#9ca3af', letterSpacing: 1, marginBottom: 6 }}>{s.label}</div>
+                        <div style={{ fontSize: 22, fontWeight: 900, color: s.color }}>{s.value}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* ── Modal content ── */}
+                <div className="flex-1 flex flex-col justify-end p-4 pb-10 gap-4">
+
+                  {/* Generated image preview */}
+                  {generatedShareImage ? (
+                    <div className="space-y-4">
+                      <div className="bg-white/10 p-3 rounded-[2rem] overflow-hidden">
+                        <img src={generatedShareImage} alt="Post" className="w-full h-auto rounded-[1.5rem] max-h-[60vh] object-contain mx-auto" />
+                      </div>
+                      <div className="flex gap-3">
+                        <Button
+                          onClick={() => {
+                            handleDownloadShareImage();
+                            setShowShareModal(false);
+                          }}
+                          className="flex-1 py-4 flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 border-none text-white"
+                        >
+                          <Download className="w-5 h-5" /> Salvar
+                        </Button>
+                        <Button
+                          onClick={handleSharePostImage}
+                          variant="secondary"
+                          className="flex-1 py-4 flex items-center justify-center gap-2 border-transparent text-white bg-white/10 hover:bg-white/20"
+                        >
+                          <Share2 className="w-5 h-5" /> Compartilhar
+                        </Button>
+                      </div>
+                      <button
+                        onClick={() => { setGeneratedShareImage(null); setShareMode(null); setCustomBgImage(null); }}
+                        className="w-full text-white/60 text-sm py-2 hover:text-white transition-colors"
+                      >
+                        ← Escolher outro estilo
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Loading state */}
+                      {isGeneratingShareImage && (
+                        <div className="flex flex-col items-center gap-3 py-8">
+                          <Loader2 className="w-10 h-10 text-orange-500 animate-spin" />
+                          <p className="text-white font-medium">Gerando imagem...</p>
+                        </div>
+                      )}
+
+                      {/* Photo picker for photo mode */}
+                      {shareMode === 'photo' && !customBgImage && !isGeneratingShareImage && (
+                        <div className="bg-white/10 rounded-[2rem] p-6 flex flex-col items-center gap-4 border border-white/20">
+                          <Camera className="w-10 h-10 text-orange-400" />
+                          <p className="text-white font-bold text-center">Escolha uma foto para o fundo</p>
+                          <p className="text-white/50 text-sm text-center mb-2">Tire uma foto agora ou escolha da galeria</p>
+                          <label className="w-full cursor-pointer">
+                            <input
+                              type="file"
+                              accept="image/*"
+                              capture="environment"
+                              className="hidden"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (!file) return;
+                                const reader = new FileReader();
+                                reader.onloadend = () => {
+                                  const result = reader.result as string;
+                                  setCustomBgImage(result);
+                                  generatePhotoPostImage(result);
+                                };
+                                reader.readAsDataURL(file);
+                              }}
+                            />
+                            <div className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-4 rounded-[1.5rem] text-center flex items-center justify-center gap-2 transition-colors">
+                              <Camera className="w-5 h-5" /> Tirar Foto
+                            </div>
+                          </label>
+                          <label className="w-full cursor-pointer mt-2">
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (!file) return;
+                                const reader = new FileReader();
+                                reader.onloadend = () => {
+                                  const result = reader.result as string;
+                                  setCustomBgImage(result);
+                                  generatePhotoPostImage(result);
+                                };
+                                reader.readAsDataURL(file);
+                              }}
+                            />
+                            <div className="bg-white/10 hover:bg-white/20 text-white font-bold py-4 rounded-[1.5rem] text-center flex items-center justify-center gap-2 transition-colors border border-white/20">
+                              <ImageIcon className="w-5 h-5" /> Galeria
+                            </div>
+                          </label>
+                        </div>
+                      )}
+
+                      {/* Mode selection cards */}
+                      {!shareMode && !isGeneratingShareImage && (
+                        <>
+                          <div className="text-center mb-4">
+                            <p className="text-white font-black text-xl">Criar Post do Passeio</p>
+                            <p className="text-white/50 text-sm mt-1">Escolha o estilo da sua imagem</p>
+                          </div>
+                          <div className="grid grid-cols-2 gap-3 mb-2">
+                            {/* Option 1: With Map */}
+                            <button
+                              onClick={() => {
+                                setShareMode('map');
+                                generateMapPostImage();
+                              }}
+                              className="bg-white/10 border-2 border-orange-400/60 rounded-[2rem] p-6 flex flex-col items-center gap-3 hover:bg-orange-500/20 transition-all active:scale-95"
+                            >
+                              <div className="w-14 h-14 bg-orange-500/20 rounded-[1.2rem] flex items-center justify-center">
+                                <MapPin className="w-7 h-7 text-orange-400" />
+                              </div>
+                              <div className="text-center">
+                                <p className="text-white font-black text-sm">Com Mapa</p>
+                                <p className="text-white/50 text-xs mt-1">Trajeto GPS + stats</p>
+                              </div>
+                            </button>
+
+                            {/* Option 2: Without Map */}
+                            <button
+                              onClick={() => setShareMode('photo')}
+                              className="bg-white/10 border-2 border-white/20 rounded-[2rem] p-6 flex flex-col items-center gap-3 hover:bg-white/20 transition-all active:scale-95"
+                            >
+                              <div className="w-14 h-14 bg-white/10 rounded-[1.2rem] flex items-center justify-center">
+                                <Camera className="w-7 h-7 text-white/70" />
+                              </div>
+                              <div className="text-center">
+                                <p className="text-white font-black text-sm">Sem Mapa</p>
+                                <p className="text-white/50 text-xs mt-1">Foto + overlay</p>
+                              </div>
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </>
+                  )}
+
+                  {/* Close button */}
+                  <button
+                    onClick={() => {
+                      setShowShareModal(false);
+                      setShareMode(null);
+                      setGeneratedShareImage(null);
+                      setCustomBgImage(null);
+                    }}
+                    className="w-full bg-white/10 text-white font-bold py-4 rounded-[1.5rem] hover:bg-white/20 transition-colors mt-2"
+                  >
+                    Fechar
+                  </button>
+                </div>
               </motion.div>
             )}
 
