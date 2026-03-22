@@ -546,6 +546,7 @@ export default function App() {
   const [generatedShareImage, setGeneratedShareImage] = useState<string | null>(null);
   const [statsScale, setStatsScale] = useState(1);
   const photoCardRef = useRef<HTMLDivElement>(null);
+  const pinchRef = useRef<{ initialDistance: number; initialScale: number } | null>(null);
   const [currentLocation, setCurrentLocation] = useState<[number, number] | null>(null);
   const [walkTimer, setWalkTimer] = useState(0);
   const [walkHistory, setWalkHistory] = useState<Walk[]>([]);
@@ -3595,36 +3596,57 @@ export default function App() {
                                 dragElastic={0}
                                 dragMomentum={false}
                                 style={{ scale: statsScale }}
+                                onTouchStart={(e) => {
+                                  if (e.touches.length === 2) {
+                                    const dist = Math.hypot(
+                                      e.touches[0].clientX - e.touches[1].clientX,
+                                      e.touches[0].clientY - e.touches[1].clientY
+                                    );
+                                    pinchRef.current = { initialDistance: dist, initialScale: statsScale };
+                                  }
+                                }}
+                                onTouchMove={(e) => {
+                                  if (e.touches.length === 2 && pinchRef.current) {
+                                    const dist = Math.hypot(
+                                      e.touches[0].clientX - e.touches[1].clientX,
+                                      e.touches[0].clientY - e.touches[1].clientY
+                                    );
+                                    const scaleChange = dist / pinchRef.current.initialDistance;
+                                    const newScale = Math.min(Math.max(0.3, pinchRef.current.initialScale * scaleChange), 3);
+                                    setStatsScale(newScale);
+                                  }
+                                }}
+                                onTouchEnd={() => { pinchRef.current = null; }}
                                 className="absolute bottom-6 left-4 p-4 min-w-[260px] cursor-move touch-none drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]"
                               >
-                                <div className="flex flex-col gap-2">
+                                <div className="flex flex-col items-center gap-2 text-center w-full">
                                   {/* Pet & Date */}
-                                  <div className="text-white">
-                                    <div className="font-black tracking-tight text-xl flex items-center gap-2 leading-none">
+                                  <div className="text-white flex flex-col items-center">
+                                    <div className="font-black tracking-tight text-xl flex items-center justify-center gap-2 leading-none w-full">
                                       <PawPrint className="w-5 h-5 text-white" />
                                       {walkSummary.petId ? walkSummary.petId.split(',').map(id => { const p = userPets.find(up => up.id === id); return p ? p.name : id; }).join(' & ') : 'Pet'}
                                     </div>
-                                    <div className="text-white/90 text-[11px] font-bold mt-1 shadow-sm">
+                                    <div className="text-white/90 text-[11px] font-bold mt-1 shadow-sm text-center">
                                       {new Date(walkSummary.startTime).toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
                                     </div>
                                   </div>
                                   {/* Stats */}
-                                  <div className="flex items-center gap-6 mt-2">
-                                    <div>
-                                      <div className="text-[9px] text-white/90 font-black tracking-widest uppercase">Distância</div>
-                                      <div className="font-black text-lg text-white leading-tight">{walkSummary.distance} km</div>
+                                  <div className="flex items-center justify-center gap-6 mt-2 w-full">
+                                    <div className="flex flex-col items-center">
+                                      <div className="text-[9px] text-white/90 font-black tracking-widest uppercase text-center">Distância</div>
+                                      <div className="font-black text-lg text-white leading-tight text-center">{walkSummary.distance} km</div>
                                     </div>
-                                    <div>
-                                      <div className="text-[9px] text-white/90 font-black tracking-widest uppercase">Tempo</div>
-                                      <div className="font-black text-lg text-white leading-tight">{Math.floor(walkSummary.duration / 60)}m {walkSummary.duration % 60}s</div>
+                                    <div className="flex flex-col items-center">
+                                      <div className="text-[9px] text-white/90 font-black tracking-widest uppercase text-center">Tempo</div>
+                                      <div className="font-black text-lg text-white leading-tight text-center">{Math.floor(walkSummary.duration / 60)}m {walkSummary.duration % 60}s</div>
                                     </div>
                                   </div>
-                                  <div className="mt-1">
+                                  <div className="flex flex-col items-center mt-1 w-full text-center">
                                       <div className="text-[9px] text-orange-400 font-black tracking-widest uppercase">Ritmo Média</div>
                                       <div className="font-black text-lg text-orange-500 leading-tight">{formatPace(walkSummary.duration, walkSummary.distance)} min/km</div>
                                   </div>
                                   {/* Watermark integrado no bloco */}
-                                  <div className="flex justify-start mt-2 pt-2 border-t border-white/10">
+                                  <div className="flex justify-center mt-2 pt-2 border-t border-white/10 w-full">
                                     <span className="font-black text-white text-base tracking-wider drop-shadow-md">FocinhoApp</span>
                                   </div>
                                 </div>
