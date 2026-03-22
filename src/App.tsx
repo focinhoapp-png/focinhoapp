@@ -44,7 +44,9 @@ import {
   Navigation,
   Globe,
   Users,
-  Copy
+  Copy,
+  Info,
+  FileText
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap } from 'react-leaflet';
@@ -3638,6 +3640,20 @@ export default function App() {
                       <ChevronRight className="text-gray-300" />
                     </button>
 
+                    <button
+                      onClick={() => setAccountSubView('sobre')}
+                      className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 flex items-center gap-4 hover:border-orange-200 transition-all text-left mb-4"
+                    >
+                      <div className="w-12 h-12 bg-orange-50 rounded-2xl flex items-center justify-center">
+                        <Info className="w-6 h-6 text-orange-400" />
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-bold text-gray-800">Sobre</h4>
+                        <p className="text-xs text-gray-400">Termos, privacidade e cache</p>
+                      </div>
+                      <ChevronRight className="text-gray-300" />
+                    </button>
+
                     {isAdmin && (
                       <button
                         onClick={() => setAccountSubView('admin')}
@@ -4174,6 +4190,66 @@ export default function App() {
                       </Button>
                       <div className="h-20" /> {/* Spacer to avoid bottom nav overlap */}
                     </div>
+                  </div>
+                )}
+
+                {accountSubView === 'sobre' && (
+                  <div className="space-y-6">
+                    <button onClick={() => setAccountSubView('menu')} className="flex items-center gap-2 text-orange-500 font-bold text-sm">
+                      <ChevronLeft className="w-4 h-4" /> Voltar ao menu
+                    </button>
+
+                    <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100 space-y-6">
+                      {/* App icon centered */}
+                      <div className="flex flex-col items-center gap-3 pb-4 border-b border-gray-100">
+                        <img src="./pwa-512x512.png" alt="FocinhoApp" className="w-20 h-20 object-cover rounded-[1.5rem] shadow-lg" />
+                        <div className="text-center">
+                          <p className="font-black text-gray-900 text-lg">FocinhoApp</p>
+                          <p className="text-xs text-gray-400">Proteja quem você ama</p>
+                        </div>
+                      </div>
+
+                      {/* Items */}
+                      <div className="space-y-3">
+                        <button
+                          onClick={() => window.open('https://focinhoapp.com/termos', '_blank')}
+                          className="w-full flex items-center gap-4 p-4 bg-gray-50 rounded-2xl hover:bg-orange-50 hover:border-orange-100 border border-transparent transition-all text-left"
+                        >
+                          <div className="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center">
+                            <FileText className="w-5 h-5 text-orange-500" />
+                          </div>
+                          <span className="flex-1 font-semibold text-gray-800 text-sm">Termos de Serviço</span>
+                          <ChevronRight className="w-4 h-4 text-gray-300" />
+                        </button>
+
+                        <button
+                          onClick={() => window.open('https://focinhoapp.com/privacidade', '_blank')}
+                          className="w-full flex items-center gap-4 p-4 bg-gray-50 rounded-2xl hover:bg-orange-50 hover:border-orange-100 border border-transparent transition-all text-left"
+                        >
+                          <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center">
+                            <ShieldCheck className="w-5 h-5 text-blue-500" />
+                          </div>
+                          <span className="flex-1 font-semibold text-gray-800 text-sm">Política de Privacidade</span>
+                          <ChevronRight className="w-4 h-4 text-gray-300" />
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            localStorage.clear();
+                            sessionStorage.clear();
+                            alert('Cache limpo com sucesso!');
+                          }}
+                          className="w-full flex items-center gap-4 p-4 bg-gray-50 rounded-2xl hover:bg-red-50 hover:border-red-100 border border-transparent transition-all text-left"
+                        >
+                          <div className="w-10 h-10 bg-red-50 rounded-xl flex items-center justify-center">
+                            <Trash2 className="w-5 h-5 text-red-400" />
+                          </div>
+                          <span className="flex-1 font-semibold text-gray-800 text-sm">Limpar Cache</span>
+                          <ChevronRight className="w-4 h-4 text-gray-300" />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="h-20" />
                   </div>
                 )}
 
