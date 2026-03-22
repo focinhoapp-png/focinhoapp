@@ -2252,19 +2252,19 @@ export default function App() {
 
   return (
     <ErrorBoundary>
-      <div className="min-h-screen bg-gray-50 font-sans text-gray-900 pb-32 md:pb-0">
+      <div className={`min-h-screen ${!user && view === 'home' ? 'bg-white' : 'bg-gray-50'} font-sans text-gray-900 pb-32 md:pb-0`}>
         {/* Header */}
-        <header className="bg-white border-b border-gray-100 px-6 py-4 sticky top-0 z-50 flex justify-between items-center">
-          <div className="flex items-center gap-2 cursor-pointer" onClick={() => setView(user ? 'dashboard' : 'home')}>
-            <img src="./logo.png" alt="FocinhoApp Logo" className="w-10 h-10 object-cover rounded-xl" />
-            <span translate="no" className="text-xl font-bold tracking-tight">FocinhoApp</span>
-          </div>
-          {user && (
+        {user && (
+          <header className="bg-white border-b border-gray-100 px-6 py-4 sticky top-0 z-50 flex justify-between items-center">
+            <div className="flex items-center gap-2 cursor-pointer" onClick={() => setView('dashboard')}>
+              <img src="./pwa-512x512.png" alt="FocinhoApp Logo" className="w-10 h-10 object-cover rounded-xl" />
+              <span translate="no" className="text-xl font-bold tracking-tight">FocinhoApp</span>
+            </div>
             <button onClick={handleLogout} className="p-2 text-gray-400 hover:text-red-500 transition-colors">
               <LogOut className="w-6 h-6" />
             </button>
-          )}
-        </header>
+          </header>
+        )}
 
         <main className="max-w-xl mx-auto p-4 md:p-6 pb-40">
           <AnimatePresence mode="wait">
@@ -2279,7 +2279,7 @@ export default function App() {
               >
                 <div className="relative">
                   <div className="absolute -inset-4 bg-orange-500/10 blur-3xl rounded-full" />
-                  <QrCode className="w-32 h-32 text-orange-500 relative" />
+                  <img src="./pwa-512x512.png" alt="FocinhoApp Logo" className="w-32 h-32 object-cover rounded-[2rem] relative z-10 shadow-2xl" />
                 </div>
                 <div className="space-y-4">
                   <h1 className="text-4xl font-extrabold leading-tight">
@@ -2356,12 +2356,44 @@ export default function App() {
                   <Button onClick={handleLogin} className="w-full py-4 text-lg" loading={authLoading}>
                     {authMode === 'login' ? 'Entrar' : 'Criar Conta'}
                   </Button>
-                  <button
-                    onClick={() => { setAuthMode(m => m === 'login' ? 'register' : 'login'); setAuthError(null); }}
-                    className="w-full text-sm text-gray-500 hover:text-orange-500 transition-colors py-1 font-medium"
-                  >
-                    {authMode === 'login' ? 'Não tem conta? Criar uma agora' : 'Já tem conta? Fazer login'}
-                  </button>
+                  {authMode === 'login' ? (
+                    <>
+                      <button
+                        onClick={async () => { 
+                          if (!authEmail) {
+                            setAuthError('Problema: Digite seu email para recuperar a senha.');
+                            return;
+                          }
+                          try {
+                            const { error } = await supabase.auth.resetPasswordForEmail(authEmail);
+                            if (error) throw error;
+                            alert('Email de recuperação enviado! Verifique sua caixa de entrada.');
+                          } catch (err: any) {
+                            setAuthError(err.message);
+                          }
+                        }}
+                        className="w-full text-sm text-gray-500 hover:text-orange-500 transition-colors py-1 font-medium"
+                      >
+                        Esqueceu a senha?
+                      </button>
+                      <div className="pt-4 pb-2 mt-2 w-full">
+                        <Button
+                          onClick={() => { setAuthMode('register'); setAuthError(null); }}
+                          variant="outline"
+                          className="w-full py-4 text-lg border-2 text-gray-800 font-bold"
+                        >
+                          Criar uma nova conta
+                        </Button>
+                      </div>
+                    </>
+                  ) : (
+                    <button
+                      onClick={() => { setAuthMode('login'); setAuthError(null); }}
+                      className="w-full text-sm text-gray-500 hover:text-orange-500 transition-colors py-1 font-medium"
+                    >
+                      Já tem conta? Fazer login
+                    </button>
+                  )}
                   <div className="flex items-center justify-center gap-2 text-sm text-gray-400">
                     <ShieldCheck className="w-4 h-4" />
                     <span>Seguro e gratuito para usuários</span>
