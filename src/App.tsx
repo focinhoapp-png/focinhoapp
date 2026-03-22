@@ -1359,6 +1359,20 @@ export default function App() {
     }
   };
 
+  const resetWalkState = () => {
+    setWalkSummary(null);
+    setGeneratedWalkImage(null);
+    setWalkPath([]);
+    setWalkMarkers([]);
+    setWalkDistance(0);
+    setWalkAltitudeGain(0);
+    setWalkMaxSpeed(0);
+    setLastAltitude(null);
+    setWalkSpeeds([]);
+    setWalkStartTime(null);
+    setShowShareModal(false);
+  };
+
   const handleDownloadShareImage = async (imgParam?: string) => {
     let img = imgParam || generatedShareImage;
     if (!img) return;
@@ -1375,6 +1389,7 @@ export default function App() {
       URL.revokeObjectURL(url);
       setSuccessMessage('Imagem salva com sucesso!');
       setTimeout(() => setSuccessMessage(null), 3000);
+      resetWalkState();
     } catch {
       const link = document.createElement('a');
       link.href = img;
@@ -1384,6 +1399,7 @@ export default function App() {
       document.body.removeChild(link);
       setSuccessMessage('Imagem salva com sucesso!');
       setTimeout(() => setSuccessMessage(null), 3000);
+      resetWalkState();
     }
   };
 
@@ -1396,6 +1412,7 @@ export default function App() {
       const file = new File([blob], `post-passeio-${Date.now()}.png`, { type: 'image/png' });
       if (navigator.share && navigator.canShare({ files: [file] })) {
         await navigator.share({ files: [file], title: 'Meu Passeio no FocinhoApp' });
+        resetWalkState();
       } else {
         handleDownloadShareImage(img);
       }
@@ -1424,6 +1441,7 @@ export default function App() {
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
+      resetWalkState();
     } catch (err) {
       const link = document.createElement('a');
       link.href = imgToDownload;
@@ -1431,6 +1449,7 @@ export default function App() {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      resetWalkState();
     }
   };
 
@@ -1453,6 +1472,7 @@ export default function App() {
           title: 'Meu Passeio no FocinhoApp',
           text: 'Confira meu passeio de hoje!',
         });
+        resetWalkState();
       } else {
         handleDownloadWalkImage(imgToShare);
       }
@@ -3392,18 +3412,7 @@ export default function App() {
                         </Button>
                       </div>
                       <Button
-                        onClick={() => {
-                          setWalkSummary(null);
-                          setGeneratedWalkImage(null);
-                          setWalkPath([]);
-                          setWalkMarkers([]);
-                          setWalkDistance(0);
-                          setWalkAltitudeGain(0);
-                          setWalkMaxSpeed(0);
-                          setLastAltitude(null);
-                          setWalkSpeeds([]);
-                          setWalkStartTime(null);
-                        }}
+                        onClick={resetWalkState}
                         variant="outline"
                         className="w-full py-4"
                       >
