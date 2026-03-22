@@ -2335,19 +2335,20 @@ export default function App() {
                         />
                       </div>
                     )}
+                    {authMode === 'login' && (
+                      <p className="text-xl font-bold text-gray-800 text-center pb-1">Entrar no FocinhoApp</p>
+                    )}
                     <Input
-                      label="Email"
                       type="email"
                       value={authEmail}
                       onChange={setAuthEmail}
                       placeholder="seu@email.com"
                     />
                     <Input
-                      label="Senha"
                       type="password"
                       value={authPassword}
                       onChange={setAuthPassword}
-                      placeholder="••••••••"
+                      placeholder="Senha"
                     />
                     {authError && (
                       <p className="text-sm text-red-500 text-center px-1 font-medium">{authError}</p>
