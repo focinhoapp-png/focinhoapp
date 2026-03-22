@@ -52,7 +52,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { toPng } from 'html-to-image';
+import { toPng, toJpeg } from 'html-to-image';
 import { supabase } from './supabase';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 import QRScanner from './components/QRScanner';
@@ -1326,10 +1326,10 @@ export default function App() {
     setIsGeneratingShareImage(true);
     try {
       // Safari warmup pass forces CSS/SVG layout calculation
-      await toPng(element, { skipFonts: true, imagePlaceholder: '' }).catch(() => {});
+      await toJpeg(element, { skipFonts: true, imagePlaceholder: '' }).catch(() => {});
       // Wait for map tiles to load
       await new Promise((r) => setTimeout(r, 1200));
-      const base = await toPng(element, { cacheBust: true, pixelRatio: 2, backgroundColor: '#ffffff' });
+      const base = await toJpeg(element, { cacheBust: true, pixelRatio: 2, backgroundColor: '#ffffff', quality: 0.95 });
       const final = await addWatermark(base);
       setGeneratedShareImage(final);
       return final;
@@ -1350,8 +1350,8 @@ export default function App() {
       // Small delay to ensure motion drag finishes settling if user just released
       await new Promise(resolve => setTimeout(resolve, 300));
       // Safari warmup pass forces CSS layout calculation
-      await toPng(element, { skipFonts: true, imagePlaceholder: '' }).catch(() => {});
-      const dataUrl = await toPng(element, { cacheBust: true, pixelRatio: 2 });
+      await toJpeg(element, { skipFonts: true, imagePlaceholder: '' }).catch(() => {});
+      const dataUrl = await toJpeg(element, { cacheBust: true, pixelRatio: 2, quality: 0.95 });
       setGeneratedShareImage(dataUrl);
       return dataUrl;
     } catch (err) {
@@ -1380,7 +1380,7 @@ export default function App() {
   const dataURLtoBlob = (dataurl: string) => {
     const arr = dataurl.split(',');
     const mimeMatch = arr[0].match(/:(.*?);/);
-    const mime = mimeMatch ? mimeMatch[1] : 'image/png';
+    const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
     const bstr = atob(arr[1]);
     let n = bstr.length;
     const u8arr = new Uint8Array(n);
@@ -1398,7 +1398,7 @@ export default function App() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `post-passeio-${Date.now()}.png`;
+      link.download = `post-passeio-${Date.now()}.jpg`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -1409,7 +1409,7 @@ export default function App() {
     } catch {
       const link = document.createElement('a');
       link.href = img;
-      link.download = `post-passeio-${Date.now()}.png`;
+      link.download = `post-passeio-${Date.now()}.jpg`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -1424,7 +1424,7 @@ export default function App() {
     if (!img) return;
     try {
       const blob = img.startsWith('data:') ? dataURLtoBlob(img) : await (await fetch(img)).blob();
-      const file = new File([blob], `post-passeio-${Date.now()}.png`, { type: 'image/png' });
+      const file = new File([blob], `post-passeio-${Date.now()}.jpg`, { type: 'image/jpeg' });
       if (navigator.share && navigator.canShare({ files: [file] })) {
         await navigator.share({ files: [file], title: 'Meu Passeio no FocinhoApp' });
         resetWalkState();
@@ -1450,7 +1450,7 @@ export default function App() {
 
       const link = document.createElement('a');
       link.href = url;
-      link.download = `passeio-${new Date().getTime()}.png`;
+      link.download = `passeio-${new Date().getTime()}.jpg`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -1459,7 +1459,7 @@ export default function App() {
     } catch (err) {
       const link = document.createElement('a');
       link.href = imgToDownload;
-      link.download = `passeio-${new Date().getTime()}.png`;
+      link.download = `passeio-${new Date().getTime()}.jpg`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -1477,7 +1477,7 @@ export default function App() {
 
     try {
       const blob = imgToShare.startsWith('data:') ? dataURLtoBlob(imgToShare) : await (await fetch(imgToShare)).blob();
-      const file = new File([blob], `passeio-${new Date().getTime()}.png`, { type: 'image/png' });
+      const file = new File([blob], `passeio-${new Date().getTime()}.jpg`, { type: 'image/jpeg' });
 
       if (navigator.share && navigator.canShare({ files: [file] })) {
         await navigator.share({
@@ -3513,7 +3513,7 @@ export default function App() {
                   {generatedShareImage ? (
                     <div className="space-y-4">
                       <div className="bg-white/10 p-3 rounded-[2rem] overflow-hidden">
-                        <img src={generatedShareImage} alt="Post" className="w-full h-auto rounded-[1.5rem] max-h-[60vh] object-contain mx-auto" />
+                        <img src={generatedShareImage} alt="Post" className="w-full h-auto rounded-[1.5rem] object-contain mx-auto" style={{ maxHeight: 600 }} />
                       </div>
                       <div className="flex gap-3">
                         <Button
@@ -3607,9 +3607,10 @@ export default function App() {
                             <div
                               id="walk-post-photo-card"
                               ref={photoCardRef}
-                              className="relative inline-block max-w-[500px] w-full rounded-[1.5rem] overflow-hidden bg-black max-h-[60vh] border border-white/20 shadow-2xl"
+                              className="relative inline-block max-w-[500px] w-full rounded-[1.5rem] overflow-hidden bg-black border border-white/20 shadow-2xl"
+                              style={{ maxHeight: 600 }}
                             >
-                              <img src={customBgImage} alt="Fundo" className="block w-full max-h-[60vh] h-auto object-contain" />
+                              <img src={customBgImage} alt="Fundo" className="block w-full h-auto object-contain" style={{ maxHeight: 600 }} />
                               
                               {/* Draggable Stats Overlay */}
                               <motion.div
