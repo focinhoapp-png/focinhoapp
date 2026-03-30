@@ -46,7 +46,8 @@ import {
   Users,
   Copy,
   Info,
-  FileText
+  FileText,
+  Cake
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap } from 'react-leaflet';
@@ -444,6 +445,52 @@ const LocationInput = ({ label, value, onChange, placeholder, icon: Icon }: any)
       </div>
     </div>
   );
+};
+
+// --- Helper Functions for Pet Dates ---
+const parsePetDate = (dateStr: string) => {
+  if (!dateStr) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    return new Date(y, m - 1, d);
+  }
+  const d = new Date(dateStr);
+  return isNaN(d.getTime()) ? null : d;
+};
+
+const getDaysTogether = (pet: PetProfile) => {
+  // Try adoptionDate first, then birthday, then fallback to createdAt
+  const startDateStr = pet.adoptionDate || pet.birthday || pet.createdAt;
+  const startDate = parsePetDate(startDateStr);
+  if (!startDate) return null;
+  const now = new Date();
+  
+  const start = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const diffTime = today.getTime() - start.getTime();
+  const diffDays = Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24)));
+  
+  const formatter = new Intl.DateTimeFormat('pt-BR', { year: 'numeric', month: 'short', day: 'numeric' });
+  return { days: diffDays, dateStr: formatter.format(startDate) };
+};
+
+const getDaysUntilBirthday = (birthdayStr?: string) => {
+  const birthday = parsePetDate(birthdayStr || '');
+  if (!birthday) return null;
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  
+  let nextBday = new Date(now.getFullYear(), birthday.getMonth(), birthday.getDate());
+  
+  if (today.getTime() > nextBday.getTime()) {
+    nextBday.setFullYear(now.getFullYear() + 1);
+  }
+  
+  const diffTime = nextBday.getTime() - today.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  
+  const formatter = new Intl.DateTimeFormat('pt-BR', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
+  return { days: diffDays, dateStr: formatter.format(nextBday) };
 };
 
 // --- Main App ---
@@ -2554,69 +2601,116 @@ export default function App() {
                     </div>
 
                     {/* Quick Actions */}
-                    <div className="grid grid-cols-2 gap-4">
-                      <div
-                        onClick={() => setView('walk')}
-                        className="bg-orange-500 p-5 rounded-[2.5rem] flex flex-col items-center text-center gap-2 cursor-pointer hover:bg-orange-600 transition-all shadow-lg shadow-orange-200 h-40 justify-center"
-                      >
-                        <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center shadow-sm">
-                          <PawPrint className="w-6 h-6 text-white" />
+                    <div className="mb-2">
+                      <h3 className="font-black text-gray-900 text-lg mb-3 tracking-tight ml-1">Ações Rápidas</h3>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div
+                          onClick={() => setView('walk')}
+                          className="bg-orange-500 p-5 rounded-[2.5rem] flex flex-col items-center text-center gap-2 cursor-pointer hover:bg-orange-600 transition-all shadow-lg shadow-orange-200 h-40 justify-center"
+                        >
+                          <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center shadow-sm">
+                            <PawPrint className="w-6 h-6 text-white" />
+                          </div>
+                          <div>
+                            <h4 className="font-black text-sm text-white">Passeio</h4>
+                            <p className="text-[10px] text-white/80 font-medium">Rastrear percurso</p>
+                          </div>
                         </div>
-                        <div>
-                          <h4 className="font-black text-sm text-white">Passeio</h4>
-                          <p className="text-[10px] text-white/80 font-medium">Rastrear percurso</p>
+                        <div
+                          onClick={() => setView('reminders')}
+                          className="bg-white p-5 rounded-[2.5rem] border border-gray-100 flex flex-col items-center text-center gap-2 cursor-pointer hover:border-orange-200 transition-all shadow-sm h-40 justify-center"
+                        >
+                          <div className="w-12 h-12 bg-orange-50 rounded-2xl flex items-center justify-center shadow-sm">
+                            <Bell className="w-6 h-6 text-orange-500" />
+                          </div>
+                          <div>
+                            <h4 className="font-black text-sm text-gray-800">Lembretes</h4>
+                            <p className="text-[10px] text-gray-400 font-medium">Vacinas e remédios</p>
+                          </div>
                         </div>
-                      </div>
-                      <div
-                        onClick={() => setView('reminders')}
-                        className="bg-white p-5 rounded-[2.5rem] border border-gray-100 flex flex-col items-center text-center gap-2 cursor-pointer hover:border-orange-200 transition-all shadow-sm h-40 justify-center"
-                      >
-                        <div className="w-12 h-12 bg-orange-50 rounded-2xl flex items-center justify-center shadow-sm">
-                          <Bell className="w-6 h-6 text-orange-500" />
+                        <div
+                          onClick={() => {
+                            setView('lost_pets');
+                            setHasNewUnreadSOS(false);
+                          }}
+                          className={`p-5 rounded-[2.5rem] border flex flex-col items-center text-center gap-2 cursor-pointer transition-all shadow-sm h-40 justify-center 
+                          ${hasNewUnreadSOS
+                              ? 'bg-red-500 border-red-600 animate-pulse text-white'
+                              : 'bg-white border-gray-100 hover:border-red-200 text-gray-800'}`}
+                        >
+                          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm ${hasNewUnreadSOS ? 'bg-white/20' : 'bg-red-50'}`}>
+                            <Megaphone className={`w-6 h-6 ${hasNewUnreadSOS ? 'text-white' : 'text-red-500'}`} />
+                          </div>
+                          <div>
+                            <h4 className={`font-black text-sm ${hasNewUnreadSOS ? 'text-white' : 'text-gray-800'}`}>Animal Perdido</h4>
+                            <p className={`text-[10px] font-medium ${hasNewUnreadSOS ? 'text-white/80' : 'text-gray-400'}`}>Alertas SOS ativos</p>
+                          </div>
                         </div>
-                        <div>
-                          <h4 className="font-black text-sm text-gray-800">Lembretes</h4>
-                          <p className="text-[10px] text-gray-400 font-medium">Vacinas e remédios</p>
+                        <div
+                          onClick={() => {
+                            setView('account');
+                            setAccountSubView('adoption');
+                            setHasNewAdoption(false);
+                          }}
+                          className={`p-5 rounded-[2.5rem] border flex flex-col items-center text-center gap-2 cursor-pointer transition-all shadow-sm h-40 justify-center
+                          ${hasNewAdoption
+                              ? 'bg-pink-500 border-pink-600 animate-pulse text-white'
+                              : 'bg-white border-gray-100 hover:border-pink-200'}`}
+                        >
+                          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm ${hasNewAdoption ? 'bg-white/20' : 'bg-pink-50'}`}>
+                            <Heart className={`w-6 h-6 ${hasNewAdoption ? 'text-white' : 'text-pink-500'}`} />
+                          </div>
+                          <div>
+                            <h4 className={`font-black text-sm ${hasNewAdoption ? 'text-white' : 'text-gray-800'}`}>Adoção</h4>
+                            <p className={`text-[10px] font-medium ${hasNewAdoption ? 'text-white/80' : 'text-gray-400'}`}>
+                              {hasNewAdoption ? '🎉 Nova adoção!' : 'Encontre um amigo'}
+                            </p>
+                          </div>
                         </div>
-                      </div>
-                      <div
-                        onClick={() => {
-                          setView('lost_pets');
-                          setHasNewUnreadSOS(false);
-                        }}
-                        className={`p-5 rounded-[2.5rem] border flex flex-col items-center text-center gap-2 cursor-pointer transition-all shadow-sm h-40 justify-center 
-                        ${hasNewUnreadSOS
-                            ? 'bg-red-500 border-red-600 animate-pulse text-white'
-                            : 'bg-white border-gray-100 hover:border-red-200 text-gray-800'}`}
-                      >
-                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm ${hasNewUnreadSOS ? 'bg-white/20' : 'bg-red-50'}`}>
-                          <Megaphone className={`w-6 h-6 ${hasNewUnreadSOS ? 'text-white' : 'text-red-500'}`} />
+
+                        {/* Eventos */}
+                        <div
+                          onClick={() => {
+                            setView('account');
+                            setAccountSubView('events');
+                          }}
+                          className="bg-white p-5 rounded-[2.5rem] border border-gray-100 flex flex-col items-center text-center gap-2 cursor-pointer hover:border-blue-200 transition-all shadow-sm h-40 justify-center"
+                        >
+                          <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center shadow-sm">
+                            <Calendar className="w-6 h-6 text-blue-500" />
+                          </div>
+                          <div>
+                            <h4 className="font-black text-sm text-gray-800">Eventos</h4>
+                            <p className="text-[10px] text-gray-400 font-medium">Na sua região</p>
+                          </div>
                         </div>
-                        <div>
-                          <h4 className={`font-black text-sm ${hasNewUnreadSOS ? 'text-white' : 'text-gray-800'}`}>Animal Perdido</h4>
-                          <p className={`text-[10px] font-medium ${hasNewUnreadSOS ? 'text-white/80' : 'text-gray-400'}`}>Alertas SOS ativos</p>
-                        </div>
-                      </div>
-                      <div
-                        onClick={() => {
-                          setView('account');
-                          setAccountSubView('adoption');
-                          setHasNewAdoption(false);
-                        }}
-                        className={`p-5 rounded-[2.5rem] border flex flex-col items-center text-center gap-2 cursor-pointer transition-all shadow-sm h-40 justify-center
-                        ${hasNewAdoption
-                            ? 'bg-pink-500 border-pink-600 animate-pulse text-white'
-                            : 'bg-white border-gray-100 hover:border-pink-200'}`}
-                      >
-                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm ${hasNewAdoption ? 'bg-white/20' : 'bg-pink-50'}`}>
-                          <Heart className={`w-6 h-6 ${hasNewAdoption ? 'text-white' : 'text-pink-500'}`} />
-                        </div>
-                        <div>
-                          <h4 className={`font-black text-sm ${hasNewAdoption ? 'text-white' : 'text-gray-800'}`}>Adoção</h4>
-                          <p className={`text-[10px] font-medium ${hasNewAdoption ? 'text-white/80' : 'text-gray-400'}`}>
-                            {hasNewAdoption ? '🎉 Nova adoção!' : 'Encontre um amigo'}
-                          </p>
-                        </div>
+
+                        {/* Aniversário */}
+                        {(() => {
+                          const currentPet = userPets[currentPetIndex];
+                          const birthdayInfo = currentPet ? getDaysUntilBirthday(currentPet.birthday) : null;
+                          return (
+                            <div
+                              onClick={() => {
+                                if (currentPet) {
+                                  setSelectedPet(currentPet); 
+                                  setView('profile');
+                                }
+                              }}
+                              className="bg-white p-5 rounded-[2.5rem] border border-gray-100 flex flex-col items-center text-center gap-2 cursor-pointer hover:border-purple-200 transition-all shadow-sm h-40 justify-center"
+                            >
+                              <div className="w-12 h-12 bg-purple-50 rounded-2xl flex items-center justify-center shadow-sm">
+                                <Cake className="w-6 h-6 text-purple-500" />
+                              </div>
+                              <div>
+                                <h4 className="font-black text-sm text-gray-800">Aniversário</h4>
+                                <p className="text-[10px] text-gray-400 font-medium">
+                                  {birthdayInfo ? `${birthdayInfo.days} dia(s) restante(s)` : 'Sem data definida'}
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </div>
                     </div>
                     <div className="h-20" /> {/* Spacer to avoid bottom nav overlap */}
@@ -3566,7 +3660,7 @@ export default function App() {
 
                     <button
                       onClick={() => setAccountSubView('adoption')}
-                      className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 flex items-center gap-4 hover:border-orange-200 transition-all text-left"
+                      className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 flex items-center gap-4 hover:border-orange-200 transition-all text-left mb-4"
                     >
                       <div className="w-12 h-12 bg-pink-50 rounded-2xl flex items-center justify-center">
                         <Heart className="w-6 h-6 text-pink-500" />
@@ -3574,6 +3668,20 @@ export default function App() {
                       <div className="flex-1">
                         <h4 className="font-bold text-gray-800">Adoção</h4>
                         <p className="text-xs text-gray-400">Encontre um novo amigo</p>
+                      </div>
+                      <ChevronRight className="text-gray-300" />
+                    </button>
+
+                    <button
+                      onClick={() => setAccountSubView('events')}
+                      className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 flex items-center gap-4 hover:border-orange-200 transition-all text-left mb-4"
+                    >
+                      <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center">
+                        <Calendar className="w-6 h-6 text-blue-500" />
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-bold text-gray-800">Eventos</h4>
+                        <p className="text-xs text-gray-400">Encontros na comunidade</p>
                       </div>
                       <ChevronRight className="text-gray-300" />
                     </button>
@@ -4381,6 +4489,28 @@ export default function App() {
                           <p className="text-purple-600 text-xs mt-1">Novos acessórios e cores exclusivas para seu pet.</p>
                         </div>
                       )}
+                    </div>
+                    <div className="h-20" /> {/* Spacer to avoid bottom nav overlap */}
+                  </div>
+                )}
+
+                {accountSubView === 'events' && (
+                  <div className="space-y-6">
+                    <button onClick={() => setAccountSubView('menu')} className="flex items-center gap-2 text-orange-500 font-bold text-sm">
+                      <ChevronLeft className="w-4 h-4" /> Voltar ao menu
+                    </button>
+                    <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 space-y-6">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center">
+                          <Calendar className="w-6 h-6 text-blue-500" />
+                        </div>
+                        <h3 className="font-bold text-xl">Eventos da Comunidade</h3>
+                      </div>
+                      
+                      <div className="bg-blue-50 p-6 rounded-[2rem] text-center border-2 border-dashed border-blue-200 mt-4">
+                        <p className="text-blue-800 font-bold text-sm">Nenhum evento próximo</p>
+                        <p className="text-blue-600 text-xs mt-1">Fique de olho! Em breve teremos encontros de pets na sua região.</p>
+                      </div>
                     </div>
                     <div className="h-20" /> {/* Spacer to avoid bottom nav overlap */}
                   </div>
