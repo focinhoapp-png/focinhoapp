@@ -57,6 +57,8 @@ import { toPng } from 'html-to-image';
 import { supabase } from './supabase';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 import QRScanner from './components/QRScanner';
+import JSZip from 'jszip';
+import { saveAs } from 'file-saver';
 
 // Helper to generate random ID (replaces doc(collection()).id)
 const generateId = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
@@ -555,6 +557,7 @@ export default function App() {
   const [amountToGenerate, setAmountToGenerate] = useState(10); // Admin only
   const [adminTagsPage, setAdminTagsPage] = useState(1); // Admin only
   const [adminPetsPage, setAdminPetsPage] = useState(1); // Admin only
+  const [selectedTagIds, setSelectedTagIds] = useState<Set<string>>(new Set()); // Admin QR selection
   const [tagIdToActivate, setTagIdToActivate] = useState('');
   const [finderPet, setFinderPet] = useState<PetProfile | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -5076,23 +5079,109 @@ export default function App() {
                           </div>
                         </div>
 
+                        {/* Bulk selection toolbar */}
+                        {selectedTagIds.size > 0 && (
+                          <div className="flex items-center gap-2 bg-orange-500 text-white rounded-2xl px-4 py-3 shadow-lg shadow-orange-200 mb-2">
+                            <div className="flex items-center gap-2 flex-1 min-w-0">
+                              <CheckCircle2 className="w-5 h-5 shrink-0" />
+                              <span className="text-sm font-black truncate">{selectedTagIds.size} selecionado(s)</span>
+                            </div>
+                            <button
+                              onClick={() => {
+                                const pageIds = allTags.slice((adminTagsPage - 1) * 20, adminTagsPage * 20).map(t => t.id);
+                                const allPageSelected = pageIds.every(id => selectedTagIds.has(id));
+                                setSelectedTagIds(prev => {
+                                  const next = new Set(prev);
+                                  if (allPageSelected) {
+                                    pageIds.forEach(id => next.delete(id));
+                                  } else {
+                                    pageIds.forEach(id => next.add(id));
+                                  }
+                                  return next;
+                                });
+                              }}
+                              className="text-[11px] font-bold bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded-xl transition-colors shrink-0"
+                            >
+                              {allTags.slice((adminTagsPage - 1) * 20, adminTagsPage * 20).every(t => selectedTagIds.has(t.id)) ? 'Desmarcar pág.' : 'Selecionar pág.'}
+                            </button>
+                            <button
+                              onClick={() => setSelectedTagIds(new Set())}
+                              className="text-[11px] font-bold bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded-xl transition-colors shrink-0"
+                            >
+                              Limpar
+                            </button>
+                            <button
+                              onClick={async () => {
+                                if (selectedTagIds.size === 0) return;
+                                setLoading(true);
+                                try {
+                                  const zip = new JSZip();
+                                  const folder = zip.folder('qrcodes-focinho')!;
+                                  const ids = Array.from(selectedTagIds);
+                                  for (const tagId of ids) {
+                                    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(window.location.origin + '/?tag=' + tagId)}`;
+                                    try {
+                                      const res = await fetch(qrUrl);
+                                      const blob = await res.blob();
+                                      folder.file(`${tagId}.png`, blob);
+                                    } catch { /* skip failed */ }
+                                  }
+                                  const content = await zip.generateAsync({ type: 'blob' });
+                                  saveAs(content, `qrcodes-focinho-${Date.now()}.zip`);
+                                  setSelectedTagIds(new Set());
+                                } catch (err) {
+                                  setError('Erro ao gerar o arquivo ZIP.');
+                                } finally {
+                                  setLoading(false);
+                                }
+                              }}
+                              className="flex items-center gap-1.5 text-[11px] font-black bg-white text-orange-600 hover:bg-orange-50 px-3 py-1.5 rounded-xl transition-colors shrink-0"
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                              Baixar ZIP
+                            </button>
+                          </div>
+                        )}
+
                         <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-3 min-h-[200px] relative z-10">
                           {allTags.slice((adminTagsPage - 1) * 20, adminTagsPage * 20).map((tag) => {
                             const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(window.location.origin + '/?tag=' + tag.id)}`;
+                            const isSelected = selectedTagIds.has(tag.id);
                             return (
-                              <div key={tag.id} className="bg-white p-3 rounded-2xl border border-gray-100 text-center shadow-sm relative group flex flex-col items-center justify-center">
+                              <div
+                                key={tag.id}
+                                onClick={() => {
+                                  setSelectedTagIds(prev => {
+                                    const next = new Set(prev);
+                                    if (next.has(tag.id)) next.delete(tag.id);
+                                    else next.add(tag.id);
+                                    return next;
+                                  });
+                                }}
+                                className={`p-3 rounded-2xl border text-center shadow-sm relative group flex flex-col items-center justify-center cursor-pointer transition-all ${
+                                  isSelected
+                                    ? 'bg-orange-50 border-orange-400 ring-2 ring-orange-400'
+                                    : 'bg-white border-gray-100 hover:border-orange-200'
+                                }`}
+                              >
+                                {/* Checkbox indicator */}
+                                <div className={`absolute top-2 left-2 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
+                                  isSelected ? 'bg-orange-500 border-orange-500' : 'bg-white border-gray-300'
+                                }`}>
+                                  {isSelected && <CheckCircle2 className="w-3.5 h-3.5 text-white" strokeWidth={3} />}
+                                </div>
                                 <div className={`absolute top-2 right-2 w-2 h-2 rounded-full ${tag.activated ? 'bg-green-500' : 'bg-gray-300'}`} title={tag.activated ? 'Ativada' : 'Inativa'} />
                                 <img src={qrUrl} alt={tag.id} className="w-full aspect-square mb-2 rounded-xl" />
                                 <p className="text-[10px] font-black text-gray-700 w-full truncate">{tag.id}</p>
                                 <a
-                                  href={qrUrl}
-                                  target="_blank"
-                                  rel="noreferrer"
+                                  href={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(window.location.origin + '/?tag=' + tag.id)}`}
+                                  download={`${tag.id}.png`}
+                                  onClick={e => e.stopPropagation()}
                                   className="text-[9px] text-orange-500 font-bold hover:underline py-1 block"
                                 >
                                   Baixar QR
                                 </a>
-                                <div className="flex gap-1 w-full mt-1 justify-center">
+                                <div className="flex gap-1 w-full mt-1 justify-center" onClick={e => e.stopPropagation()}>
                                   <button
                                     title="Editar ID"
                                     onClick={() => setEditingTag({ id: tag.id, newId: tag.id })}
@@ -5111,6 +5200,7 @@ export default function App() {
                                         }
                                         await supabase.from('tags').delete().eq('id', tag.id);
                                         setAllTags(prev => prev.filter(t => t.id !== tag.id));
+                                        setSelectedTagIds(prev => { const next = new Set(prev); next.delete(tag.id); return next; });
                                       } catch { setError('Erro ao excluir tag.'); }
                                       finally { setLoading(false); }
                                     }}
