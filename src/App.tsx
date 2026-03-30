@@ -193,6 +193,16 @@ interface Partner {
   created_at: any;
 }
 
+interface PetEvent {
+  id: string;
+  title: string;
+  description?: string;
+  imageUrl?: string;
+  event_date?: string;
+  location?: string;
+  created_at: any;
+}
+
 interface Walk {
   id: string;
   userId: string;
@@ -493,6 +503,33 @@ const getDaysUntilBirthday = (birthdayStr?: string) => {
   return { days: diffDays, dateStr: formatter.format(nextBday) };
 };
 
+const calculatePetAge = (birthdayStr?: string) => {
+  if (!birthdayStr) return '';
+  const birthday = parsePetDate(birthdayStr);
+  if (!birthday) return '';
+  const today = new Date();
+  
+  let years = today.getFullYear() - birthday.getFullYear();
+  let months = today.getMonth() - birthday.getMonth();
+  
+  if (today.getDate() < birthday.getDate()) {
+    months--;
+  }
+  
+  if (months < 0) {
+    years--;
+    months += 12;
+  }
+  
+  const yearStr = years > 0 ? `${years} ano(s)` : '';
+  const monthStr = months > 0 ? `${months} mês(es)` : '';
+  
+  if (yearStr && monthStr) return `${yearStr}, ${monthStr} de idade`;
+  if (yearStr) return `${yearStr} de idade`;
+  if (monthStr) return `${monthStr} de idade`;
+  return 'Menos de 1 mês de idade';
+};
+
 // --- Main App ---
 
 export default function App() {
@@ -542,6 +579,14 @@ export default function App() {
   const [partners, setPartners] = useState<Partner[]>([]); // DB Partners
   const [partnerForm, setPartnerForm] = useState<Partial<Partner>>({ id: '', name: '', category: 'Pet Shops', description: '', location: '', logo: '', url: '' }); // Admin
   const [partnerMessage, setPartnerMessage] = useState<string | null>(null); // Admin
+
+  // Events State
+  const [petEvents, setPetEvents] = useState<PetEvent[]>([]);
+  const [eventForm, setEventForm] = useState<Partial<PetEvent>>({ id: '', title: '', description: '', imageUrl: '', event_date: '', location: '' });
+  const [eventMessage, setEventMessage] = useState<string | null>(null);
+
+  // Tag editing state (admin)
+  const [editingTag, setEditingTag] = useState<{ id: string; newId: string } | null>(null);
 
   const [activeNotification, setActiveNotification] = useState<{ title: string, message: string } | null>(null);
 
@@ -826,7 +871,7 @@ export default function App() {
       }
       ownerIds = Array.from(new Set(ownerIds)); // unique IDs
 
-      const { data } = await supabase.from('pets').select('*').in('ownerId', ownerIds).neq('deleted', true);
+      const { data } = await supabase.from('pets').select('*').in('ownerId', ownerIds).or('deleted.is.null,deleted.eq.false');
       setUserPets((data || []) as PetProfile[]);
       setIsFetchingUserPets(false);
     };
@@ -926,6 +971,19 @@ export default function App() {
     return () => { supabase.removeChannel(channel); };
   }, []);
 
+  // Fetch Events
+  useEffect(() => {
+    const fetchEvents = async () => {
+      const { data } = await supabase.from('events').select('*').order('created_at', { ascending: false });
+      setPetEvents((data || []) as PetEvent[]);
+    };
+    fetchEvents();
+    const channel = supabase.channel('events-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, fetchEvents)
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, []);
+
   // Fetch All Pets and Tags (Admin Only)
   useEffect(() => {
     if (!isAdmin || accountSubView !== 'admin') return;
@@ -934,7 +992,7 @@ export default function App() {
       setIsFetchingAllTags(true);
       try {
         const [petsRes, tagsRes, storeRes] = await Promise.all([
-          supabase.from('pets').select('*').neq('deleted', true),
+          supabase.from('pets').select('*').or('deleted.is.null,deleted.eq.false'),
           supabase.from('tags').select('*').order('id', { ascending: true }),
           supabase.from('store_items').select('*').order('created_at', { ascending: false })
         ]);
@@ -1859,7 +1917,7 @@ export default function App() {
         await supabase.from('tags').upsert({ id: effectiveTagId, activated: true, ownerId: user.id, petId: petId });
       }
       // Refresh pets
-      const { data } = await supabase.from('pets').select('*').eq('ownerId', user.id).neq('deleted', true);
+      const { data } = await supabase.from('pets').select('*').eq('ownerId', user.id).or('deleted.is.null,deleted.eq.false');
       setUserPets((data || []) as PetProfile[]);
       setView('dashboard');
       setSelectedPet(null);
@@ -2604,6 +2662,7 @@ export default function App() {
                     <div className="mb-2">
                       <h3 className="font-black text-gray-900 text-lg mb-3 tracking-tight ml-1">Ações Rápidas</h3>
                       <div className="grid grid-cols-2 gap-4">
+                        {/* Passeio */}
                         <div
                           onClick={() => setView('walk')}
                           className="bg-orange-500 p-5 rounded-[2.5rem] flex flex-col items-center text-center gap-2 cursor-pointer hover:bg-orange-600 transition-all shadow-lg shadow-orange-200 h-40 justify-center"
@@ -2616,18 +2675,35 @@ export default function App() {
                             <p className="text-[10px] text-white/80 font-medium">Rastrear percurso</p>
                           </div>
                         </div>
-                        <div
-                          onClick={() => setView('reminders')}
-                          className="bg-white p-5 rounded-[2.5rem] border border-gray-100 flex flex-col items-center text-center gap-2 cursor-pointer hover:border-orange-200 transition-all shadow-sm h-40 justify-center"
-                        >
-                          <div className="w-12 h-12 bg-orange-50 rounded-2xl flex items-center justify-center shadow-sm">
-                            <Bell className="w-6 h-6 text-orange-500" />
-                          </div>
-                          <div>
-                            <h4 className="font-black text-sm text-gray-800">Lembretes</h4>
-                            <p className="text-[10px] text-gray-400 font-medium">Vacinas e remédios</p>
-                          </div>
-                        </div>
+
+                        {/* Aniversário — ao lado do Passeio */}
+                        {(() => {
+                          const currentPet = userPets[currentPetIndex];
+                          const birthdayInfo = currentPet ? getDaysUntilBirthday(currentPet.birthday) : null;
+                          return (
+                            <div
+                              onClick={() => {
+                                if (currentPet) {
+                                  setSelectedPet(currentPet);
+                                  setView('pet_birthday');
+                                }
+                              }}
+                              className="bg-white p-5 rounded-[2.5rem] border border-gray-100 flex flex-col items-center text-center gap-2 cursor-pointer hover:border-purple-200 transition-all shadow-sm h-40 justify-center"
+                            >
+                              <div className="w-12 h-12 bg-purple-50 rounded-2xl flex items-center justify-center shadow-sm">
+                                <Cake className="w-6 h-6 text-purple-500" />
+                              </div>
+                              <div>
+                                <h4 className="font-black text-sm text-gray-800">Aniversário</h4>
+                                <p className="text-[10px] text-gray-400 font-medium">
+                                  {birthdayInfo ? `${birthdayInfo.days} dia(s) restante(s)` : 'Sem data definida'}
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        })()}
+
+                        {/* Animal Perdido */}
                         <div
                           onClick={() => {
                             setView('lost_pets');
@@ -2646,6 +2722,22 @@ export default function App() {
                             <p className={`text-[10px] font-medium ${hasNewUnreadSOS ? 'text-white/80' : 'text-gray-400'}`}>Alertas SOS ativos</p>
                           </div>
                         </div>
+
+                        {/* Lembretes */}
+                        <div
+                          onClick={() => setView('reminders')}
+                          className="bg-white p-5 rounded-[2.5rem] border border-gray-100 flex flex-col items-center text-center gap-2 cursor-pointer hover:border-orange-200 transition-all shadow-sm h-40 justify-center"
+                        >
+                          <div className="w-12 h-12 bg-orange-50 rounded-2xl flex items-center justify-center shadow-sm">
+                            <Bell className="w-6 h-6 text-orange-500" />
+                          </div>
+                          <div>
+                            <h4 className="font-black text-sm text-gray-800">Lembretes</h4>
+                            <p className="text-[10px] text-gray-400 font-medium">Vacinas e remédios</p>
+                          </div>
+                        </div>
+
+                        {/* Adoção — ao lado de Eventos */}
                         <div
                           onClick={() => {
                             setView('account');
@@ -2684,33 +2776,6 @@ export default function App() {
                             <p className="text-[10px] text-gray-400 font-medium">Na sua região</p>
                           </div>
                         </div>
-
-                        {/* Aniversário */}
-                        {(() => {
-                          const currentPet = userPets[currentPetIndex];
-                          const birthdayInfo = currentPet ? getDaysUntilBirthday(currentPet.birthday) : null;
-                          return (
-                            <div
-                              onClick={() => {
-                                if (currentPet) {
-                                  setSelectedPet(currentPet); 
-                                  setView('profile');
-                                }
-                              }}
-                              className="bg-white p-5 rounded-[2.5rem] border border-gray-100 flex flex-col items-center text-center gap-2 cursor-pointer hover:border-purple-200 transition-all shadow-sm h-40 justify-center"
-                            >
-                              <div className="w-12 h-12 bg-purple-50 rounded-2xl flex items-center justify-center shadow-sm">
-                                <Cake className="w-6 h-6 text-purple-500" />
-                              </div>
-                              <div>
-                                <h4 className="font-black text-sm text-gray-800">Aniversário</h4>
-                                <p className="text-[10px] text-gray-400 font-medium">
-                                  {birthdayInfo ? `${birthdayInfo.days} dia(s) restante(s)` : 'Sem data definida'}
-                                </p>
-                              </div>
-                            </div>
-                          );
-                        })()}
                       </div>
                     </div>
                     <div className="h-20" /> {/* Spacer to avoid bottom nav overlap */}
@@ -2718,6 +2783,151 @@ export default function App() {
                 )}
                   </>
                 )}
+              </motion.div>
+            )}
+
+            {/* Pet Birthday View */}
+            {view === 'pet_birthday' && selectedPet && (
+              <motion.div key="pet_birthday" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="min-h-screen bg-[#FFF8F0] flex flex-col relative overflow-hidden">
+                {/* Confetti / Fireworks when it's the birthday */}
+                {(() => {
+                  const info = getDaysUntilBirthday(selectedPet.birthday);
+                  if (!info || info.days !== 0) return null;
+                  const emojis = ['🎉','🎊','✨','🐾','🎈','💛','⭐','🎁'];
+                  return (
+                    <div className="absolute inset-0 pointer-events-none z-20 overflow-hidden">
+                      {Array.from({ length: 24 }).map((_, i) => (
+                        <motion.span
+                          key={i}
+                          initial={{ opacity: 0, y: -20, x: `${(i / 24) * 100}vw` as any }}
+                          animate={{ opacity: [0, 1, 1, 0], y: '110vh' as any }}
+                          transition={{ duration: 2.8 + (i % 5) * 0.4, delay: (i % 8) * 0.15, repeat: Infinity, repeatDelay: 1 }}
+                          className="absolute text-2xl"
+                          style={{ left: `${(i / 24) * 100}%`, top: `-${30 + (i % 4) * 20}px` }}
+                        >
+                          {emojis[i % emojis.length]}
+                        </motion.span>
+                      ))}
+                    </div>
+                  );
+                })()}
+
+                {/* Birthday celebration overlay card */}
+                {(() => {
+                  const info = getDaysUntilBirthday(selectedPet.birthday);
+                  if (!info || info.days !== 0) return null;
+                  return (
+                    <div className="absolute inset-0 flex items-center justify-center z-30 bg-black/30 backdrop-blur-sm px-8">
+                      <motion.div
+                        initial={{ scale: 0.7, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        className="bg-white rounded-[2.5rem] p-8 w-full max-w-sm shadow-2xl text-center"
+                      >
+                        <div className="text-6xl mb-4">🎂</div>
+                        <h2 className="text-2xl font-black text-orange-500 mb-2">Feliz Aniversário,<br />{selectedPet.name}!</h2>
+                        <p className="text-gray-500 text-sm font-medium mb-6">Hoje é um dia muito especial. Que {selectedPet.name} tenha muitos mais anos de alegria, aventuras e muito carinho! 🐾❤️</p>
+                        <button
+                          onClick={() => setView('dashboard')}
+                          className="w-full bg-orange-500 text-white font-bold py-4 rounded-2xl hover:bg-orange-600 transition-all shadow-lg shadow-orange-200"
+                        >
+                          Celebrar juntos! 🎊
+                        </button>
+                      </motion.div>
+                    </div>
+                  );
+                })()}
+
+                {/* Header */}
+                <div className="pt-12 px-6 pb-4 flex items-center relative z-10 w-full">
+                  <button onClick={() => setView('dashboard')} className="p-2 -ml-2 text-gray-700">
+                    <ChevronLeft className="w-8 h-8" strokeWidth={1.5} />
+                  </button>
+                </div>
+
+                {/* Content */}
+                <div className="flex flex-col items-center px-6 relative z-10 w-full mt-2">
+                  {/* Photo & Name */}
+                  <div className="flex flex-col items-center">
+                    <div className="w-28 h-28 rounded-full overflow-hidden mb-3 ring-4 ring-orange-100 shadow-md">
+                      <img src={selectedPet.photoUrl} alt={selectedPet.name} className="w-full h-full object-cover" />
+                    </div>
+                    <h2 className="text-2xl font-black text-gray-800 mb-1 tracking-tight">{selectedPet.name}</h2>
+                    <p className="text-[13px] text-gray-400 font-medium">{calculatePetAge(selectedPet.birthday)}</p>
+                  </div>
+
+                  {/* Countdown section */}
+                  {(() => {
+                    const info = getDaysUntilBirthday(selectedPet.birthday);
+                    if (!info) return (
+                      <div className="mt-12 text-center">
+                        <p className="text-gray-400 text-sm font-medium">Data de nascimento não registrada.</p>
+                        <p className="text-gray-300 text-xs mt-1">Adicione a data no perfil do pet para ver a contagem!</p>
+                      </div>
+                    );
+                    const isToday = info.days === 0;
+                    return (
+                      <div className="mt-10 flex flex-col items-center w-full">
+                        <div className="bg-white/80 rounded-[2rem] px-8 py-6 shadow-sm border border-orange-100 text-center w-full max-w-xs">
+                          <p className="text-xs font-bold text-orange-400 uppercase tracking-widest mb-1">Próximo aniversário</p>
+                          <p className="text-sm font-semibold text-gray-600 capitalize mb-5">{info.dateStr.replace('-feira', '').replace('-féira', '').replace(',', '.,')}</p>
+                          {isToday ? (
+                            <div className="text-center">
+                              <span className="text-6xl">🎂</span>
+                              <p className="text-lg font-black text-orange-500 mt-3">Hoje é o dia!</p>
+                            </div>
+                          ) : (
+                            <div className="flex flex-col items-center">
+                              <span className="text-[96px] leading-none font-black text-gray-800 tracking-tighter">{info.days}</span>
+                              <span className="text-sm font-semibold text-gray-400 mt-1">{info.days === 1 ? 'dia restante' : 'dias restantes'}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                {/* New tiered cake SVG – orange & warm tones, paw prints */}
+                <div className="absolute bottom-0 left-0 w-full pointer-events-none z-0" style={{ bottom: '-2px' }}>
+                  <svg viewBox="0 0 430 280" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-auto">
+                    {/* Candle 1 */}
+                    <rect x="160" y="60" width="16" height="52" rx="8" fill="#FFAB76" />
+                    <ellipse cx="168" cy="52" rx="7" ry="10" fill="#FFD580" />
+                    {/* Candle 2 */}
+                    <rect x="215" y="48" width="16" height="64" rx="8" fill="#FF8FAB" />
+                    <ellipse cx="223" cy="40" rx="7" ry="10" fill="#FFD580" />
+                    {/* Candle 3 */}
+                    <rect x="270" y="60" width="16" height="52" rx="8" fill="#FFAB76" />
+                    <ellipse cx="278" cy="52" rx="7" ry="10" fill="#FFD580" />
+
+                    {/* Top tier */}
+                    <rect x="130" y="112" width="170" height="60" rx="20" fill="#FF8FAB" />
+                    {/* Top tier frosting drip */}
+                    <path d="M140 112 Q160 125 180 112 Q200 99 220 112 Q240 125 260 112 Q280 99 290 112" stroke="#FFF0F5" strokeWidth="6" fill="none" strokeLinecap="round"/>
+
+                    {/* Bottom tier */}
+                    <rect x="65" y="172" width="300" height="80" rx="24" fill="#FFAB76" />
+                    {/* Bottom tier frosting drip */}
+                    <path d="M75 172 Q100 188 125 172 Q150 156 175 172 Q200 188 225 172 Q250 156 275 172 Q300 188 325 172 Q345 156 355 172" stroke="#FFF0F5" strokeWidth="7" fill="none" strokeLinecap="round"/>
+
+                    {/* Base plate */}
+                    <ellipse cx="215" cy="254" rx="165" ry="18" fill="#FFD580" opacity="0.6" />
+
+                    {/* Paw prints inside bottom tier */}
+                    <circle cx="130" cy="210" r="6" fill="white" opacity="0.35" />
+                    <circle cx="120" cy="200" r="3.5" fill="white" opacity="0.35" />
+                    <circle cx="132" cy="198" r="3.5" fill="white" opacity="0.35" />
+                    <circle cx="144" cy="200" r="3.5" fill="white" opacity="0.35" />
+
+                    <circle cx="300" cy="210" r="6" fill="white" opacity="0.35" />
+                    <circle cx="290" cy="200" r="3.5" fill="white" opacity="0.35" />
+                    <circle cx="302" cy="198" r="3.5" fill="white" opacity="0.35" />
+                    <circle cx="314" cy="200" r="3.5" fill="white" opacity="0.35" />
+                  </svg>
+                </div>
+
+                {/* Bottom padding so content doesn't sit on cake */}
+                <div className="h-60" />
               </motion.div>
             )}
 
@@ -4499,20 +4709,50 @@ export default function App() {
                     <button onClick={() => setAccountSubView('menu')} className="flex items-center gap-2 text-orange-500 font-bold text-sm">
                       <ChevronLeft className="w-4 h-4" /> Voltar ao menu
                     </button>
-                    <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 space-y-6">
-                      <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center">
-                          <Calendar className="w-6 h-6 text-blue-500" />
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="w-10 h-10 bg-blue-50 rounded-2xl flex items-center justify-center">
+                          <Calendar className="w-5 h-5 text-blue-500" />
                         </div>
                         <h3 className="font-bold text-xl">Eventos da Comunidade</h3>
                       </div>
-                      
-                      <div className="bg-blue-50 p-6 rounded-[2rem] text-center border-2 border-dashed border-blue-200 mt-4">
-                        <p className="text-blue-800 font-bold text-sm">Nenhum evento próximo</p>
-                        <p className="text-blue-600 text-xs mt-1">Fique de olho! Em breve teremos encontros de pets na sua região.</p>
-                      </div>
+
+                      {petEvents.length === 0 ? (
+                        <div className="bg-blue-50 p-6 rounded-[2rem] text-center border-2 border-dashed border-blue-200">
+                          <p className="text-blue-800 font-bold text-sm">Nenhum evento próximo</p>
+                          <p className="text-blue-600 text-xs mt-1">Fique de olho! Em breve teremos encontros de pets na sua região.</p>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col gap-4">
+                          {petEvents.map(ev => (
+                            <div key={ev.id} className="bg-white rounded-[2rem] border border-gray-100 overflow-hidden shadow-sm">
+                              {ev.imageUrl && (
+                                <div className="w-full aspect-video overflow-hidden">
+                                  <img src={ev.imageUrl} alt={ev.title} className="w-full h-full object-cover" />
+                                </div>
+                              )}
+                              <div className="p-5">
+                                <h4 className="font-black text-gray-900 text-lg mb-1">{ev.title}</h4>
+                                {ev.description && <p className="text-sm text-gray-500 mb-3">{ev.description}</p>}
+                                <div className="flex flex-wrap gap-2">
+                                  {ev.event_date && (
+                                    <span className="bg-blue-50 text-blue-600 text-xs font-bold px-3 py-1.5 rounded-full">
+                                      📅 {new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }).format(new Date(ev.event_date + 'T12:00:00'))}
+                                    </span>
+                                  )}
+                                  {ev.location && (
+                                    <span className="bg-orange-50 text-orange-600 text-xs font-bold px-3 py-1.5 rounded-full">
+                                      📍 {ev.location}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                    <div className="h-20" /> {/* Spacer to avoid bottom nav overlap */}
+                    <div className="h-20" />
                   </div>
                 )}
 
@@ -4783,7 +5023,7 @@ export default function App() {
                                   let tagId = '';
                                   let isDuplicate = true;
                                   while(isDuplicate) {
-                                    tagId = `${getRandom(letters, 3)}-${getRandom(numbers, 4)}`;
+                                    tagId = `${getRandom(letters, 3)}${getRandom(numbers, 3)}`;
                                     isDuplicate = allTags.some(t => t.id === tagId) || newTags.some(t => t.id === tagId);
                                   }
                                   
@@ -4852,6 +5092,33 @@ export default function App() {
                                 >
                                   Baixar QR
                                 </a>
+                                <div className="flex gap-1 w-full mt-1 justify-center">
+                                  <button
+                                    title="Editar ID"
+                                    onClick={() => setEditingTag({ id: tag.id, newId: tag.id })}
+                                    className="w-8 h-8 bg-orange-50 text-orange-600 hover:bg-orange-100 rounded-lg flex items-center justify-center transition-colors"
+                                  >
+                                    <Edit2 className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    title="Excluir tag"
+                                    onClick={async () => {
+                                      if (!window.confirm(`Excluir tag ${tag.id}? Se ativada, o pet será desvinculado.`)) return;
+                                      setLoading(true);
+                                      try {
+                                        if (tag.petId) {
+                                          await supabase.from('pets').update({ tagId: null }).eq('tagId', tag.id);
+                                        }
+                                        await supabase.from('tags').delete().eq('id', tag.id);
+                                        setAllTags(prev => prev.filter(t => t.id !== tag.id));
+                                      } catch { setError('Erro ao excluir tag.'); }
+                                      finally { setLoading(false); }
+                                    }}
+                                    className="w-8 h-8 bg-red-50 text-red-500 hover:bg-red-100 rounded-lg flex items-center justify-center transition-colors"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
                               </div>
                             );
                           })}
@@ -5170,6 +5437,167 @@ export default function App() {
                         </div>
                       </div>
 
+                      {/* Events Management */}
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between mb-4">
+                          <h4 className="font-bold text-gray-800 flex items-center gap-2">
+                            <Calendar className="w-5 h-5 text-gray-400" /> Eventos ({petEvents.length})
+                          </h4>
+                        </div>
+                        <div className="bg-gray-50/50 border border-gray-100 rounded-[2rem] p-4">
+                          <form
+                            onSubmit={async (e) => {
+                              e.preventDefault();
+                              if (!eventForm.title) return;
+                              try {
+                                const payload = {
+                                  title: eventForm.title,
+                                  description: eventForm.description || null,
+                                  imageUrl: eventForm.imageUrl || null,
+                                  event_date: eventForm.event_date || null,
+                                  location: eventForm.location || null,
+                                };
+                                if (eventForm.id) {
+                                  await supabase.from('events').update(payload).eq('id', eventForm.id);
+                                  setEventMessage('Evento atualizado!');
+                                } else {
+                                  const newId = `evt-${Date.now()}`;
+                                  await supabase.from('events').insert({ id: newId, ...payload });
+                                  setEventMessage('Evento criado!');
+                                }
+                                const { data } = await supabase.from('events').select('*').order('created_at', { ascending: false });
+                                setPetEvents((data || []) as PetEvent[]);
+                                setEventForm({ id: '', title: '', description: '', imageUrl: '', event_date: '', location: '' });
+                                setTimeout(() => setEventMessage(null), 3000);
+                              } catch { setError('Erro ao salvar evento.'); }
+                            }}
+                            className="flex flex-col gap-3 mb-6"
+                          >
+                            <Input
+                              placeholder="Título do Evento"
+                              icon={Calendar}
+                              value={eventForm.title || ''}
+                              onChange={(v: string) => setEventForm(prev => ({ ...prev, title: v }))}
+                            />
+                            <Input
+                              placeholder="Descrição (opcional)"
+                              value={eventForm.description || ''}
+                              onChange={(v: string) => setEventForm(prev => ({ ...prev, description: v }))}
+                            />
+                            <div className="flex gap-3">
+                              <Input
+                                placeholder="Data (ex: 2026-04-15)"
+                                value={eventForm.event_date || ''}
+                                onChange={(v: string) => setEventForm(prev => ({ ...prev, event_date: v }))}
+                              />
+                              <Input
+                                placeholder="Local / Cidade"
+                                icon={MapPin}
+                                value={eventForm.location || ''}
+                                onChange={(v: string) => setEventForm(prev => ({ ...prev, location: v }))}
+                              />
+                            </div>
+
+                            {/* Image Upload */}
+                            <div className="flex flex-col gap-1.5">
+                              <label className="text-sm font-medium text-gray-600 ml-1">Imagem do Evento</label>
+                              <div className="flex gap-2">
+                                {eventForm.imageUrl && (
+                                  <div className="w-20 h-20 rounded-xl overflow-hidden relative group shrink-0 border border-gray-200">
+                                    <img src={eventForm.imageUrl} className="w-full h-full object-cover" alt="Event" />
+                                    <button
+                                      type="button"
+                                      onClick={() => setEventForm(prev => ({ ...prev, imageUrl: '' }))}
+                                      className="absolute inset-0 bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                                    >
+                                      <X className="w-5 h-5" />
+                                    </button>
+                                  </div>
+                                )}
+                                {!eventForm.imageUrl && (
+                                  <label className="w-20 h-20 bg-gray-50 rounded-xl flex flex-col items-center justify-center border-2 border-dashed border-gray-200 hover:border-orange-300 transition-all cursor-pointer shrink-0">
+                                    <input
+                                      type="file"
+                                      accept="image/*"
+                                      className="hidden"
+                                      onChange={async (e) => {
+                                        const file = e.target.files?.[0];
+                                        if (!file) return;
+                                        const reader = new FileReader();
+                                        reader.onload = (ev) => setEventForm(prev => ({ ...prev, imageUrl: ev.target?.result as string }));
+                                        reader.readAsDataURL(file);
+                                      }}
+                                    />
+                                    <Camera className="w-5 h-5 text-gray-300" />
+                                    <span className="text-[8px] text-gray-400 font-bold uppercase mt-1">Foto</span>
+                                  </label>
+                                )}
+                              </div>
+                            </div>
+
+                            {eventMessage && (
+                              <div className="bg-green-50 text-green-600 p-3 rounded-xl text-center text-sm font-bold border border-green-200 mt-1">
+                                {eventMessage}
+                              </div>
+                            )}
+
+                            <div className="flex gap-2 mt-1">
+                              <Button type="submit" className="w-full bg-blue-500 hover:bg-blue-600 shadow-blue-100">
+                                {eventForm.id ? 'Salvar Alterações' : 'Criar Evento'}
+                              </Button>
+                              {eventForm.id && (
+                                <button
+                                  type="button"
+                                  onClick={() => setEventForm({ id: '', title: '', description: '', imageUrl: '', event_date: '', location: '' })}
+                                  className="px-6 rounded-2xl border-2 border-gray-100 text-gray-500 font-bold hover:bg-gray-50"
+                                >
+                                  Cancelar
+                                </button>
+                              )}
+                            </div>
+                          </form>
+
+                          <div className="flex flex-col gap-3">
+                            {petEvents.map(ev => (
+                              <div key={ev.id} className="bg-white p-4 rounded-3xl border border-gray-200 flex justify-between items-center shadow-sm gap-3">
+                                {ev.imageUrl ? (
+                                  <img src={ev.imageUrl} className="w-14 h-14 rounded-2xl object-cover border border-gray-100 shrink-0" alt={ev.title} />
+                                ) : (
+                                  <div className="w-14 h-14 rounded-2xl bg-blue-50 border border-gray-100 flex items-center justify-center shrink-0">
+                                    <Calendar className="w-6 h-6 text-blue-300" />
+                                  </div>
+                                )}
+                                <div className="min-w-0 flex-1">
+                                  <h5 className="font-bold text-gray-900 truncate text-sm">{ev.title}</h5>
+                                  <p className="text-[10px] text-gray-500 font-bold truncate">
+                                    {ev.event_date && `📅 ${ev.event_date}`}{ev.location && ` • 📍 ${ev.location}`}
+                                  </p>
+                                </div>
+                                <div className="flex gap-2 shrink-0">
+                                  <button
+                                    onClick={() => setEventForm({ id: ev.id, title: ev.title, description: ev.description || '', imageUrl: ev.imageUrl || '', event_date: ev.event_date || '', location: ev.location || '' })}
+                                    className="p-2.5 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-colors"
+                                  >
+                                    <Edit2 className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={async () => {
+                                      if (!window.confirm('Excluir este evento?')) return;
+                                      await supabase.from('events').delete().eq('id', ev.id);
+                                      setPetEvents(prev => prev.filter(e => e.id !== ev.id));
+                                    }}
+                                    className="p-2.5 bg-red-50 text-red-500 rounded-xl hover:bg-red-100 transition-colors"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                            {petEvents.length === 0 && <p className="text-center text-xs text-gray-400 font-medium py-4">Nenhum evento cadastrado.</p>}
+                          </div>
+                        </div>
+                      </div>
+
                       {/* Adoption Management */}
                       <div className="space-y-4">
                         <div className="flex items-center justify-between mb-4">
@@ -5241,6 +5669,62 @@ export default function App() {
               </motion.div>
             )}
                     {/* Add Adoption Pet Modal */}
+                    {/* Tag Edit Modal */}
+                    {editingTag && (
+                      <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center px-6">
+                        <motion.div
+                          initial={{ scale: 0.9, opacity: 0 }}
+                          animate={{ scale: 1, opacity: 1 }}
+                          className="bg-white rounded-[2.5rem] p-8 w-full max-w-sm shadow-2xl"
+                        >
+                          <h3 className="font-black text-gray-900 text-xl mb-1">Editar ID da Tag</h3>
+                          <p className="text-xs text-gray-400 font-medium mb-5">O QR Code será atualizado automaticamente.</p>
+                          <div className="bg-gray-50 rounded-2xl px-4 flex items-center mb-4 border border-gray-200">
+                            <input
+                              value={editingTag.newId}
+                              onChange={e => setEditingTag(prev => prev ? { ...prev, newId: e.target.value.toUpperCase() } : null)}
+                              className="flex-1 py-3 bg-transparent outline-none text-gray-800 font-mono font-bold text-sm"
+                              placeholder="Ex: ABC-1234"
+                              maxLength={10}
+                            />
+                          </div>
+                          <div className="flex gap-3">
+                            <Button
+                              onClick={async () => {
+                                if (!editingTag.newId.trim() || editingTag.newId === editingTag.id) {
+                                  setEditingTag(null);
+                                  return;
+                                }
+                                setLoading(true);
+                                try {
+                                  const { data: existing } = await supabase.from('tags').select('id').eq('id', editingTag.newId).single();
+                                  if (existing) { setError('Esse ID já existe. Escolha outro.'); setLoading(false); return; }
+                                  const oldTag = allTags.find(t => t.id === editingTag.id);
+                                  await supabase.from('tags').insert({ ...oldTag, id: editingTag.newId });
+                                  if (oldTag?.petId) {
+                                    await supabase.from('pets').update({ tagId: editingTag.newId }).eq('tagId', editingTag.id);
+                                  }
+                                  await supabase.from('tags').delete().eq('id', editingTag.id);
+                                  setAllTags(prev => prev.map(t => t.id === editingTag.id ? { ...t, id: editingTag.newId } : t));
+                                  setEditingTag(null);
+                                } catch { setError('Erro ao atualizar tag.'); }
+                                finally { setLoading(false); }
+                              }}
+                              loading={loading}
+                              className="flex-1 bg-orange-500 hover:bg-orange-600"
+                            >
+                              Salvar
+                            </Button>
+                            <button
+                              onClick={() => setEditingTag(null)}
+                              className="px-6 rounded-2xl border-2 border-gray-100 text-gray-500 font-bold hover:bg-gray-50"
+                            >
+                              Cancelar
+                            </button>
+                          </div>
+                        </motion.div>
+                      </div>
+                    )}
                     <AnimatePresence>
                       {isAddingAdoptionPet && (
                         <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 overflow-y-auto">
