@@ -52,7 +52,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { toPng, toJpeg } from 'html-to-image';
+import { toPng } from 'html-to-image';
 import { supabase } from './supabase';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 import QRScanner from './components/QRScanner';
@@ -538,15 +538,6 @@ export default function App() {
   const [selectedWalkPets, setSelectedWalkPets] = useState<string[]>([]);
   const [generatedWalkImage, setGeneratedWalkImage] = useState<string | null>(null);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
-  // Walk Post Creator
-  const [showShareModal, setShowShareModal] = useState(false);
-  const [shareMode, setShareMode] = useState<'map' | 'photo' | null>(null);
-  const [customBgImage, setCustomBgImage] = useState<string | null>(null);
-  const [isGeneratingShareImage, setIsGeneratingShareImage] = useState(false);
-  const [generatedShareImage, setGeneratedShareImage] = useState<string | null>(null);
-  const [statsScale, setStatsScale] = useState(1);
-  const photoCardRef = useRef<HTMLDivElement>(null);
-  const pinchRef = useRef<{ initialDistance: number; initialScale: number } | null>(null);
   const [currentLocation, setCurrentLocation] = useState<[number, number] | null>(null);
   const [walkTimer, setWalkTimer] = useState(0);
   const [walkHistory, setWalkHistory] = useState<Walk[]>([]);
@@ -1294,75 +1285,6 @@ export default function App() {
     }
   };
 
-  // ─── Walk Post Creator helpers ───────────────────────────────────────────
-
-  const formatPace = (durationSec: number, distanceKm: number): string => {
-    if (!distanceKm || distanceKm === 0) return '--:--';
-    const paceMin = durationSec / 60 / distanceKm;
-    const mins = Math.floor(paceMin);
-    const secs = Math.round((paceMin - mins) * 60);
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  const addWatermark = async (dataUrl: string): Promise<string> => {
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    const img = new Image();
-    await new Promise((resolve) => { img.onload = resolve; img.src = dataUrl; });
-    canvas.width = img.width;
-    canvas.height = img.height;
-    if (!ctx) return dataUrl;
-    ctx.drawImage(img, 0, 0);
-    ctx.font = `bold ${Math.round(img.width * 0.045)}px Inter, sans-serif`;
-    ctx.fillStyle = 'rgba(249,115,22,0.55)';
-    ctx.textAlign = 'right';
-    ctx.fillText('FocinhoApp', canvas.width - 32, canvas.height - 28);
-    return canvas.toDataURL('image/png');
-  };
-
-  const generateMapPostImage = async (): Promise<string | null> => {
-    const element = document.getElementById('walk-post-map-card');
-    if (!element || !walkSummary) return null;
-    setIsGeneratingShareImage(true);
-    try {
-      // Safari warmup pass forces CSS/SVG layout calculation
-      await toJpeg(element, { skipFonts: true, imagePlaceholder: '' }).catch(() => {});
-      // Wait for map tiles to load
-      await new Promise((r) => setTimeout(r, 1200));
-      const base = await toJpeg(element, { cacheBust: true, pixelRatio: 2, backgroundColor: '#ffffff', quality: 0.95 });
-      const final = await addWatermark(base);
-      setGeneratedShareImage(final);
-      return final;
-    } catch (err) {
-      console.error('generateMapPostImage error', err);
-      setError('Não foi possível gerar a imagem do mapa.');
-      return null;
-    } finally {
-      setIsGeneratingShareImage(false);
-    }
-  };
-
-  const capturePhotoPostImage = async () => {
-    const element = document.getElementById('walk-post-photo-card');
-    if (!element) return null;
-    setIsGeneratingShareImage(true);
-    try {
-      // Small delay to ensure motion drag finishes settling if user just released
-      await new Promise(resolve => setTimeout(resolve, 300));
-      // Safari warmup pass forces CSS layout calculation
-      await toJpeg(element, { skipFonts: true, imagePlaceholder: '' }).catch(() => {});
-      const dataUrl = await toJpeg(element, { cacheBust: true, pixelRatio: 2, quality: 0.95 });
-      setGeneratedShareImage(dataUrl);
-      return dataUrl;
-    } catch (err) {
-      console.error('capturePhotoPostImage error', err);
-      setError('Erro ao gerar imagem com foto.');
-      return null;
-    } finally {
-      setIsGeneratingShareImage(false);
-    }
-  };
-
   const resetWalkState = () => {
     setWalkSummary(null);
     setGeneratedWalkImage(null);
@@ -1374,7 +1296,6 @@ export default function App() {
     setLastAltitude(null);
     setWalkSpeeds([]);
     setWalkStartTime(null);
-    setShowShareModal(false);
   };
 
   const dataURLtoBlob = (dataurl: string) => {
@@ -1388,52 +1309,6 @@ export default function App() {
       u8arr[n] = bstr.charCodeAt(n);
     }
     return new Blob([u8arr], { type: mime });
-  };
-
-  const handleDownloadShareImage = async (imgParam?: string) => {
-    let img = imgParam || generatedShareImage;
-    if (!img) return;
-    try {
-      const blob = img.startsWith('data:') ? dataURLtoBlob(img) : await (await fetch(img)).blob();
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `post-passeio-${Date.now()}.jpg`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-      setSuccessMessage('Imagem salva com sucesso!');
-      setTimeout(() => setSuccessMessage(null), 3000);
-      resetWalkState();
-    } catch {
-      const link = document.createElement('a');
-      link.href = img;
-      link.download = `post-passeio-${Date.now()}.jpg`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      setSuccessMessage('Imagem salva com sucesso!');
-      setTimeout(() => setSuccessMessage(null), 3000);
-      resetWalkState();
-    }
-  };
-
-  const handleSharePostImage = async (imgParam?: string) => {
-    let img = imgParam || generatedShareImage;
-    if (!img) return;
-    try {
-      const blob = img.startsWith('data:') ? dataURLtoBlob(img) : await (await fetch(img)).blob();
-      const file = new File([blob], `post-passeio-${Date.now()}.jpg`, { type: 'image/jpeg' });
-      if (navigator.share && navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file], title: 'Meu Passeio no FocinhoApp' });
-        resetWalkState();
-      } else {
-        handleDownloadShareImage(img);
-      }
-    } catch {
-      handleDownloadShareImage(img);
-    }
   };
 
   const handleDownloadWalkImage = async (imgUrlOrEvent?: string | React.MouseEvent) => {
@@ -1467,32 +1342,6 @@ export default function App() {
     }
   };
 
-  const handleShareWalkImage = async () => {
-    let imgToShare = generatedWalkImage;
-    if (!imgToShare) {
-      const generated = await generateSummaryImage();
-      if (!generated) return;
-      imgToShare = generated;
-    }
-
-    try {
-      const blob = imgToShare.startsWith('data:') ? dataURLtoBlob(imgToShare) : await (await fetch(imgToShare)).blob();
-      const file = new File([blob], `passeio-${new Date().getTime()}.jpg`, { type: 'image/jpeg' });
-
-      if (navigator.share && navigator.canShare({ files: [file] })) {
-        await navigator.share({
-          files: [file],
-          title: 'Meu Passeio no FocinhoApp',
-          text: 'Confira meu passeio de hoje!',
-        });
-        resetWalkState();
-      } else {
-        handleDownloadWalkImage(imgToShare);
-      }
-    } catch (err) {
-      handleDownloadWalkImage(imgToShare);
-    }
-  };
 
   const handleEndWalk = async () => {
     if (!user || !walkStartTime) return;
@@ -3390,40 +3239,14 @@ export default function App() {
                     )}
 
                     <div className="space-y-3">
-                      {/* NEW: Criar Post button */}
                       <Button
-                        onClick={() => {
-                          setShowShareModal(true);
-                          setShareMode('photo');
-                          setGeneratedShareImage(null);
-                          setCustomBgImage(null);
-                          setStatsScale(1);
-                        }}
-                        variant="outline"
-                        className="w-full py-4 flex items-center justify-center gap-2 border-2 border-orange-200 text-orange-600 font-bold hover:bg-orange-50 mb-3"
+                        onClick={handleDownloadWalkImage}
+                        loading={isGeneratingImage}
+                        className="w-full bg-orange-500 hover:bg-orange-600 shadow-orange-200 py-4 flex items-center justify-center gap-2"
                       >
-                        <span className="text-lg">✨</span> Criar Post
+                        <Download className="w-5 h-5" />
+                        Salvar na Galeria
                       </Button>
-
-                      <div className="flex gap-3">
-                        <Button
-                          onClick={handleDownloadWalkImage}
-                          loading={isGeneratingImage}
-                          className="flex-1 bg-orange-500 hover:bg-orange-600 shadow-orange-200 py-4 flex items-center justify-center gap-2"
-                        >
-                          <Download className="w-5 h-5" />
-                          Salvar na Galeria
-                        </Button>
-                        <Button
-                          onClick={handleShareWalkImage}
-                          loading={isGeneratingImage}
-                          variant="secondary"
-                          className="flex-1 py-4 flex items-center justify-center gap-2"
-                        >
-                          <Share2 className="w-5 h-5" />
-                          Compartilhar
-                        </Button>
-                      </div>
                       <Button
                         onClick={resetWalkState}
                         variant="outline"
@@ -3434,345 +3257,6 @@ export default function App() {
                     </div>
                   </div>
                 )}
-              </motion.div>
-            )}
-
-            {/* ═══ WALK POST CREATOR MODAL ═══ */}
-            {showShareModal && walkSummary && (
-              <motion.div
-                key="share-modal"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="fixed inset-0 z-50 flex flex-col"
-                style={{ backgroundColor: 'rgba(0,0,0,0.85)' }}
-              >
-                {/* Hidden off-screen card for map image capture */}
-                <div
-                  id="walk-post-map-card"
-                  style={{
-                    position: 'absolute',
-                    left: '-9999px',
-                    top: 0,
-                    width: '540px',
-                    backgroundColor: '#ffffff',
-                    borderRadius: '24px',
-                    padding: '32px',
-                    fontFamily: 'Inter, sans-serif',
-                  }}
-                >
-                  {/* Header: Logo Only */}
-                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '24px' }}>
-                    <img src="./pwa-512x512.png" alt="FocinhoApp" style={{ width: 64, height: 64, borderRadius: 16, objectFit: 'cover' }} />
-                  </div>
-
-                  {/* Map First */}
-                  <div style={{ height: 280, borderRadius: 20, overflow: 'hidden', border: '2px solid #f3f4f6', marginBottom: 20, position: 'relative' }}>
-                    <MapContainer
-                      center={walkSummary.path[0] ? [walkSummary.path[0].lat, walkSummary.path[0].lng] : currentLocation || [0, 0]}
-                      zoom={15}
-                      style={{ height: '100%', width: '100%' }}
-                      zoomControl={false} dragging={false} scrollWheelZoom={false} touchZoom={false}
-                    >
-                      <TileLayer url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png" crossOrigin="anonymous" />
-                      <Polyline positions={walkSummary.path.map(p => [p.lat, p.lng] as [number, number])} color="#f97316" weight={6} />
-                    </MapContainer>
-                  </div>
-
-                  {/* Context Info (Pet Name & Date) under the Map */}
-                  <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-                    <div style={{ fontWeight: 900, fontSize: 22, color: '#111' }}>
-                      {walkSummary.petId
-                        ? walkSummary.petId.split(',').map(id => { const p = userPets.find(up => up.id === id); return p ? p.name : id; }).join(' & ')
-                        : 'Meu Pet'}
-                    </div>
-                    <div style={{ fontSize: 13, color: '#999', marginTop: 4 }}>
-                      {new Date(walkSummary.startTime).toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
-                    </div>
-                  </div>
-
-                  {/* Stats grid */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
-                    {[
-                      { label: 'DISTÂNCIA', value: `${walkSummary.distance} km`, color: '#f97316' },
-                      { label: 'TEMPO', value: `${Math.floor(walkSummary.duration / 60)}m ${walkSummary.duration % 60}s`, color: '#111' },
-                      { label: 'RITMO', value: `${formatPace(walkSummary.duration, walkSummary.distance)} min/km`, color: '#111' },
-                    ].map(s => (
-                      <div key={s.label} style={{ background: '#f9fafb', borderRadius: 16, padding: '16px 12px', textAlign: 'center' }}>
-                        <div style={{ fontSize: 10, fontWeight: 700, color: '#9ca3af', letterSpacing: 1, marginBottom: 6 }}>{s.label}</div>
-                        <div style={{ fontSize: 22, fontWeight: 900, color: s.color }}>{s.value}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* ── Modal content ── */}
-                <div className="flex-1 flex flex-col justify-end p-4 pb-10 gap-4">
-
-                  {/* Generated image preview */}
-                  {generatedShareImage ? (
-                    <div className="space-y-4">
-                      <div className="bg-white/10 p-3 rounded-[2rem] overflow-hidden">
-                        <img src={generatedShareImage} alt="Post" className="w-full h-auto rounded-[1.5rem] object-contain mx-auto" style={{ maxHeight: 600 }} />
-                      </div>
-                      <div className="flex gap-3">
-                        <Button
-                          onClick={() => {
-                            handleDownloadShareImage();
-                            setShowShareModal(false);
-                          }}
-                          className="flex-1 py-4 flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 border-none text-white"
-                        >
-                          <Download className="w-5 h-5" /> Salvar
-                        </Button>
-                        <Button
-                          onClick={handleSharePostImage}
-                          variant="secondary"
-                          className="flex-1 py-4 flex items-center justify-center gap-2 border-transparent text-white bg-white/10 hover:bg-white/20"
-                        >
-                          <Share2 className="w-5 h-5" /> Compartilhar
-                        </Button>
-                      </div>
-                      <button
-                        onClick={() => { setGeneratedShareImage(null); setShareMode(null); setCustomBgImage(null); }}
-                        className="w-full text-white/60 text-sm py-2 hover:text-white transition-colors"
-                      >
-                        ← Escolher outro estilo
-                      </button>
-                    </div>
-                  ) : (
-                    <>
-                      {/* Loading state */}
-                      {isGeneratingShareImage && (
-                        <div className="flex flex-col items-center gap-3 py-8">
-                          <Loader2 className="w-10 h-10 text-orange-500 animate-spin" />
-                          <p className="text-white font-medium">Gerando imagem...</p>
-                        </div>
-                      )}
-
-                      {/* Photo picker for photo mode */}
-                      {shareMode === 'photo' && !customBgImage && !isGeneratingShareImage && (
-                        <div className="bg-white/10 rounded-[2rem] p-6 flex flex-col items-center gap-4 border border-white/20">
-                          <Camera className="w-10 h-10 text-orange-400" />
-                          <p className="text-white font-bold text-center">Escolha uma foto para o fundo</p>
-                          <p className="text-white/50 text-sm text-center mb-2">Tire uma foto agora ou escolha da galeria</p>
-                          <label className="w-full cursor-pointer">
-                            <input
-                              type="file"
-                              accept="image/*"
-                              capture="environment"
-                              className="hidden"
-                              onChange={(e) => {
-                                const file = e.target.files?.[0];
-                                if (!file) return;
-                                const reader = new FileReader();
-                                reader.onloadend = () => {
-                                  const result = reader.result as string;
-                                  setCustomBgImage(result);
-                                };
-                                reader.readAsDataURL(file);
-                              }}
-                            />
-                            <div className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-4 rounded-[1.5rem] text-center flex items-center justify-center gap-2 transition-colors">
-                              <Camera className="w-5 h-5" /> Tirar Foto
-                            </div>
-                          </label>
-                          <label className="w-full cursor-pointer mt-2">
-                            <input
-                              type="file"
-                              accept="image/*"
-                              className="hidden"
-                              onChange={(e) => {
-                                const file = e.target.files?.[0];
-                                if (!file) return;
-                                const reader = new FileReader();
-                                reader.onloadend = () => {
-                                  const result = reader.result as string;
-                                  setCustomBgImage(result);
-                                };
-                                reader.readAsDataURL(file);
-                              }}
-                            />
-                            <div className="bg-white/10 hover:bg-white/20 text-white font-bold py-4 rounded-[1.5rem] text-center flex items-center justify-center gap-2 transition-colors border border-white/20">
-                              <ImageIcon className="w-5 h-5" /> Galeria
-                            </div>
-                          </label>
-                        </div>
-                      )}
-
-                      {/* Interactive Photo Editor */}
-                      {shareMode === 'photo' && customBgImage && !generatedShareImage && !isGeneratingShareImage && (
-                        <div className="flex flex-col gap-4">
-                          <div className="relative w-full flex justify-center items-center">
-                            <div
-                              id="walk-post-photo-card"
-                              ref={photoCardRef}
-                              className="relative inline-block max-w-[500px] w-full rounded-[1.5rem] overflow-hidden bg-black border border-white/20 shadow-2xl"
-                              style={{ maxHeight: 600 }}
-                            >
-                              <img src={customBgImage} alt="Fundo" className="block w-full h-auto object-contain" style={{ maxHeight: 600 }} />
-                              
-                              {/* Draggable Stats Overlay */}
-                              <motion.div
-                                drag
-                                dragConstraints={photoCardRef}
-                                dragElastic={0}
-                                dragMomentum={false}
-                                style={{ scale: statsScale }}
-                                onTouchStart={(e) => {
-                                  if (e.touches.length === 2) {
-                                    const dist = Math.hypot(
-                                      e.touches[0].clientX - e.touches[1].clientX,
-                                      e.touches[0].clientY - e.touches[1].clientY
-                                    );
-                                    pinchRef.current = { initialDistance: dist, initialScale: statsScale };
-                                  }
-                                }}
-                                onTouchMove={(e) => {
-                                  if (e.touches.length === 2 && pinchRef.current) {
-                                    const dist = Math.hypot(
-                                      e.touches[0].clientX - e.touches[1].clientX,
-                                      e.touches[0].clientY - e.touches[1].clientY
-                                    );
-                                    const scaleChange = dist / pinchRef.current.initialDistance;
-                                    const newScale = Math.min(Math.max(0.3, pinchRef.current.initialScale * scaleChange), 3);
-                                    setStatsScale(newScale);
-                                  }
-                                }}
-                                onTouchEnd={() => { pinchRef.current = null; }}
-                                className="absolute bottom-6 left-4 p-4 min-w-[260px] cursor-move touch-none drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]"
-                              >
-                                <div className="flex flex-col items-center gap-2 text-center w-full">
-                                  {/* Pet & Date */}
-                                  <div className="text-white flex flex-col items-center">
-                                    <div className="font-black tracking-tight text-xl flex items-center justify-center gap-2 leading-none w-full">
-                                      <PawPrint className="w-5 h-5 text-white" />
-                                      {walkSummary.petId ? walkSummary.petId.split(',').map(id => { const p = userPets.find(up => up.id === id); return p ? p.name : id; }).join(' & ') : 'Pet'}
-                                    </div>
-                                    <div className="text-white/90 text-[11px] font-bold mt-1 shadow-sm text-center">
-                                      {new Date(walkSummary.startTime).toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
-                                    </div>
-                                  </div>
-                                  {/* Stats */}
-                                  <div className="flex items-center justify-center gap-6 mt-2 w-full">
-                                    <div className="flex flex-col items-center">
-                                      <div className="text-[9px] text-white/90 font-black tracking-widest uppercase text-center">Distância</div>
-                                      <div className="font-black text-lg text-white leading-tight text-center">{walkSummary.distance} km</div>
-                                    </div>
-                                    <div className="flex flex-col items-center">
-                                      <div className="text-[9px] text-white/90 font-black tracking-widest uppercase text-center">Tempo</div>
-                                      <div className="font-black text-lg text-white leading-tight text-center">{Math.floor(walkSummary.duration / 60)}m {walkSummary.duration % 60}s</div>
-                                    </div>
-                                  </div>
-                                  <div className="flex flex-col items-center mt-1 w-full text-center">
-                                      <div className="text-[9px] text-orange-400 font-black tracking-widest uppercase">Ritmo Média</div>
-                                      <div className="font-black text-lg text-orange-500 leading-tight">{formatPace(walkSummary.duration, walkSummary.distance)} min/km</div>
-                                  </div>
-                                  {/* Watermark integrado no bloco */}
-                                  <div className="flex justify-center mt-2 pt-2 border-t border-white/10 w-full">
-                                    <span className="font-black text-white text-base tracking-wider drop-shadow-md">FocinhoApp</span>
-                                  </div>
-                                </div>
-                              </motion.div>
-                            </div>
-                          </div>
-
-                          {/* Direct Action Buttons */}
-                          <div className="flex flex-col gap-3 mt-2">
-                            <div className="flex gap-3">
-                              <Button
-                                onClick={async () => {
-                                  const img = await capturePhotoPostImage();
-                                  if (img) {
-                                    handleDownloadShareImage(img);
-                                    setShowShareModal(false);
-                                  }
-                                }}
-                                className="flex-1 py-4 flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 border-none text-white font-bold rounded-[1.5rem]"
-                              >
-                                <Download className="w-5 h-5" /> Salvar
-                              </Button>
-                              <Button
-                                onClick={async () => {
-                                  const img = await capturePhotoPostImage();
-                                  if (img) {
-                                    handleSharePostImage(img);
-                                    setShowShareModal(false);
-                                  }
-                                }}
-                                variant="secondary"
-                                className="flex-1 py-4 flex items-center justify-center gap-2 border-transparent text-white bg-white/10 hover:bg-white/20 font-bold rounded-[1.5rem]"
-                              >
-                                <Share2 className="w-5 h-5" /> Compartilhar
-                              </Button>
-                            </div>
-                            <button
-                              onClick={() => { setGeneratedShareImage(null); setShareMode(null); setCustomBgImage(null); setShowShareModal(false); }}
-                              className="w-full text-white/60 text-sm py-2 hover:text-white transition-colors"
-                            >
-                              ← Escolher outro estilo
-                            </button>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Mode selection cards */}
-                      {!shareMode && !isGeneratingShareImage && (
-                        <>
-                          <div className="text-center mb-4">
-                            <p className="text-white font-black text-xl">Criar Post do Passeio</p>
-                            <p className="text-white/50 text-sm mt-1">Escolha o estilo da sua imagem</p>
-                          </div>
-                          <div className="grid grid-cols-2 gap-3 mb-2">
-                            {/* Option 1: With Map */}
-                            <button
-                              onClick={() => {
-                                setShareMode('map');
-                                generateMapPostImage();
-                              }}
-                              className="bg-white/10 border-2 border-orange-400/60 rounded-[2rem] p-6 flex flex-col items-center gap-3 hover:bg-orange-500/20 transition-all active:scale-95"
-                            >
-                              <div className="w-14 h-14 bg-orange-500/20 rounded-[1.2rem] flex items-center justify-center">
-                                <MapPin className="w-7 h-7 text-orange-400" />
-                              </div>
-                              <div className="text-center">
-                                <p className="text-white font-black text-sm">Com Mapa</p>
-                                <p className="text-white/50 text-xs mt-1">Trajeto GPS + stats</p>
-                              </div>
-                            </button>
-
-                            {/* Option 2: Without Map */}
-                            <button
-                              onClick={() => setShareMode('photo')}
-                              className="bg-white/10 border-2 border-white/20 rounded-[2rem] p-6 flex flex-col items-center gap-3 hover:bg-white/20 transition-all active:scale-95"
-                            >
-                              <div className="w-14 h-14 bg-white/10 rounded-[1.2rem] flex items-center justify-center">
-                                <Camera className="w-7 h-7 text-white/70" />
-                              </div>
-                              <div className="text-center">
-                                <p className="text-white font-black text-sm">Sem Mapa</p>
-                                <p className="text-white/50 text-xs mt-1">Foto + overlay</p>
-                              </div>
-                            </button>
-                          </div>
-                        </>
-                      )}
-                    </>
-                  )}
-
-                  {/* Close button */}
-                  <button
-                    onClick={() => {
-                      setShowShareModal(false);
-                      setShareMode(null);
-                      setGeneratedShareImage(null);
-                      setCustomBgImage(null);
-                    }}
-                    className="w-full bg-white/10 text-white font-bold py-4 rounded-[1.5rem] hover:bg-white/20 transition-colors mt-2"
-                  >
-                    Fechar
-                  </button>
-                </div>
               </motion.div>
             )}
 
