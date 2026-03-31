@@ -2371,9 +2371,18 @@ export default function App() {
               <img src="./pwa-512x512.png" alt="FocinhoApp Logo" className="w-10 h-10 object-cover rounded-xl" />
               <span translate="no" className="text-xl font-bold tracking-tight">FocinhoApp</span>
             </div>
-            <button onClick={handleLogout} className="p-2 text-gray-400 hover:text-red-500 transition-colors">
-              <LogOut className="w-6 h-6" />
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setShowScanner(true)}
+                className="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center text-orange-600 hover:bg-orange-200 transition-colors"
+                title="Escanear QR Code ou Tag"
+              >
+                <QrCode className="w-5 h-5" />
+              </button>
+              <button onClick={handleLogout} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors" title="Sair da conta">
+                <LogOut className="w-6 h-6" />
+              </button>
+            </div>
           </header>
         )}
 
@@ -2547,21 +2556,7 @@ export default function App() {
                   </div>
                 ) : (
                   <>
-                    <div className="flex justify-between items-end">
-                  <div>
-                    <h2 className="text-2xl font-bold">Olá, {ownerProfile?.name?.split(' ')[0] || user.user_metadata?.full_name?.split(' ')[0] || user.email?.split('@')[0]}!</h2>
-                    <p className="text-gray-400 text-sm">Bem-vindo de volta ao FocinhoApp</p>
-                  </div>
-                  <div className="flex gap-2">
-                    {/* City Selector Button Removed */}
-                    <button
-                      onClick={() => setShowScanner(true)}
-                      className="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center text-orange-600 hover:bg-orange-200 transition-colors"
-                    >
-                      <QrCode className="w-5 h-5" />
-                    </button>
-                  </div>
-                </div>
+
 
                 {/* SOS Alerts on Dashboard - MOVED TO ANIMAL PERDIDO VIEW */}
 
