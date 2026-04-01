@@ -548,6 +548,7 @@ export default function App() {
   const [accountSubView, setAccountSubView] = useState('menu'); // menu, profile, pets, support, store, admin, partners
   const [activePartnerFilter, setActivePartnerFilter] = useState('Todos');
   const [selectedPet, setSelectedPet] = useState<PetProfile | null>(null);
+  const [pendingGuestPet, setPendingGuestPet] = useState<Partial<PetProfile> | null>(null);
   const [userPets, setUserPets] = useState<PetProfile[]>([]);
   const [isFetchingUserPets, setIsFetchingUserPets] = useState(true);
   const [allPets, setAllPets] = useState<PetProfile[]>([]); // Admin only
@@ -721,7 +722,17 @@ export default function App() {
       }
 
       setTagIdToActivate(id);
-      setView('activate');
+      
+      // Check if user is logged in
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) {
+        // Redireciona para o formulário do pet, indicando que deve ser preenchido
+        setSelectedPet({ tagId: id } as any);
+        setView('profile');
+      } else {
+        setAuthMode('register');
+        setView('activate');
+      }
     } catch (err) {
       console.error('Error processing scanned tag:', err);
       alert('Erro ao processar o QR Code. Tente novamente.');
@@ -806,6 +817,16 @@ export default function App() {
 
         // Tag not associated with any pet yet
         setTagIdToActivate(id);
+
+        // Checar sessão para decidir destino
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user) {
+          setSelectedPet({ tagId: id } as any);
+          setView('profile');
+        } else {
+          setAuthMode('register');
+          setView('activate');
+        }
       } catch (err) {
         console.error('Error checking tag:', err);
       } finally {
@@ -847,6 +868,8 @@ export default function App() {
           } else {
             setView(currentView => {
               if (currentView === 'finder') return 'finder';
+              // Não limpar caso a pessoa deslogada esteja criando um perfil no modo convidade agora
+              if (currentView === 'profile' && selectedPet) return 'profile';
               return 'home';
             });
           }
@@ -856,6 +879,56 @@ export default function App() {
     });
     return () => subscription.unsubscribe();
   }, []);
+
+  // Processar pendingGuestPet se o usuário logar/registrar e houver pendência
+  useEffect(() => {
+    const processPendingPet = async () => {
+      if (user && pendingGuestPet) {
+        setLoading(true);
+        try {
+          const effectiveTagId = pendingGuestPet.tagId;
+          if (effectiveTagId) {
+            const { data: tagRow } = await supabase.from('tags').select('*').eq('id', effectiveTagId).maybeSingle();
+            if (!tagRow) {
+              await supabase.from('tags').insert({ id: effectiveTagId, activated: false, ownerId: null, petId: null });
+            }
+          }
+          
+          const petId = pendingGuestPet.id || generateId();
+          const finalPetData = {
+            ...pendingGuestPet,
+            id: petId,
+            ownerId: user.id,
+            createdAt: new Date().toISOString(),
+          };
+          
+          const { error } = await supabase.from('pets').upsert(finalPetData);
+          if (error) throw error;
+          
+          if (effectiveTagId) {
+            await supabase.from('tags').upsert({ id: effectiveTagId, activated: true, ownerId: user.id, petId: petId });
+          }
+          
+          // Clear states
+          setPendingGuestPet(null);
+          setTagIdToActivate('');
+          setView('dashboard');
+          
+          setTimeout(() => {
+            alert('Parabéns! Conta criada, perfil do Pet salvo e Tag ativada com sucesso!');
+          }, 500);
+          
+        } catch (err) {
+          console.error('Error saving pending guest pet:', err);
+          setError('Erro ao salvar o Pet que estava pendente.');
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+    
+    processPendingPet();
+  }, [user, pendingGuestPet]);
 
   // Fetch User Pets
   useEffect(() => {
@@ -1870,11 +1943,22 @@ export default function App() {
   };
 
   const handleSavePet = async () => {
-    if (!user || !selectedPet) return;
+    if (!selectedPet) return;
+    
+    const effectiveTagId = (tagIdToActivate || selectedPet.tagId || '').trim().toUpperCase() || null;
+
+    if (!user) {
+      setPendingGuestPet({ ...selectedPet, tagId: effectiveTagId });
+      setAuthMode('register');
+      setView('home');
+      setSuccessMessage('Perfil do Pet salvo provisoriamente! Crie sua conta para concluir e atrelar sua Tag.');
+      setTimeout(() => setSuccessMessage(null), 8000);
+      return;
+    }
+
     const petsWithoutTag = userPets.filter(p => !p.tagId);
     const hasActiveTag = userPets.some(p => p.tagId);
     // effectiveTagId: prefer state flow, fallback to form field
-    const effectiveTagId = (tagIdToActivate || selectedPet.tagId || '').trim().toUpperCase() || null;
 
     if (!effectiveTagId) {
       const isNewPet = !userPets.find(p => p.id === selectedPet.id);
@@ -2409,6 +2493,17 @@ export default function App() {
                     Pingentes inteligentes com QR Code para que seu pet nunca se perca. Simples, moderno e funcional.
                   </p>
                 </div>
+                
+                {successMessage && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="w-full bg-green-50 border border-green-200 text-green-700 p-4 rounded-2xl text-sm font-medium"
+                  >
+                    {successMessage}
+                  </motion.div>
+                )}
+
                 <div className="w-full space-y-4 pt-4">
                   <div className="space-y-3 w-full">
                     {authMode === 'register' && (
@@ -2521,23 +2616,7 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 w-full mt-8">
-                  <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 text-left">
-                    <div className="bg-blue-50 w-10 h-10 rounded-full flex items-center justify-center mb-4">
-                      <Phone className="w-5 h-5 text-blue-500" />
-                    </div>
-                    <h3 className="font-bold mb-1">Contato Direto</h3>
-                    <p className="text-xs text-gray-400">WhatsApp do dono em um clique.</p>
-                  </div>
-                  <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 text-left">
-                    <div className="bg-green-50 w-10 h-10 rounded-full flex items-center justify-center mb-4">
-                      <MapPin className="w-5 h-5 text-green-500" />
-                    </div>
-                    <h3 className="font-bold mb-1">Localização</h3>
-                    <p className="text-xs text-gray-400">Envio de GPS em tempo real.</p>
-                  </div>
-                  <div className="h-20" /> {/* Spacer to avoid bottom nav overlap */}
-                </div>
+                <div className="h-20" /> {/* Spacer to avoid bottom nav overlap */}
               </motion.div>
             )}
 
@@ -6224,9 +6303,9 @@ export default function App() {
                       className="w-full py-4"
                       loading={loading}
                     >
-                      Salvar Perfil
+                      {user ? 'Salvar Perfil' : 'Próximo Passo'}
                     </Button>
-                    {selectedPet && (
+                    {user && selectedPet && (
                       <button
                         onClick={async () => {
                           if (window.confirm('Tem certeza que deseja excluir este pet?')) {
