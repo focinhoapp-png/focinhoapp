@@ -828,8 +828,12 @@ export default function App() {
         // Checar sessão e PWA para decidir destino
         const { data: { session } } = await supabase.auth.getSession();
         const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (document as any).referrer.includes('android-app://') || (window.navigator as any).standalone === true;
+        const isPendingTagActivating = localStorage.getItem('focinho_pending_tag') === id;
 
-        if (!isStandalone) {
+        if (isPendingTagActivating) {
+          setSelectedPet({ tagId: id } as any);
+          setView('profile');
+        } else if (!isStandalone) {
           setSelectedPet({ tagId: id } as any);
           setView('install_pwa');
         } else if (!session?.user) {
