@@ -542,14 +542,17 @@ export default function App() {
   // (login/logout), ignoring token refreshes and tab-focus session recoveries
   const lastUserIdRef = useRef<string | null | undefined>(undefined);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState('dashboard'); // home, dashboard, reminders, walk, lost_pets, account, activate, profile, finder
+  const [view, setView] = useState(() => localStorage.getItem('focinho_pending_tag') ? 'profile' : 'dashboard'); // home, dashboard, reminders, walk, lost_pets, account, activate, profile, finder
   const [userCity, setUserCity] = useState<string>('');          // GPS auto-detected city (City - State)
   const [selectedCity, setSelectedCity] = useState<string>(() => localStorage.getItem('focinho_selected_city') || ''); // user-selected city for filtering
   const [showCityPicker, setShowCityPicker] = useState(false);
   const [cityInputTemp, setCityInputTemp] = useState('');
   const [accountSubView, setAccountSubView] = useState('menu'); // menu, profile, pets, support, store, admin, partners
   const [activePartnerFilter, setActivePartnerFilter] = useState('Todos');
-  const [selectedPet, setSelectedPet] = useState<PetProfile | null>(null);
+  const [selectedPet, setSelectedPet] = useState<PetProfile | null>(() => {
+    const pendingTag = localStorage.getItem('focinho_pending_tag');
+    return pendingTag ? ({ tagId: pendingTag } as any) : null;
+  });
   const [pendingGuestPet, setPendingGuestPet] = useState<Partial<PetProfile> | null>(null);
   const [userPets, setUserPets] = useState<PetProfile[]>([]);
   const [isFetchingUserPets, setIsFetchingUserPets] = useState(true);
@@ -561,7 +564,7 @@ export default function App() {
   const [adminTagsPage, setAdminTagsPage] = useState(1); // Admin only
   const [adminPetsPage, setAdminPetsPage] = useState(1); // Admin only
   const [selectedTagIds, setSelectedTagIds] = useState<Set<string>>(new Set()); // Admin QR selection
-  const [tagIdToActivate, setTagIdToActivate] = useState('');
+  const [tagIdToActivate, setTagIdToActivate] = useState(() => localStorage.getItem('focinho_pending_tag') || '');
   const [finderPet, setFinderPet] = useState<PetProfile | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -873,6 +876,7 @@ export default function App() {
             setView(currentView => {
               if (currentView === 'finder') return 'finder';
               if (tag) return 'activate';
+              if (localStorage.getItem('focinho_pending_tag')) return 'profile';
               return 'dashboard';
             });
           } else {
@@ -890,6 +894,26 @@ export default function App() {
     });
     return () => subscription.unsubscribe();
   }, []);
+
+  // Interceptar botão voltar do navegador quando usuário não logado está cadastrando pet com tag
+  useEffect(() => {
+    const isTagFlow = view === 'profile' && (
+      !user || (!!localStorage.getItem('focinho_pending_tag') && !selectedPet?.id) || (!!selectedPet?.tagId && !selectedPet?.id)
+    );
+    if (!isTagFlow) return;
+
+    // Push um estado extra para poder interceptar o "voltar"
+    window.history.pushState({ focinhoBlock: true }, '');
+
+    const handlePopState = (e: PopStateEvent) => {
+      // Redirecionar de volta para o perfil (não deixar sair)
+      window.history.pushState({ focinhoBlock: true }, '');
+      setView('profile');
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [user, tagIdToActivate, view, selectedPet]);
 
   // Processar pendingGuestPet se o usuário logar/registrar e houver pendência
   useEffect(() => {
@@ -921,6 +945,7 @@ export default function App() {
           }
           
           // Clear states
+          localStorage.removeItem('focinho_pending_tag');
           setPendingGuestPet(null);
           setTagIdToActivate('');
           setView('dashboard');
@@ -1920,6 +1945,7 @@ export default function App() {
       if (!tagData) {
         await supabase.from('tags').insert({ id: tagIdToActivate, activated: false, ownerId: null, petId: null });
       }
+      localStorage.setItem('focinho_pending_tag', tagIdToActivate);
       // Mostrar tela de sucesso antes de ir para o perfil
       setTagVerifiedSuccess(true);
     } catch (err) {
@@ -2019,6 +2045,7 @@ export default function App() {
       const { data } = await supabase.from('pets').select('*').eq('ownerId', user.id).or('deleted.is.null,deleted.eq.false');
       setUserPets((data || []) as PetProfile[]);
       setView('dashboard');
+      localStorage.removeItem('focinho_pending_tag');
       setSelectedPet(null);
       setTagIdToActivate('');
     } catch (err) {
@@ -6249,18 +6276,17 @@ export default function App() {
                 className="space-y-8"
               >
                 <div className="flex items-center gap-4">
-                  <button
-                    onClick={() => {
-                      if (!user && tagIdToActivate) {
-                        setView('install_pwa');
-                      } else {
-                        setView('dashboard');
-                      }
-                    }}
-                    className="p-2 bg-white rounded-xl shadow-sm"
-                  >
-                    <ChevronRight className="w-6 h-6 rotate-180" />
-                  </button>
+                  {/* Ocultar botão voltar quando usuário veio do fluxo de verificação de tag */}
+                  {!( !user || (localStorage.getItem('focinho_pending_tag') && !selectedPet?.id) || (selectedPet?.tagId && !selectedPet?.id) ) && (
+                    <button
+                      onClick={() => {
+                        setView(user ? 'dashboard' : 'install_pwa');
+                      }}
+                      className="p-2 bg-white rounded-xl shadow-sm"
+                    >
+                      <ChevronRight className="w-6 h-6 rotate-180" />
+                    </button>
+                  )}
                   <h2 className="text-2xl font-bold">
                     {userPets.some(p => p.id === selectedPet?.id) ? 'Editar Perfil' : 'Cadastrar Novo Pet'}
                   </h2>
