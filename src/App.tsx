@@ -47,7 +47,9 @@ import {
   Copy,
   Info,
   FileText,
-  Cake
+  Cake,
+  Smartphone,
+  MoreVertical
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap } from 'react-leaflet';
@@ -591,6 +593,8 @@ export default function App() {
 
   // Tag editing state (admin)
   const [editingTag, setEditingTag] = useState<{ id: string; newId: string } | null>(null);
+  const [tagVerifiedSuccess, setTagVerifiedSuccess] = useState(false);
+
 
   const [activeNotification, setActiveNotification] = useState<{ title: string, message: string } | null>(null);
 
@@ -818,12 +822,18 @@ export default function App() {
         // Tag not associated with any pet yet
         setTagIdToActivate(id);
 
-        // Checar sessão para decidir destino
+        // Checar sessão e PWA para decidir destino
         const { data: { session } } = await supabase.auth.getSession();
-        if (!session?.user) {
+        const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (document as any).referrer.includes('android-app://') || (window.navigator as any).standalone === true;
+
+        if (!isStandalone) {
+          setSelectedPet({ tagId: id } as any);
+          setView('install_pwa');
+        } else if (!session?.user) {
           setSelectedPet({ tagId: id } as any);
           setView('profile');
         } else {
+          setTagIdToActivate(''); // deixar o usuário digitar manualmente
           setAuthMode('register');
           setView('activate');
         }
@@ -868,7 +878,8 @@ export default function App() {
           } else {
             setView(currentView => {
               if (currentView === 'finder') return 'finder';
-              // Não limpar caso a pessoa deslogada esteja criando um perfil no modo convidade agora
+              // Não limpar caso a pessoa esteja no instalador PWA ou criando perfil
+              if (currentView === 'install_pwa') return 'install_pwa';
               if (currentView === 'profile' && selectedPet) return 'profile';
               return 'home';
             });
@@ -1909,7 +1920,8 @@ export default function App() {
       if (!tagData) {
         await supabase.from('tags').insert({ id: tagIdToActivate, activated: false, ownerId: null, petId: null });
       }
-      setView('profile');
+      // Mostrar tela de sucesso antes de ir para o perfil
+      setTagVerifiedSuccess(true);
     } catch (err) {
       console.error(err);
       setError('Erro ao verificar tag.');
@@ -2449,7 +2461,7 @@ export default function App() {
     <ErrorBoundary>
       <div className={`min-h-screen ${!user && view === 'home' ? 'bg-white' : 'bg-gray-50'} font-sans text-gray-900 pb-32 md:pb-0`}>
         {/* Header */}
-        {user && (
+        {user && view !== 'install_pwa' && (
           <header className="bg-white border-b border-gray-100 px-6 py-4 sticky top-0 z-50 flex justify-between items-center">
             <div className="flex items-center gap-2 cursor-pointer" onClick={() => setView('dashboard')}>
               <img src="./pwa-512x512.png" alt="FocinhoApp Logo" className="w-10 h-10 object-cover rounded-xl" />
@@ -2472,6 +2484,92 @@ export default function App() {
 
         <main className="max-w-xl mx-auto p-4 md:p-6 pb-40">
           <AnimatePresence mode="wait">
+            {/* Install PWA Tutorial Page */}
+            {view === 'install_pwa' && (
+              <motion.div
+                key="install_pwa"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                className="flex flex-col max-w-sm mx-auto space-y-5 pt-8 pb-12"
+              >
+                <div className="flex flex-col items-center text-center space-y-3 mb-2">
+                  <div className="w-20 h-20 bg-white rounded-3xl shadow-xl p-1 flex items-center justify-center">
+                    <img src="./pwa-512x512.png" alt="Icon" className="w-full h-full rounded-2xl object-cover" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-black text-gray-900 tracking-tight">Instale o App</h2>
+                    <p className="text-gray-500 font-medium mt-1 text-sm">Adicione o FocinhoApp à sua tela inicial em menos de 1 minuto</p>
+                  </div>
+                </div>
+
+                {/* Android */}
+                <div className="bg-white rounded-[2rem] p-5 shadow-sm border border-gray-100">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-9 h-9 bg-green-50 rounded-xl flex items-center justify-center shrink-0">
+                      <Smartphone className="w-5 h-5 text-green-500" />
+                    </div>
+                    <div>
+                      <p className="font-bold text-gray-900 text-sm leading-none">Android</p>
+                      <p className="text-xs text-gray-400 font-medium mt-0.5">Usar o Google Chrome</p>
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    {[
+                      'Toque nos três pontinhos no canto superior direito',
+                      'Toque em "Adicionar à tela inicial"',
+                      'Confirme o nome do app e toque em "Adicionar"',
+                    ].map((step, i) => (
+                      <div key={i} className="flex gap-3 items-start">
+                        <span className="bg-green-100 text-green-600 w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-black shrink-0 mt-0.5">{i + 1}</span>
+                        <p className="text-[13px] text-gray-600 font-medium leading-snug">{step}</p>
+                      </div>
+                    ))}
+                    <div className="flex gap-3 items-center pt-1">
+                      <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0" />
+                      <p className="text-[13px] text-green-600 font-bold">Pronto! O ícone aparece na sua tela inicial.</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* iPhone */}
+                <div className="bg-white rounded-[2rem] p-5 shadow-sm border border-gray-100">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-9 h-9 bg-blue-50 rounded-xl flex items-center justify-center shrink-0">
+                      <Smartphone className="w-5 h-5 text-blue-500" />
+                    </div>
+                    <div>
+                      <p className="font-bold text-gray-900 text-sm leading-none">iPhone</p>
+                      <p className="text-xs text-gray-400 font-medium mt-0.5">Usar o Safari — não funciona no Chrome</p>
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    {[
+                      'Toque no botão de compartilhar na barra inferior do Safari',
+                      'Role para baixo e toque em "Adicionar à Tela de Início"',
+                      'Confirme o nome do app e toque em "Adicionar"',
+                    ].map((step, i) => (
+                      <div key={i} className="flex gap-3 items-start">
+                        <span className="bg-blue-100 text-blue-600 w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-black shrink-0 mt-0.5">{i + 1}</span>
+                        <p className="text-[13px] text-gray-600 font-medium leading-snug">{step}</p>
+                      </div>
+                    ))}
+                    <div className="flex gap-3 items-center pt-1">
+                      <CheckCircle2 className="w-5 h-5 text-blue-500 shrink-0" />
+                      <p className="text-[13px] text-blue-600 font-bold">Pronto! O ícone aparece na sua tela inicial.</p>
+                    </div>
+                  </div>
+                </div>
+
+                <Button
+                  onClick={() => { setView('activate'); }}
+                  className="w-full py-4 text-base shadow-lg shadow-orange-500/20"
+                >
+                  Continuar Cadastro <ChevronRight className="w-5 h-5 ml-2" />
+                </Button>
+              </motion.div>
+            )}
+
             {/* Landing Page */}
             {view === 'home' && !user && (
               <motion.div
@@ -6036,30 +6134,109 @@ export default function App() {
                 animate={{ opacity: 1, x: 0 }}
                 className="space-y-8 py-8"
               >
-                <div className="text-center space-y-2">
-                  <h2 className="text-3xl font-bold">Ativar Tag</h2>
-                  <p className="text-gray-400">Insira o ID que veio com o seu QR Code</p>
-                </div>
-                <div className="space-y-6">
-                  <Input
-                    label="ID da Tag"
-                    placeholder="Ex: PAW-12345"
-                    value={tagIdToActivate}
-                    onChange={setTagIdToActivate}
-                    icon={QrCode}
-                  />
-                  {error && <p className="text-red-500 text-sm text-center">{error}</p>}
-                  <Button
-                    onClick={handleActivateTag}
-                    className="w-full py-4"
-                    loading={loading}
-                  >
-                    Verificar Tag
-                  </Button>
-                  <Button onClick={() => setView('dashboard')} variant="secondary" className="w-full">
-                    Cancelar
-                  </Button>
-                </div>
+                <AnimatePresence mode="wait">
+                  {tagVerifiedSuccess ? (
+                    /* ---- SUCCESS STATE ---- */
+                    <motion.div
+                      key="success"
+                      initial={{ opacity: 0, scale: 0.85 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.85 }}
+                      transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                      className="flex flex-col items-center text-center gap-6 py-6"
+                    >
+                      {/* Animated check circle */}
+                      <motion.div
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        transition={{ delay: 0.15, type: 'spring', stiffness: 400, damping: 18 }}
+                        className="w-28 h-28 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center shadow-2xl shadow-orange-300"
+                      >
+                        <motion.div
+                          initial={{ pathLength: 0, opacity: 0 }}
+                          animate={{ pathLength: 1, opacity: 1 }}
+                          transition={{ delay: 0.3, duration: 0.5 }}
+                        >
+                          <CheckCircle2 className="w-14 h-14 text-white" />
+                        </motion.div>
+                      </motion.div>
+
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.4 }}
+                        className="space-y-2"
+                      >
+                        <h2 className="text-3xl font-black text-gray-900 tracking-tight">Pingente Verificado!</h2>
+                        <p className="text-gray-500 font-medium">O pingente está pronto para ser vinculado ao seu pet.</p>
+                      </motion.div>
+
+                      <motion.div
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.5 }}
+                        className="bg-orange-50 border border-orange-200 rounded-2xl px-6 py-4 flex items-center gap-3"
+                      >
+                        <QrCode className="w-6 h-6 text-orange-500 shrink-0" />
+                        <div className="text-left">
+                          <p className="text-[11px] text-orange-400 font-bold uppercase tracking-wider">ID do Pingente</p>
+                          <p className="text-xl font-black text-orange-700 tracking-widest">{tagIdToActivate}</p>
+                        </div>
+                      </motion.div>
+
+                      <motion.div
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.65 }}
+                        className="w-full pt-2"
+                      >
+                        <Button
+                          onClick={() => {
+                            setTagVerifiedSuccess(false);
+                            setView('profile');
+                          }}
+                          className="w-full py-4 text-base shadow-lg shadow-orange-500/20"
+                        >
+                          Cadastrar Meu Pet <ChevronRight className="w-5 h-5 ml-1" />
+                        </Button>
+                      </motion.div>
+                    </motion.div>
+                  ) : (
+                    /* ---- FORM STATE ---- */
+                    <motion.div
+                      key="form"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="space-y-6"
+                    >
+                      <div className="text-center space-y-2">
+                        <h2 className="text-3xl font-bold">Ativar Pingente</h2>
+                        <p className="text-gray-400">Insira o ID que veio com o seu Pingente</p>
+                      </div>
+                      <div className="space-y-6">
+                        <Input
+                          label="ID do Pingente"
+                          placeholder="Ex: CAF943"
+                          value={tagIdToActivate}
+                          onChange={setTagIdToActivate}
+                          icon={QrCode}
+                        />
+                        {error && <p className="text-red-500 text-sm text-center">{error}</p>}
+                        <Button
+                          onClick={handleActivateTag}
+                          className="w-full py-4"
+                          loading={loading}
+                        >
+                          Verificar Pingente
+                        </Button>
+                        <Button onClick={() => setView(user ? 'dashboard' : 'install_pwa')} variant="secondary" className="w-full">
+                          {user ? 'Cancelar' : 'Voltar'}
+                        </Button>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </motion.div>
             )}
 
@@ -6072,10 +6249,21 @@ export default function App() {
                 className="space-y-8"
               >
                 <div className="flex items-center gap-4">
-                  <button onClick={() => setView('dashboard')} className="p-2 bg-white rounded-xl shadow-sm">
+                  <button
+                    onClick={() => {
+                      if (!user && tagIdToActivate) {
+                        setView('install_pwa');
+                      } else {
+                        setView('dashboard');
+                      }
+                    }}
+                    className="p-2 bg-white rounded-xl shadow-sm"
+                  >
                     <ChevronRight className="w-6 h-6 rotate-180" />
                   </button>
-                  <h2 className="text-2xl font-bold">{selectedPet ? 'Editar Perfil' : 'Novo Perfil'}</h2>
+                  <h2 className="text-2xl font-bold">
+                    {userPets.some(p => p.id === selectedPet?.id) ? 'Editar Perfil' : 'Cadastrar Novo Pet'}
+                  </h2>
                 </div>
 
                 <div className="space-y-6 pb-24">
@@ -6158,26 +6346,27 @@ export default function App() {
                     )}
                     {selectedPet?.tagId && (
                       <div className="bg-green-50 p-4 rounded-2xl border border-green-100 flex flex-col gap-3">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <ShieldCheck className="w-5 h-5 text-green-500" />
-                            <div>
-                              <p className="text-xs font-bold text-green-800">TAG VINCULADA</p>
-                              <p className="text-[10px] text-green-600">ID: {selectedPet.tagId}</p>
-                            </div>
+                        <div className="flex items-center gap-3">
+                          <ShieldCheck className="w-5 h-5 text-green-500" />
+                          <div>
+                            <p className="text-xs font-bold text-green-800">PINGENTE VINCULADO</p>
+                            <p className="text-[10px] text-green-600">ID: {selectedPet.tagId}</p>
                           </div>
                         </div>
-                        <button
-                          onClick={(e) => {
-                            e.preventDefault();
-                            if (selectedPet.id && selectedPet.tagId) {
-                              handleDeactivateTag(selectedPet.tagId, selectedPet.id);
-                            }
-                          }}
-                          className="text-xs font-bold text-red-500 bg-red-50 hover:bg-red-100 py-2 px-3 rounded-xl transition-colors border border-red-100 w-full text-center"
-                        >
-                          Perdeu a tag? Desativar agora
-                        </button>
+                        {/* Botão de desativar apenas na edição de pet já salvo */}
+                        {userPets.some(p => p.id === selectedPet?.id) && (
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                              if (selectedPet.id && selectedPet.tagId) {
+                                handleDeactivateTag(selectedPet.tagId, selectedPet.id);
+                              }
+                            }}
+                            className="text-xs font-bold text-red-500 bg-red-50 hover:bg-red-100 py-2 px-3 rounded-xl transition-colors border border-red-100 w-full text-center"
+                          >
+                            Perdeu o pingente? Desativar agora
+                          </button>
+                        )}
                       </div>
                     )}
 
@@ -6191,7 +6380,7 @@ export default function App() {
                           </div>
                         </div>
                         <button
-                          onClick={() => setView('activate')}
+                          onClick={() => { setTagIdToActivate(''); setView('activate'); }}
                           className="text-xs font-bold text-orange-500 hover:underline"
                         >
                           Vincular Agora
@@ -6295,15 +6484,45 @@ export default function App() {
                         onChange={(e) => setSelectedPet(prev => ({ ...prev, observations: e.target.value } as any))}
                       />
                     </div>
+
+                    {/* WhatsApp field — only for guest users */}
+                    {!user && (
+                      <div className="bg-green-50 border border-green-200 rounded-3xl p-5 space-y-3">
+                        <div className="flex items-center gap-2">
+                          <MessageCircle className="w-5 h-5 text-green-600" />
+                          <p className="text-sm font-bold text-green-800">Seu WhatsApp de Resgate</p>
+                        </div>
+                        <p className="text-xs text-green-700">Quem encontrar seu pet poderá te contatar diretamente. Vamos verificar o número agora.</p>
+                        <Input
+                          label="Número do WhatsApp"
+                          placeholder="(00) 00000-0000"
+                          value={selectedPet?.ownerPhone || ''}
+                          onChange={(v: string) => setSelectedPet(prev => ({ ...prev, ownerPhone: formatPhoneMask(v) } as any))}
+                          icon={Phone}
+                        />
+                        {selectedPet?.phoneVerified && (
+                          <div className="flex items-center gap-2 text-green-700">
+                            <CheckCircle2 className="w-4 h-4" />
+                            <span className="text-xs font-bold">WhatsApp verificado!</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex flex-col gap-3">
                     <Button
-                      onClick={handleSavePet}
+                      onClick={() => {
+                        if (!user && selectedPet?.ownerPhone && !selectedPet?.phoneVerified) {
+                          startPhoneVerification();
+                        } else {
+                          handleSavePet();
+                        }
+                      }}
                       className="w-full py-4"
                       loading={loading}
                     >
-                      {user ? 'Salvar Perfil' : 'Próximo Passo'}
+                      {user ? 'Salvar Perfil' : (selectedPet?.phoneVerified ? 'Criar Conta' : 'Verificar WhatsApp')}
                     </Button>
                     {user && selectedPet && (
                       <button
@@ -6633,7 +6852,7 @@ export default function App() {
         </main>
 
         {/* Mobile Nav */}
-        {user && view !== 'finder' && (
+        {user && view !== 'finder' && view !== 'install_pwa' && (
           <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 px-2 py-3 flex justify-around items-center z-50 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
             <button
               onClick={() => setView('dashboard')}
