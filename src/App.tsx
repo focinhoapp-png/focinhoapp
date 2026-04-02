@@ -6511,44 +6511,16 @@ export default function App() {
                       />
                     </div>
 
-                    {/* WhatsApp field — only for guest users */}
-                    {!user && (
-                      <div className="bg-green-50 border border-green-200 rounded-3xl p-5 space-y-3">
-                        <div className="flex items-center gap-2">
-                          <MessageCircle className="w-5 h-5 text-green-600" />
-                          <p className="text-sm font-bold text-green-800">Seu WhatsApp de Resgate</p>
-                        </div>
-                        <p className="text-xs text-green-700">Quem encontrar seu pet poderá te contatar diretamente. Vamos verificar o número agora.</p>
-                        <Input
-                          label="Número do WhatsApp"
-                          placeholder="(00) 00000-0000"
-                          value={selectedPet?.ownerPhone || ''}
-                          onChange={(v: string) => setSelectedPet(prev => ({ ...prev, ownerPhone: formatPhoneMask(v) } as any))}
-                          icon={Phone}
-                        />
-                        {selectedPet?.phoneVerified && (
-                          <div className="flex items-center gap-2 text-green-700">
-                            <CheckCircle2 className="w-4 h-4" />
-                            <span className="text-xs font-bold">WhatsApp verificado!</span>
-                          </div>
-                        )}
-                      </div>
-                    )}
+
                   </div>
 
                   <div className="flex flex-col gap-3">
                     <Button
-                      onClick={() => {
-                        if (!user && selectedPet?.ownerPhone && !selectedPet?.phoneVerified) {
-                          startPhoneVerification();
-                        } else {
-                          handleSavePet();
-                        }
-                      }}
+                      onClick={handleSavePet}
                       className="w-full py-4"
                       loading={loading}
                     >
-                      {user ? 'Salvar Perfil' : (selectedPet?.phoneVerified ? 'Criar Conta' : 'Verificar WhatsApp')}
+                      {user ? 'Salvar Perfil' : 'Criar Conta'}
                     </Button>
                     {user && selectedPet && (
                       <button
