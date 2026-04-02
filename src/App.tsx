@@ -5193,7 +5193,7 @@ export default function App() {
                                   const folder = zip.folder('qrcodes-focinho')!;
                                   const ids = Array.from(selectedTagIds);
                                   for (const tagId of ids) {
-                                    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(window.location.origin + '/?tag=' + tagId)}`;
+                                    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent('https://focinhoapp.vercel.app' + '/?tag=' + tagId)}`;
                                     try {
                                       const res = await fetch(qrUrl);
                                       const blob = await res.blob();
@@ -5219,7 +5219,7 @@ export default function App() {
 
                         <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-3 min-h-[200px] relative z-10">
                           {allTags.slice((adminTagsPage - 1) * 20, adminTagsPage * 20).map((tag) => {
-                            const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(window.location.origin + '/?tag=' + tag.id)}`;
+                            const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent('https://focinhoapp.vercel.app' + '/?tag=' + tag.id)}`;
                             const isSelected = selectedTagIds.has(tag.id);
                             return (
                               <div
@@ -5248,7 +5248,7 @@ export default function App() {
                                 <img src={qrUrl} alt={tag.id} className="w-full aspect-square mb-2 rounded-xl" />
                                 <p className="text-[10px] font-black text-gray-700 w-full truncate">{tag.id}</p>
                                 <a
-                                  href={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(window.location.origin + '/?tag=' + tag.id)}`}
+                                  href={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent('https://focinhoapp.vercel.app' + '/?tag=' + tag.id)}`}
                                   download={`${tag.id}.png`}
                                   onClick={e => e.stopPropagation()}
                                   className="text-[9px] text-orange-500 font-bold hover:underline py-1 block"
