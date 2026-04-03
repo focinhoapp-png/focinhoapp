@@ -61,6 +61,7 @@ import { toPng } from 'html-to-image';
 import { supabase } from './supabase';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 import QRScanner from './components/QRScanner';
+import { ImageCropperModal } from './components/ImageCropperModal';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 
@@ -680,6 +681,38 @@ export default function App() {
   const [joiningFamily, setJoiningFamily] = useState(false);
 
   const [showScanner, setShowScanner] = useState(false);
+
+  const [cropModalConfig, setCropModalConfig] = useState({
+    isOpen: false,
+    imageSrc: null as string | null,
+    aspectRatio: 1,
+    circularCrop: false,
+    onConfirm: (blob: Blob) => {},
+  });
+
+  const requestCrop = (file: File, aspectRatio = 1, circularCrop = false): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        if (e.target?.result && typeof e.target.result === 'string') {
+          setCropModalConfig({
+            isOpen: true,
+            imageSrc: e.target.result,
+            aspectRatio,
+            circularCrop,
+            onConfirm: (blob) => {
+              resolve(blob);
+              setCropModalConfig(prev => ({ ...prev, isOpen: false }));
+            }
+          });
+        } else {
+          reject(new Error('Failed to read file'));
+        }
+      };
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsDataURL(file);
+    });
+  };
 
   const processScannedTag = async (id: string) => {
     setLoading(true);
@@ -2245,18 +2278,20 @@ export default function App() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setLoading(true);
     try {
+      const croppedBlob = await requestCrop(file, 1, true);
       const reader = new FileReader();
       reader.onloadend = () => {
         setOwnerProfile(prev => ({ ...prev, photoUrl: reader.result as string } as any));
-        setLoading(false);
       };
-      reader.readAsDataURL(file);
+      reader.readAsDataURL(croppedBlob);
     } catch (err) {
-      setError('Erro ao carregar foto.');
-      setLoading(false);
+      console.error(err);
+      setError('Erro ao recortar foto.');
     }
+    
+    // reset input
+    e.target.value = '';
   };
 
   const handleAdoptionPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -2437,19 +2472,25 @@ export default function App() {
     });
   };
 
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 5000000) { // 5MB limit for base64 in Firestore
+      if (file.size > 5000000) {
         setError('A imagem é muito grande. Escolha uma foto menor que 5MB.');
         return;
       }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setSelectedPet(prev => ({ ...prev, photoUrl: reader.result as string } as any));
-      };
-      reader.readAsDataURL(file);
+      try {
+        const croppedBlob = await requestCrop(file, 1, false);
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setSelectedPet(prev => ({ ...prev, photoUrl: reader.result as string } as any));
+        };
+        reader.readAsDataURL(croppedBlob);
+      } catch (err) {
+        console.error(err);
+      }
     }
+    e.target.value = '';
   };
 
   const handleGalleryUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -6824,15 +6865,21 @@ export default function App() {
                           type="file"
                           accept="image/*"
                           className="hidden"
-                          onChange={(e) => {
+                          onChange={async (e) => {
                             const file = e.target.files?.[0];
                             if (file) {
-                              const reader = new FileReader();
-                              reader.onloadend = () => {
-                                setNewPost(prev => ({ ...prev, imageUrl: reader.result as string }));
-                              };
-                              reader.readAsDataURL(file);
+                              try {
+                                const croppedBlob = await requestCrop(file, 1, false);
+                                const reader = new FileReader();
+                                reader.onloadend = () => {
+                                  setNewPost(prev => ({ ...prev, imageUrl: reader.result as string }));
+                                };
+                                reader.readAsDataURL(croppedBlob);
+                              } catch (err) {
+                                console.error(err);
+                              }
                             }
+                            e.target.value = '';
                           }}
                         />
                       </div>
@@ -6945,7 +6992,16 @@ export default function App() {
 
         {/* Lightbox */}
         <AnimatePresence>
-          {lightboxImage && (
+          <ImageCropperModal
+        isOpen={cropModalConfig.isOpen}
+        imageSrc={cropModalConfig.imageSrc}
+        aspectRatio={cropModalConfig.aspectRatio}
+        circularCrop={cropModalConfig.circularCrop}
+        onClose={() => setCropModalConfig(prev => ({ ...prev, isOpen: false }))}
+        onCropComplete={cropModalConfig.onConfirm}
+      />
+
+      {lightboxImage && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
