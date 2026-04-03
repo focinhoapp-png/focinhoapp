@@ -325,17 +325,17 @@ class ErrorBoundary extends Component<any, any> {
 
 const Button = ({ children, onClick, variant = 'primary', className = '', disabled = false, loading = false }: any) => {
   const variants: any = {
-    primary: 'bg-orange-500 text-white hover:bg-orange-600 shadow-orange-200',
-    secondary: 'bg-white text-gray-800 border border-gray-200 hover:bg-gray-50',
+    primary: 'clay-btn-primary border-none',
+    secondary: 'clay-btn-secondary border-none',
     outline: 'bg-transparent border-2 border-orange-500 text-orange-500 hover:bg-orange-50',
-    danger: 'bg-red-500 text-white hover:bg-red-600 shadow-red-200',
+    danger: 'bg-red-500 text-white hover:bg-red-600 shadow-lg shadow-red-200 border-none transition-transform active:scale-95',
   };
 
   return (
     <button
       onClick={onClick}
       disabled={disabled || loading}
-      className={`px-6 py-4 rounded-2xl font-bold transition-all active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg text-base ${variants[variant]} ${className}`}
+      className={`px-6 py-4 font-bold flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed text-base rounded-[24px] ${variants[variant]} ${className}`}
     >
       {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : children}
     </button>
@@ -344,7 +344,7 @@ const Button = ({ children, onClick, variant = 'primary', className = '', disabl
 
 const Input = ({ label, value, onChange, placeholder, type = 'text', icon: Icon }: any) => (
   <div className="flex flex-col gap-1.5 w-full">
-    {label && <label className="text-sm font-bold text-gray-700 ml-1">{label}</label>}
+    {label && <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">{label}</label>}
     <div className="relative">
       {Icon && <Icon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />}
       <input
@@ -352,7 +352,7 @@ const Input = ({ label, value, onChange, placeholder, type = 'text', icon: Icon 
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className={`w-full bg-gray-50 border border-gray-200 rounded-2xl py-4 ${Icon ? 'pl-12' : 'px-4'} pr-4 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all text-base`}
+        className={`w-full clay-input outline-none py-4 ${Icon ? 'pl-12' : 'px-4'} pr-4 text-base`}
       />
     </div>
   </div>
@@ -370,13 +370,13 @@ const ESTADOS_BR = [
 
 const Select = ({ label, value, onChange, options, icon: Icon }: any) => (
   <div className="flex flex-col gap-1.5 w-full">
-    {label && <label className="text-sm font-bold text-gray-700 ml-1">{label}</label>}
+    {label && <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">{label}</label>}
     <div className="relative">
       {Icon && <Icon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />}
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className={`w-full bg-gray-50 border border-gray-200 rounded-2xl py-4 ${Icon ? 'pl-12' : 'px-4'} pr-10 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all appearance-none text-base`}
+        className={`w-full clay-input outline-none py-4 ${Icon ? 'pl-12' : 'px-4'} pr-10 appearance-none text-base`}
       >
         <option value="">Selecione...</option>
         {options.map((opt: any) => {
@@ -437,7 +437,7 @@ const LocationInput = ({ label, value, onChange, placeholder, icon: Icon }: any)
 
   return (
     <div className="flex flex-col gap-1.5 w-full relative">
-      {label && <label className="text-sm font-bold text-gray-700 ml-1">{label}</label>}
+      {label && <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">{label}</label>}
       <div className="relative flex items-center">
         {Icon && <Icon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />}
         <input
@@ -445,7 +445,7 @@ const LocationInput = ({ label, value, onChange, placeholder, icon: Icon }: any)
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
-          className={`w-full bg-gray-50 border border-gray-200 rounded-2xl py-4 ${Icon ? 'pl-12' : 'px-4'} pr-16 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all text-base`}
+          className={`w-full clay-input outline-none py-4 ${Icon ? 'pl-12' : 'px-4'} pr-16 text-base`}
         />
         <button
           type="button"
