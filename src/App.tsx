@@ -49,7 +49,9 @@ import {
   FileText,
   Cake,
   Smartphone,
-  MoreVertical
+  MoreVertical,
+  Clock,
+  DollarSign
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap } from 'react-leaflet';
@@ -182,6 +184,7 @@ interface LostAlert {
   petPhoto: string;
   city: string;
   lastSeen: string;
+  reward?: string;
   contactPhone: string;
   createdAt: any;
 }
@@ -580,7 +583,7 @@ export default function App() {
   const [lostAlerts, setLostAlerts] = useState<LostAlert[]>([]);
   const [isAddingSOS, setIsAddingSOS] = useState(false);
   const [editingSOSId, setEditingSOSId] = useState<string | null>(null);
-  const [newSOS, setNewSOS] = useState({ petId: '', city: '', lastSeen: '' });
+  const [newSOS, setNewSOS] = useState({ petId: '', city: '', lastSeen: '', reward: '' });
   const [hasNewUnreadSOS, setHasNewUnreadSOS] = useState(false);
   const lastLostAlertsCount = useRef(0);
 
@@ -1317,6 +1320,7 @@ export default function App() {
         petPhoto: pet.photoUrl,
         city: newSOS.city,
         lastSeen: newSOS.lastSeen,
+        reward: newSOS.reward || null,
         contactPhone: pet.ownerPhone || ownerProfile?.phone || '',
         createdAt: editingSOSId ? lostAlerts.find(a => a.id === editingSOSId)?.createdAt : new Date().toISOString()
       };
@@ -1326,7 +1330,7 @@ export default function App() {
 
       setIsAddingSOS(false);
       setEditingSOSId(null);
-      setNewSOS({ petId: '', city: '', lastSeen: '' });
+      setNewSOS({ petId: '', city: '', lastSeen: '', reward: '' });
       const { data } = await supabase.from('lost_alerts').select('*');
       setLostAlerts((data || []) as LostAlert[]);
     } catch (err) {
@@ -3874,6 +3878,18 @@ export default function App() {
                             <div className="bg-white/50 p-4 rounded-2xl border border-red-100">
                               <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">Visto por último em:</p>
                               <p className="text-sm text-gray-700 font-medium">{alert.lastSeen}</p>
+                              <div className="flex items-center gap-2 mt-3 pt-3 border-t border-red-100/50">
+                                <Clock className="w-4 h-4 text-red-400" />
+                                <span className="text-[11px] text-red-500 font-bold tracking-wide uppercase">
+                                  Gerado em: {new Date(alert.createdAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
+                                </span>
+                              </div>
+                              {alert.reward && (
+                                <div className="mt-3 bg-green-50 border border-green-200 p-2.5 rounded-xl text-green-700 font-bold text-sm shadow-[inset_0_2px_4px_rgba(0,0,0,0.05)] border-t border-green-300 flex items-center justify-center gap-2">
+                                  <DollarSign className="w-5 h-5 text-green-600" />
+                                  Recompensa Agendada: <span className="font-black text-lg">{alert.reward}</span>
+                                </div>
+                              )}
                             </div>
 
                             <div className="flex flex-col gap-2">
@@ -3892,7 +3908,8 @@ export default function App() {
                                       setNewSOS({
                                         petId: alert.petId,
                                         city: alert.city,
-                                        lastSeen: alert.lastSeen
+                                        lastSeen: alert.lastSeen,
+                                        reward: alert.reward
                                       });
                                       setIsAddingSOS(true);
                                     }}
@@ -3932,7 +3949,7 @@ export default function App() {
                         onClick={() => {
                           setIsAddingSOS(false);
                           setEditingSOSId(null);
-                          setNewSOS({ petId: '', city: '', lastSeen: '' });
+                          setNewSOS({ petId: '', city: '', lastSeen: '', reward: '' });
                         }}
                         className="absolute inset-0 bg-black/40 backdrop-blur-sm"
                       />
@@ -3947,7 +3964,7 @@ export default function App() {
                           <button onClick={() => {
                             setIsAddingSOS(false);
                             setEditingSOSId(null);
-                            setNewSOS({ petId: '', city: '', lastSeen: '' });
+                            setNewSOS({ petId: '', city: '', lastSeen: '', reward: '' });
                           }} className="p-2 hover:bg-gray-100 rounded-full">
                             <X className="w-5 h-5" />
                           </button>
@@ -3984,6 +4001,13 @@ export default function App() {
                             value={newSOS.lastSeen}
                             onChange={(v: string) => setNewSOS(prev => ({ ...prev, lastSeen: v }))}
                             icon={AlertCircle}
+                          />
+                          <Input
+                            label="Recompensa (Opcional)"
+                            placeholder="Ex: R$ 500,00"
+                            value={newSOS.reward || ''}
+                            onChange={(v: string) => setNewSOS(prev => ({ ...prev, reward: v }))}
+                            icon={DollarSign}
                           />
                         </div>
 
