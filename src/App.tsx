@@ -959,7 +959,7 @@ export default function App() {
           setView('dashboard');
           
           setTimeout(() => {
-            alert('Parabéns! Conta criada, perfil do Pet salvo e Tag ativada com sucesso!');
+            alert('Parabéns! Conta criada, perfil do Pet salvo e Pingente ativado com sucesso!');
           }, 500);
           
         } catch (err) {
@@ -6560,6 +6560,7 @@ export default function App() {
             )}
 
             {/* Finder Page (Public) */}
+            {/* Finder Page (Public) */}
             {view === 'finder' && finderPet && (
               <motion.div
                 key="finder"
@@ -6708,19 +6709,24 @@ export default function App() {
                       {finderPet.privacySettings?.showPhone !== false ? (
                         finderPet.ownerPhone ? (
                           <>
-                            <Button
+                            <button
                               onClick={() => window.open(`https://wa.me/55${finderPet.ownerPhone!.replace(/\D/g, '')}?text=${encodeURIComponent(`Olá! Encontrei seu pet ${finderPet.name}.`)}`, '_blank')}
-                              className="w-full py-5 text-lg bg-green-500 hover:bg-green-600 shadow-green-200"
+                              className="w-full py-4 text-lg bg-green-500 hover:bg-green-600 active:bg-green-700 shadow-lg shadow-green-200 text-white font-bold rounded-[20px] flex items-center justify-center transition-colors"
                             >
-                              <MessageCircle className="w-6 h-6" /> Falar com o Dono
-                            </Button>
-                            <Button
+                              <MessageCircle className="w-6 h-6 mr-2" /> Falar com tutor no WhatsApp
+                            </button>
+                            <button
+                              onClick={() => window.open(`tel:${finderPet.ownerPhone?.replace(/\D/g, '')}`, '_blank')}
+                              className="w-full py-4 text-lg bg-red-500 hover:bg-red-600 active:bg-red-700 shadow-lg shadow-red-200 text-white font-bold rounded-[20px] flex items-center justify-center transition-colors"
+                            >
+                              <Phone className="w-6 h-6 mr-2" /> Ligar para o Tutor
+                            </button>
+                            <button
                               onClick={sendLocation}
-                              variant="outline"
-                              className="w-full py-5 text-lg"
+                              className="w-full py-4 text-lg bg-orange-500 hover:bg-orange-600 active:bg-orange-700 shadow-lg shadow-orange-200 text-white font-bold rounded-[20px] flex items-center justify-center transition-colors"
                             >
-                              <MapPin className="w-6 h-6" /> Enviar Minha Localização
-                            </Button>
+                              <MapPin className="w-6 h-6 mr-2" /> Enviar Localização do Pet
+                            </button>
                           </>
                         ) : (
                           <div className="bg-red-50 p-4 rounded-2xl border border-red-100 text-center">
