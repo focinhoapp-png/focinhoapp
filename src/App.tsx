@@ -2235,7 +2235,7 @@ export default function App() {
       setSuccessMessage('Configurações salvas com sucesso!');
       setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err) {
-      setError('Erro ao salvar perfil do dono.');
+      setError('Erro ao salvar perfil do tutor.');
     } finally {
       setLoading(false);
     }
@@ -2389,7 +2389,7 @@ export default function App() {
 
   const sendLocation = () => {
     if (!finderPet?.ownerPhone) {
-      setError('O dono não cadastrou um telefone de contato.');
+      setError('O tutor não cadastrou um telefone de contato.');
       return;
     }
 
@@ -2405,7 +2405,7 @@ export default function App() {
       const whatsappUrl = `https://wa.me/55${finderPet.ownerPhone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
       window.open(whatsappUrl, '_blank');
     }, () => {
-      alert('Por favor, permita o acesso à localização para ajudar o dono.');
+      alert('Por favor, permita o acesso à localização para ajudar o tutor.');
     });
   };
 
@@ -2932,7 +2932,7 @@ export default function App() {
                             <Megaphone className={`w-6 h-6 ${hasNewUnreadSOS ? 'text-white' : 'text-red-500'}`} />
                           </div>
                           <div>
-                            <h4 className={`font-black text-sm ${hasNewUnreadSOS ? 'text-white' : 'text-gray-800'}`}>Animal Perdido</h4>
+                            <h4 className={`font-black text-sm ${hasNewUnreadSOS ? 'text-white' : 'text-gray-800'}`}>Alertas</h4>
                             <p className={`text-[10px] font-medium ${hasNewUnreadSOS ? 'text-white/80' : 'text-gray-400'}`}>Alertas SOS ativos</p>
                           </div>
                         </div>
@@ -3782,7 +3782,7 @@ export default function App() {
             {view === 'lost_pets' && (
               <motion.div key="lost_pets" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
                 <div className="flex justify-between items-center">
-                  <h2 className="text-2xl font-bold">Animal Perdido</h2>
+                  <h2 className="text-2xl font-bold">Alertas</h2>
                   <div className="flex gap-2">
 
                     <button
@@ -5488,7 +5488,7 @@ export default function App() {
                                 </div>
                                 <div className="flex-1 min-w-0 pr-2">
                                   <h5 className="font-black text-gray-900 text-lg truncate">{pet.name}</h5>
-                                  <p className="text-[10px] text-gray-400 font-bold truncate mt-0.5">Dono: <span className="font-mono bg-gray-100 px-1 py-0.5 rounded text-gray-500">{pet.ownerId}</span></p>
+                                  <p className="text-[10px] text-gray-400 font-bold truncate mt-0.5">Tutor: <span className="font-mono bg-gray-100 px-1 py-0.5 rounded text-gray-500">{pet.ownerId}</span></p>
                                   <div className="flex gap-2 mt-2">
                                     {pet.tagId ? (
                                       <span className="bg-green-100 text-green-700 text-[9px] font-black px-2 py-0.5 rounded-md uppercase">ID: {pet.tagId}</span>
@@ -6654,7 +6654,7 @@ export default function App() {
                     {finderPet.ownerName && (
                       <div className="bg-orange-50/50 rounded-2xl p-3 mb-6 inline-flex items-center justify-center gap-2 border border-orange-100">
                         <UserIcon className="w-4 h-4 text-orange-500" />
-                        <span className="text-orange-900 text-xs font-bold uppercase tracking-wide">Dono(a): {finderPet.ownerName}</span>
+                        <span className="text-orange-900 text-xs font-bold uppercase tracking-wide">Tutor(a): {finderPet.ownerName}</span>
                       </div>
                     )}
 
@@ -6710,7 +6710,7 @@ export default function App() {
                           <div>
                             <h4 className="font-bold text-sm text-gray-500">Endereço Oculto</h4>
                             <p className="text-gray-400 text-xs mt-1">
-                              O dono ativou o modo privado para este campo.
+                              O tutor ativou o modo privado para este campo.
                             </p>
                           </div>
                         </div>
@@ -6759,7 +6759,7 @@ export default function App() {
                         )
                       ) : (
                         <div className="bg-orange-50 p-4 rounded-2xl border border-orange-100 text-center">
-                          <p className="text-sm text-orange-600 font-bold">O dono optou por ocultar o número de telefone.</p>
+                          <p className="text-sm text-orange-600 font-bold">O tutor optou por ocultar o número de telefone.</p>
                         </div>
                       )}
                     </div>
@@ -6924,7 +6924,7 @@ export default function App() {
               className={`flex flex-col items-center gap-1 transition-colors flex-1 min-h-[44px] justify-center relative ${view === 'lost_pets' ? 'text-orange-500' : 'text-gray-300'}`}
             >
               <Megaphone className={`w-7 h-7 ${hasNewUnreadSOS && view !== 'lost_pets' ? 'text-red-500 animate-pulse' : ''}`} />
-              <span translate="no" className="text-[11px] font-bold uppercase">Animal Perdido</span>
+              <span translate="no" className="text-[11px] font-bold uppercase">Alertas</span>
               {hasNewUnreadSOS && view !== 'lost_pets' && (
                 <span className="absolute top-1 right-1/2 translate-x-4 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white animate-bounce" />
               )}
