@@ -947,6 +947,10 @@ export default function App() {
           if (effectiveTagId) {
             await supabase.from('tags').upsert({ id: effectiveTagId, activated: true, ownerId: user.id, petId: petId });
           }
+
+          // Atualizar os pets em memória para refleti-los no dashboard
+          const { data } = await supabase.from('pets').select('*').eq('ownerId', user.id).or('deleted.is.null,deleted.eq.false');
+          setUserPets((data || []) as PetProfile[]);
           
           // Clear states
           localStorage.removeItem('focinho_pending_tag');
