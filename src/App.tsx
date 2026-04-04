@@ -538,6 +538,146 @@ const calculatePetAge = (birthdayStr?: string) => {
   return 'Menos de 1 mês de idade';
 };
 
+// --- Reusable State→City Picker ---
+const BRAZIL_STATES = [
+  { sigla: 'AC', nome: 'Acre' }, { sigla: 'AL', nome: 'Alagoas' }, { sigla: 'AP', nome: 'Amapá' },
+  { sigla: 'AM', nome: 'Amazonas' }, { sigla: 'BA', nome: 'Bahia' }, { sigla: 'CE', nome: 'Ceará' },
+  { sigla: 'DF', nome: 'Distrito Federal' }, { sigla: 'ES', nome: 'Espírito Santo' }, { sigla: 'GO', nome: 'Goiás' },
+  { sigla: 'MA', nome: 'Maranhão' }, { sigla: 'MT', nome: 'Mato Grosso' }, { sigla: 'MS', nome: 'Mato Grosso do Sul' },
+  { sigla: 'MG', nome: 'Minas Gerais' }, { sigla: 'PA', nome: 'Pará' }, { sigla: 'PB', nome: 'Paraíba' },
+  { sigla: 'PR', nome: 'Paraná' }, { sigla: 'PE', nome: 'Pernambuco' }, { sigla: 'PI', nome: 'Piauí' },
+  { sigla: 'RJ', nome: 'Rio de Janeiro' }, { sigla: 'RN', nome: 'Rio Grande do Norte' }, { sigla: 'RS', nome: 'Rio Grande do Sul' },
+  { sigla: 'RO', nome: 'Rondônia' }, { sigla: 'RR', nome: 'Roraima' }, { sigla: 'SC', nome: 'Santa Catarina' },
+  { sigla: 'SP', nome: 'São Paulo' }, { sigla: 'SE', nome: 'Sergipe' }, { sigla: 'TO', nome: 'Tocantins' },
+];
+
+function CityStatePicker({ state, city, onStateChange, onCityChange, label = 'Localização' }: {
+  state: string; city: string;
+  onStateChange: (s: string) => void;
+  onCityChange: (c: string) => void;
+  label?: string;
+}) {
+  const [open, setOpen] = React.useState(false);
+  const [step, setStep] = React.useState<'state' | 'city'>('state');
+  const [selState, setSelState] = React.useState<{ sigla: string; nome: string } | null>(null);
+  const [cities, setCities] = React.useState<string[]>([]);
+  const [citySearch, setCitySearch] = React.useState('');
+  const [stateSearch, setStateSearch] = React.useState('');
+  const [loadingCities, setLoadingCities] = React.useState(false);
+
+  const displayValue = state && city ? `${city} - ${state}` : state ? state : '';
+
+  const reset = () => { setStep('state'); setSelState(null); setCities([]); setCitySearch(''); setStateSearch(''); };
+
+  return (
+    <>
+      <div className="flex flex-col gap-1.5">
+        <label className="text-sm font-medium text-gray-600 ml-1">{label}</label>
+        <button
+          type="button"
+          onClick={() => { setOpen(true); reset(); }}
+          className="w-full flex items-center gap-3 px-4 py-3.5 bg-gray-50 border border-gray-200 rounded-2xl hover:border-orange-400 transition-all text-left"
+        >
+          <MapPin className="w-4 h-4 text-orange-500 shrink-0" />
+          <span className={`flex-1 text-sm font-medium ${displayValue ? 'text-gray-800' : 'text-gray-400'}`}>
+            {displayValue || 'Selecionar Estado / Cidade'}
+          </span>
+          <ChevronRight className="w-4 h-4 text-gray-300" />
+        </button>
+      </div>
+
+      {open && (
+        <div className="fixed inset-0 z-[300] flex items-end justify-center">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => { setOpen(false); reset(); }} />
+          <div className="relative bg-white w-full max-w-lg rounded-t-[3rem] p-6 shadow-2xl z-10 flex flex-col" style={{ maxHeight: '85vh' }}>
+            {/* Header */}
+            <div className="flex items-center gap-3 mb-5">
+              {step === 'city' && (
+                <button onClick={() => { setStep('state'); setSelState(null); setCities([]); setCitySearch(''); }} className="p-2 bg-gray-100 rounded-full hover:bg-gray-200 transition-colors">
+                  <ChevronLeft className="w-5 h-5 text-gray-600" />
+                </button>
+              )}
+              <div className="flex-1">
+                <h3 className="text-xl font-black text-gray-900">{step === 'state' ? 'Selecionar Estado' : selState?.nome}</h3>
+                <p className="text-xs text-gray-400 font-medium mt-0.5">{step === 'state' ? 'Escolha o estado primeiro' : 'Agora escolha a cidade'}</p>
+              </div>
+              <button onClick={() => { setOpen(false); reset(); }} className="p-2 bg-gray-100 rounded-full hover:bg-gray-200 transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Search */}
+            <div className="relative mb-3">
+              <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-orange-500" />
+              <input
+                type="text"
+                placeholder={step === 'state' ? 'Buscar estado...' : 'Buscar cidade...'}
+                value={step === 'state' ? stateSearch : citySearch}
+                onChange={e => step === 'state' ? setStateSearch(e.target.value) : setCitySearch(e.target.value)}
+                className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-medium focus:outline-none focus:border-orange-400 transition-all"
+                autoFocus
+              />
+            </div>
+
+            {/* States */}
+            {step === 'state' && (
+              <div className="overflow-y-auto flex-1 space-y-1 pr-1">
+                {BRAZIL_STATES.filter(s => s.nome.toLowerCase().includes(stateSearch.toLowerCase()) || s.sigla.toLowerCase().includes(stateSearch.toLowerCase())).map(s => (
+                  <button key={s.sigla} onClick={async () => {
+                    setSelState(s); setStep('city'); setCitySearch(''); setLoadingCities(true);
+                    try {
+                      const res = await fetch(`https://servicodados.ibge.gov.br/api/v1/localidades/estados/${s.sigla}/municipios?orderBy=nome`);
+                      const data = await res.json();
+                      setCities(data.map((m: { nome: string }) => m.nome));
+                    } catch { setCities([]); } finally { setLoadingCities(false); }
+                  }} className="w-full flex items-center justify-between p-4 rounded-2xl hover:bg-orange-50 border border-transparent hover:border-orange-200 transition-all text-left active:scale-[0.98]">
+                    <div className="flex items-center gap-3">
+                      <span className="w-10 h-10 bg-orange-50 text-orange-600 font-black text-xs rounded-xl flex items-center justify-center shrink-0">{s.sigla}</span>
+                      <span className="font-bold text-gray-800 text-sm">{s.nome}</span>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-gray-300" />
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Cities */}
+            {step === 'city' && (
+              <div className="overflow-y-auto flex-1 pr-1">
+                {loadingCities ? (
+                  <div className="flex flex-col items-center justify-center py-12 gap-3">
+                    <Loader2 className="w-8 h-8 text-orange-500 animate-spin" />
+                    <p className="text-sm text-gray-400 font-medium">Carregando cidades...</p>
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    {cities.filter(c => c.toLowerCase().includes(citySearch.toLowerCase())).map(c => (
+                      <button key={c} onClick={() => {
+                        onStateChange(selState!.sigla);
+                        onCityChange(c);
+                        setOpen(false); reset();
+                      }} className={`w-full flex items-center gap-3 p-4 rounded-2xl border transition-all text-left active:scale-[0.98] ${
+                        state === selState?.sigla && city === c ? 'bg-orange-50 border-orange-300' : 'border-transparent hover:bg-orange-50 hover:border-orange-200'
+                      }`}>
+                        <MapPin className="w-4 h-4 text-orange-400 shrink-0" />
+                        <span className="font-bold text-gray-800 text-sm">{c}</span>
+                        {state === selState?.sigla && city === c && <span className="ml-auto text-orange-500 text-xs font-black">✓</span>}
+                      </button>
+                    ))}
+                    {cities.filter(c => c.toLowerCase().includes(citySearch.toLowerCase())).length === 0 && (
+                      <div className="text-center py-8"><p className="text-gray-400 text-sm">Nenhuma cidade encontrada.</p></div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 // --- Main App ---
 
 export default function App() {
@@ -551,6 +691,12 @@ export default function App() {
   const [selectedCity, setSelectedCity] = useState<string>(() => localStorage.getItem('focinho_selected_city') || ''); // user-selected city for filtering
   const [showCityPicker, setShowCityPicker] = useState(false);
   const [cityInputTemp, setCityInputTemp] = useState('');
+  const [pickerStep, setPickerStep] = useState<'state' | 'city'>('state');
+  const [pickerSelectedState, setPickerSelectedState] = useState<{sigla: string, nome: string} | null>(null);
+  const [pickerCities, setPickerCities] = useState<string[]>([]);
+  const [pickerCitySearch, setPickerCitySearch] = useState('');
+  const [pickerStateSearch, setPickerStateSearch] = useState('');
+  const [isLoadingCities, setIsLoadingCities] = useState(false);
   const [accountSubView, setAccountSubView] = useState('menu'); // menu, profile, pets, support, store, admin, partners
   const [activePartnerFilter, setActivePartnerFilter] = useState('Todos');
   const [selectedPet, setSelectedPet] = useState<PetProfile | null>(() => {
@@ -1171,10 +1317,13 @@ export default function App() {
       const { data } = await supabase.from('lost_alerts').select('*');
       const allAlerts = (data || []) as LostAlert[];
 
-      // City-level filter: extract "City" part from "City - State"
+      // City-level filter: compare only the city portion from both sides
       const cityName = selectedCity ? selectedCity.split(' - ')[0].trim().toLowerCase() : '';
       const filteredAlerts = cityName && !isAdmin
-        ? allAlerts.filter(a => a.city.toLowerCase().includes(cityName))
+        ? allAlerts.filter(a => {
+            const alertCity = (a.city || '').split(' - ')[0].trim().toLowerCase();
+            return alertCity.includes(cityName) || cityName.includes(alertCity);
+          })
         : allAlerts;
 
       setHasNewUnreadSOS(prev => {
@@ -2545,17 +2694,27 @@ export default function App() {
           <header className="bg-white border-b border-gray-100 px-6 py-4 sticky top-0 z-50 flex justify-between items-center">
             <div className="flex items-center gap-2 cursor-pointer" onClick={() => setView('dashboard')}>
               <img src="./pwa-512x512.png" alt="FocinhoApp Logo" className="w-10 h-10 object-cover rounded-xl" />
-              <span translate="no" className="text-xl font-bold tracking-tight">FocinhoApp</span>
+              <div className="hidden sm:block">
+                <span translate="no" className="text-xl font-bold tracking-tight">FocinhoApp</span>
+              </div>
             </div>
             <div className="flex items-center gap-3">
               <button
+                onClick={() => setShowCityPicker(true)}
+                className="flex items-center gap-1.5 px-3 py-2 bg-orange-50 border border-orange-100 text-orange-600 rounded-xl hover:bg-orange-100 transition-colors text-xs font-bold shadow-sm"
+                title="Mudar localização global"
+              >
+                <MapPin className="w-4 h-4 shrink-0" />
+                <span className="max-w-[70px] sm:max-w-[100px] truncate">{selectedCity ? selectedCity.split(' - ')[0] : 'Todas'}</span>
+              </button>
+              <button
                 onClick={() => setShowScanner(true)}
-                className="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center text-orange-600 hover:bg-orange-200 transition-colors"
+                className="w-10 h-10 bg-gray-50 border border-gray-200 rounded-xl flex items-center justify-center text-gray-600 hover:bg-gray-100 transition-colors shrink-0"
                 title="Escanear QR Code ou Tag"
               >
                 <QrCode className="w-5 h-5" />
               </button>
-              <button onClick={handleLogout} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors" title="Sair da conta">
+              <button onClick={handleLogout} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors shrink-0" title="Sair da conta">
                 <LogOut className="w-6 h-6" />
               </button>
             </div>
@@ -2701,24 +2860,13 @@ export default function App() {
                           onChange={(v) => setAuthPhone(formatPhoneMask(v))}
                           icon={Phone}
                         />
-                        <div className="flex gap-2 w-full">
-                          <div className="w-1/3">
-                            <Select
-                              label="Estado"
-                              value={authState}
-                              onChange={setAuthState}
-                              options={ESTADOS_BR}
-                            />
-                          </div>
-                          <div className="w-2/3">
-                            <Input
-                              label="Cidade"
-                              placeholder="Sua cidade"
-                              value={authCity}
-                              onChange={setAuthCity}
-                            />
-                          </div>
-                        </div>
+                        <CityStatePicker
+                          label="Estado / Cidade"
+                          state={authState}
+                          city={authCity}
+                          onStateChange={setAuthState}
+                          onCityChange={setAuthCity}
+                        />
                         <Input
                           label="Endereço"
                           value={authAddress}
@@ -3825,7 +3973,6 @@ export default function App() {
                 <div className="flex justify-between items-center">
                   <h2 className="text-2xl font-bold">Alertas</h2>
                   <div className="flex gap-2">
-
                     <button
                       onClick={() => setIsAddingSOS(true)}
                       className="p-2 bg-red-100 text-red-600 rounded-xl hover:bg-red-200 transition-colors"
@@ -3893,89 +4040,136 @@ export default function App() {
                       </span>
                     )}
                   </div>
-                  {lostAlerts.length > 0 ? (
-                    <div className="grid grid-cols-1 gap-6">
-                      {lostAlerts.map((alert) => (
-                        <div key={alert.id} className="bg-red-50 p-6 rounded-[2.5rem] border-2 border-red-500 space-y-4 shadow-xl shadow-red-100 relative overflow-hidden">
-                          <div className="aspect-video bg-white rounded-3xl overflow-hidden relative border-2 border-red-200">
-                            <img src={alert.petPhoto} alt={alert.petName} className="w-full h-full object-cover" />
-                            <div className="absolute top-4 right-4 bg-red-600 text-white text-[10px] font-black px-3 py-1.5 rounded-full uppercase shadow-lg animate-pulse">
-                              Desaparecido
-                            </div>
-                          </div>
-                          <div className="px-2 space-y-3">
-                            <div className="flex justify-between items-start">
-                              <div>
-                                <h4 className="font-black text-2xl text-red-700">{alert.petName}</h4>
-                                <p className="text-sm text-red-500 font-bold flex items-center gap-1">
-                                  <MapPin className="w-4 h-4" /> {alert.city}
-                                </p>
-                              </div>
-                              <div className="bg-red-100 text-red-600 px-3 py-1 rounded-full text-[10px] font-black uppercase">
-                                SOS
+                  {(() => {
+                    const filteredAlerts = lostAlerts.filter(alert => {
+                      if (isAdmin || !selectedCity || !alert.city) return true;
+                      const cityName = selectedCity.split(' - ')[0].trim().toLowerCase();
+                      return alert.city.toLowerCase().includes(cityName);
+                    });
+                    
+                    return filteredAlerts.length > 0 ? (
+                      <div className="grid grid-cols-1 gap-6">
+                        {filteredAlerts.map((alert) => (
+                          <div key={alert.id} className="bg-red-50 p-6 rounded-[2.5rem] border-2 border-red-500 space-y-4 shadow-xl shadow-red-100 relative overflow-hidden">
+                            <div className="aspect-video bg-white rounded-3xl overflow-hidden relative border-2 border-red-200">
+                              <img src={alert.petPhoto} alt={alert.petName} className="w-full h-full object-cover" />
+                              <div className="absolute top-4 right-4 bg-red-600 text-white text-[10px] font-black px-3 py-1.5 rounded-full uppercase shadow-lg animate-pulse">
+                                Desaparecido
                               </div>
                             </div>
-
-                            <div className="bg-white/50 p-4 rounded-2xl border border-red-100">
-                              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">Visto por último em:</p>
-                              <p className="text-sm text-gray-700 font-medium">{alert.lastSeen}</p>
-                              <div className="flex items-center gap-2 mt-3 pt-3 border-t border-red-100/50">
-                                <Clock className="w-4 h-4 text-red-400" />
-                                <span className="text-[11px] text-red-500 font-bold tracking-wide uppercase">
-                                  Gerado em: {new Date(alert.createdAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
-                                </span>
-                              </div>
-                              {alert.reward && (
-                                <div className="mt-3 bg-green-50 border border-green-200 p-2.5 rounded-xl text-green-700 font-bold text-sm shadow-[inset_0_2px_4px_rgba(0,0,0,0.05)] border-t border-green-300 flex items-center justify-center gap-2">
-                                  <DollarSign className="w-5 h-5 text-green-600" />
-                                  Recompensa Agendada: <span className="font-black text-lg">{alert.reward}</span>
+                            <div className="px-2 space-y-3">
+                              <div className="flex justify-between items-start">
+                                <div>
+                                  <h4 className="font-black text-2xl text-red-700">{alert.petName}</h4>
+                                  <p className="text-sm text-red-500 font-bold flex items-center gap-1">
+                                    <MapPin className="w-4 h-4" /> {alert.city}
+                                  </p>
                                 </div>
-                              )}
-                            </div>
+                                <div className="bg-red-100 text-red-600 px-3 py-1 rounded-full text-[10px] font-black uppercase">
+                                  SOS
+                                </div>
+                              </div>
 
-                            <div className="flex flex-col gap-2">
-                              <button
-                                onClick={() => window.open(`https://wa.me/55${alert.contactPhone.replace(/\D/g, '')}?text=${encodeURIComponent(`Olá! Queria falar sobre o alerta do animal perdido: ${alert.petName}`)}`, '_blank')}
-                                className="w-full py-5 bg-red-600 text-white text-lg font-black rounded-2xl hover:bg-red-700 transition-all shadow-xl shadow-red-200 flex items-center justify-center gap-3 active:scale-95"
-                              >
-                                <MessageCircle className="w-6 h-6" /> ENTRAR EM CONTATO
-                              </button>
+                              <div className="bg-white/50 p-4 rounded-2xl border border-red-100">
+                                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">Visto por último em:</p>
+                                <p className="text-sm text-gray-700 font-medium">{alert.lastSeen}</p>
+                                <div className="flex items-center gap-2 mt-3 pt-3 border-t border-red-100/50">
+                                  <Clock className="w-4 h-4 text-red-400" />
+                                  <span className="text-[11px] text-red-500 font-bold tracking-wide uppercase">
+                                    Gerado em: {new Date(alert.createdAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
+                                  </span>
+                                </div>
+                                {alert.reward && (
+                                  <div className="mt-3 bg-green-50 border border-green-200 p-2.5 rounded-xl text-green-700 font-bold text-sm shadow-[inset_0_2px_4px_rgba(0,0,0,0.05)] border-t border-green-300 flex items-center justify-center gap-2">
+                                    <DollarSign className="w-5 h-5 text-green-600" />
+                                    Recompensa Agendada: <span className="font-black text-lg">{alert.reward}</span>
+                                  </div>
+                                )}
+                              </div>
 
-                              {user && alert.ownerId === user.id && (
-                                <div className="grid grid-cols-2 gap-2 mt-2">
+                              <div className="flex flex-col gap-2">
+                                <div className="flex gap-2">
                                   <button
                                     onClick={() => {
-                                      setEditingSOSId(alert.id);
-                                      setNewSOS({
-                                        petId: alert.petId,
-                                        city: alert.city,
-                                        lastSeen: alert.lastSeen,
-                                        reward: alert.reward
-                                      });
-                                      setIsAddingSOS(true);
+                                      const phone = (alert.contactPhone || '').replace(/\D/g, '');
+                                      if (!phone) { alert('Este alerta não possui telefone de contato.'); return; }
+                                      window.open(`https://wa.me/55${phone}?text=${encodeURIComponent(`Olá! Queria falar sobre o alerta do animal perdido: ${alert.petName}`)}`, '_blank');
                                     }}
-                                    className="py-3 bg-white border-2 border-orange-500 text-orange-500 rounded-xl font-bold text-sm hover:bg-orange-50 transition-all flex items-center justify-center gap-2"
+                                    className="flex-1 py-5 bg-red-600 text-white text-lg font-black rounded-2xl hover:bg-red-700 transition-all shadow-xl shadow-red-200 flex items-center justify-center gap-3 active:scale-95"
                                   >
-                                    <Plus className="w-4 h-4" /> Editar
+                                    <MessageCircle className="w-6 h-6" /> ENTRAR EM CONTATO
                                   </button>
                                   <button
-                                    onClick={() => handleDeleteSOS(alert.id)}
-                                    className="py-3 bg-white border-2 border-green-600 text-green-600 rounded-xl font-bold text-sm hover:bg-green-50 transition-all flex items-center justify-center gap-2"
+                                    onClick={async () => {
+                                      if (navigator.share) {
+                                        try {
+                                          await navigator.share({
+                                            title: `Alerta SOS: ${alert.petName}`,
+                                            text: `Alerta SOS: ${alert.petName} desapareceu${alert.city ? ` em ${alert.city}` : ''}. Ajude a encontrar!`,
+                                            url: window.location.href,
+                                          });
+                                        } catch (err) {
+                                          console.log('Error sharing:', err);
+                                        }
+                                      } else {
+                                        alert('O compartilhamento não é suportado neste dispositivo.');
+                                      }
+                                    }}
+                                    className="py-5 px-6 bg-red-50 text-red-600 rounded-2xl hover:bg-red-100 transition-all shadow-xl flex items-center justify-center active:scale-95 border-2 border-red-200"
+                                    title="Compartilhar"
                                   >
-                                    <ShieldCheck className="w-4 h-4" /> Encontrado
+                                    <Share2 className="w-6 h-6" />
                                   </button>
                                 </div>
-                              )}
+
+                                {user && alert.ownerId === user.id && (
+                                  <div className="grid grid-cols-2 gap-2 mt-2">
+                                    <button
+                                      onClick={() => {
+                                        setEditingSOSId(alert.id);
+                                        setNewSOS({
+                                          petId: alert.petId,
+                                          city: alert.city,
+                                          lastSeen: alert.lastSeen,
+                                          reward: alert.reward
+                                        });
+                                        setIsAddingSOS(true);
+                                      }}
+                                      className="py-3 bg-white border-2 border-orange-500 text-orange-500 rounded-xl font-bold text-sm hover:bg-orange-50 transition-all flex items-center justify-center gap-2"
+                                    >
+                                      <Plus className="w-4 h-4" /> Editar
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteSOS(alert.id)}
+                                      className="py-3 bg-white border-2 border-green-600 text-green-600 rounded-xl font-bold text-sm hover:bg-green-50 transition-all flex items-center justify-center gap-2"
+                                    >
+                                      <ShieldCheck className="w-4 h-4" /> Encontrado
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="bg-gray-50 p-8 rounded-[2rem] text-center border border-dashed border-gray-200">
-                      <p className="text-gray-400 text-sm">Nenhum alerta ativo no momento.</p>
-                    </div>
-                  )}
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="bg-gray-50 p-8 rounded-[2rem] text-center border border-dashed border-gray-200">
+                        <p className="text-gray-400 text-sm">
+                          {selectedCity && !isAdmin
+                            ? `Nenhum alerta ativo em ${selectedCity.split(' - ')[0]}.`
+                            : 'Nenhum alerta ativo no momento.'}
+                        </p>
+                        {selectedCity && !isAdmin && (
+                          <button
+                            onClick={() => { setSelectedCity(''); localStorage.removeItem('focinho_selected_city'); }}
+                            className="mt-3 text-xs font-bold text-orange-500 underline"
+                          >
+                            Ver todos os alertas
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })()}
                   <div className="h-20" /> {/* Spacer to avoid bottom nav overlap */}
                 </div>
 
@@ -4020,12 +4214,18 @@ export default function App() {
                             icon={Dog}
                           />
                           <div className="relative">
-                            <Input
-                              label="Cidade"
-                              placeholder="Ex: São Paulo - SP"
-                              value={newSOS.city}
-                              onChange={(v: string) => setNewSOS(prev => ({ ...prev, city: v }))}
-                              icon={MapPin}
+                            <CityStatePicker
+                              label="Cidade do alerta"
+                              state={newSOS.city ? (newSOS.city.includes(' - ') ? newSOS.city.split(' - ')[1] : '') : ''}
+                              city={newSOS.city ? (newSOS.city.includes(' - ') ? newSOS.city.split(' - ')[0] : newSOS.city) : ''}
+                              onStateChange={(s) => {
+                                const currentCity = newSOS.city?.includes(' - ') ? newSOS.city.split(' - ')[0] : newSOS.city || '';
+                                setNewSOS(prev => ({ ...prev, city: currentCity ? `${currentCity} - ${s}` : s }));
+                              }}
+                              onCityChange={(c) => {
+                                const currentState = newSOS.city?.includes(' - ') ? newSOS.city.split(' - ')[1] : '';
+                                setNewSOS(prev => ({ ...prev, city: currentState ? `${c} - ${currentState}` : c }));
+                              }}
                             />
                             <button
                               type="button"
@@ -4522,24 +4722,13 @@ export default function App() {
                           onChange={(v: string) => setOwnerProfile(prev => ({ ...prev, phone: formatPhoneMask(v) } as any))}
                           icon={Phone}
                         />
-                        <div className="flex gap-2 w-full">
-                          <div className="w-1/3">
-                            <Select
-                              label="Estado"
-                              value={ownerProfile?.state || ''}
-                              onChange={(v: string) => setOwnerProfile(prev => ({ ...prev, state: v } as any))}
-                              options={ESTADOS_BR}
-                            />
-                          </div>
-                          <div className="w-2/3">
-                            <Input
-                              label="Cidade"
-                              placeholder="Sua cidade"
-                              value={ownerProfile?.city || ''}
-                              onChange={(v: string) => setOwnerProfile(prev => ({ ...prev, city: v } as any))}
-                            />
-                          </div>
-                        </div>
+                        <CityStatePicker
+                          label="Estado / Cidade"
+                          state={ownerProfile?.state || ''}
+                          city={ownerProfile?.city || ''}
+                          onStateChange={(v) => setOwnerProfile(prev => ({ ...prev, state: v } as any))}
+                          onCityChange={(v) => setOwnerProfile(prev => ({ ...prev, city: v } as any))}
+                        />
                         <Input
                           label="Endereço"
                           placeholder="Rua, Número, Bairro..."
@@ -5117,12 +5306,39 @@ export default function App() {
                                   <p className="text-sm text-gray-600 leading-relaxed">{pet.description}</p>
 
                                   <div className="flex flex-col gap-3 mt-4">
-                                    <button
-                                      onClick={() => window.open(`https://wa.me/${pet.contactPhone.replace(/\D/g, '')}`, '_blank')}
-                                      className="w-full py-4 bg-pink-500 text-white text-sm font-black rounded-2xl hover:bg-pink-600 transition-all shadow-lg shadow-pink-100 flex items-center justify-center gap-2"
-                                    >
-                                      <MessageCircle className="w-5 h-5" /> Quero adotar
-                                    </button>
+                                    <div className="flex gap-2">
+                                      <button
+                                        onClick={() => {
+                                          const phone = (pet.contactPhone || '').replace(/\D/g, '');
+                                          if (!phone) { alert('Este pet não possui telefone de contato.'); return; }
+                                          window.open(`https://wa.me/${phone}`, '_blank');
+                                        }}
+                                        className="flex-1 py-4 bg-pink-500 text-white text-sm font-black rounded-2xl hover:bg-pink-600 transition-all shadow-lg shadow-pink-100 flex items-center justify-center gap-2 active:scale-95"
+                                      >
+                                        <MessageCircle className="w-5 h-5" /> Quero adotar
+                                      </button>
+                                      <button
+                                        onClick={async () => {
+                                          if (navigator.share) {
+                                            try {
+                                              await navigator.share({
+                                                title: `Ação de Adoção: ${pet.name}`,
+                                                text: `Conheça ${pet.name}, um pet incrível disponível para adoção!`,
+                                                url: window.location.href,
+                                              });
+                                            } catch (err) {
+                                              console.log('Error sharing:', err);
+                                            }
+                                          } else {
+                                            alert('O compartilhamento não é suportado neste dispositivo.');
+                                          }
+                                        }}
+                                        className="py-4 px-5 bg-pink-50 text-pink-500 rounded-2xl hover:bg-pink-100 transition-all shadow-lg flex items-center justify-center active:scale-95 border-2 border-pink-200"
+                                        title="Compartilhar"
+                                      >
+                                        <Share2 className="w-5 h-5" />
+                                      </button>
+                                    </div>
                                     {isAdmin && (
                                       <div className="flex gap-2">
                                         <button
@@ -6167,24 +6383,13 @@ export default function App() {
                                   onChange={(v: string) => setNewAdoptionPet(prev => ({ ...prev, contactPhone: formatPhoneMask(v) }))}
                                   icon={Phone}
                                 />
-                                <div className="flex gap-2 w-full">
-                                  <div className="w-1/3">
-                                    <Select
-                                      label="Estado"
-                                      value={newAdoptionPet.state || ''}
-                                      onChange={(v: string) => setNewAdoptionPet(prev => ({ ...prev, state: v }))}
-                                      options={ESTADOS_BR}
-                                    />
-                                  </div>
-                                  <div className="w-2/3">
-                                    <Input
-                                      label="Cidade"
-                                      placeholder="Sua cidade"
-                                      value={newAdoptionPet.city || ''}
-                                      onChange={(v: string) => setNewAdoptionPet(prev => ({ ...prev, city: v }))}
-                                    />
-                                  </div>
-                                </div>
+                                <CityStatePicker
+                                  label="Estado / Cidade"
+                                  state={newAdoptionPet.state || ''}
+                                  city={newAdoptionPet.city || ''}
+                                  onStateChange={(v) => setNewAdoptionPet(prev => ({ ...prev, state: v }))}
+                                  onCityChange={(v) => setNewAdoptionPet(prev => ({ ...prev, city: v }))}
+                                />
                                 <Input
                                   label="Endereço"
                                   placeholder="Rua, Bairro..."
@@ -7126,7 +7331,7 @@ export default function App() {
           )}
         </AnimatePresence>
 
-        {/* City Picker Modal */}
+        {/* City Picker Modal — Estado → Cidade via IBGE */}
         <AnimatePresence>
           {showCityPicker && (
             <div className="fixed inset-0 z-[200] flex items-end justify-center">
@@ -7134,7 +7339,7 @@ export default function App() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                onClick={() => setShowCityPicker(false)}
+                onClick={() => { setShowCityPicker(false); setPickerStep('state'); setPickerSelectedState(null); setPickerCities([]); setPickerCitySearch(''); setPickerStateSearch(''); }}
                 className="absolute inset-0 bg-black/40 backdrop-blur-sm"
               />
               <motion.div
@@ -7142,68 +7347,193 @@ export default function App() {
                 animate={{ y: 0, opacity: 1 }}
                 exit={{ y: 100, opacity: 0 }}
                 transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-                className="relative bg-white w-full max-w-lg rounded-t-[3rem] p-8 shadow-2xl z-10 space-y-6 pb-safe-bottom"
+                className="relative bg-white w-full max-w-lg rounded-t-[3rem] p-6 shadow-2xl z-10 flex flex-col"
+                style={{ maxHeight: '85vh' }}
               >
-                <div className="flex justify-between items-center">
-                  <div>
-                    <h3 className="text-xl font-black text-gray-900">Selecionar Cidade</h3>
-                    <p className="text-xs text-gray-400 font-medium mt-0.5">Filtra alertas, adoções e parceiros por cidade</p>
+                {/* Header */}
+                <div className="flex justify-between items-center mb-5">
+                  <div className="flex items-center gap-3">
+                    {pickerStep === 'city' && (
+                      <button
+                        onClick={() => { setPickerStep('state'); setPickerSelectedState(null); setPickerCities([]); setPickerCitySearch(''); }}
+                        className="p-2 bg-gray-100 rounded-full hover:bg-gray-200 transition-colors"
+                      >
+                        <ChevronLeft className="w-5 h-5 text-gray-600" />
+                      </button>
+                    )}
+                    <div>
+                      <h3 className="text-xl font-black text-gray-900">
+                        {pickerStep === 'state' ? 'Selecionar Estado' : pickerSelectedState?.nome}
+                      </h3>
+                      <p className="text-xs text-gray-400 font-medium mt-0.5">
+                        {pickerStep === 'state' ? 'Escolha o estado primeiro' : 'Agora escolha a cidade'}
+                      </p>
+                    </div>
                   </div>
-                  <button onClick={() => setShowCityPicker(false)} className="p-2 bg-gray-100 rounded-full hover:bg-gray-200 transition-colors">
+                  <button
+                    onClick={() => { setShowCityPicker(false); setPickerStep('state'); setPickerSelectedState(null); setPickerCities([]); setPickerCitySearch(''); setPickerStateSearch(''); }}
+                    className="p-2 bg-gray-100 rounded-full hover:bg-gray-200 transition-colors"
+                  >
                     <X className="w-5 h-5" />
                   </button>
                 </div>
 
-                <div className="space-y-3">
-                  <div className="relative">
-                    <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-orange-500" />
-                    <input
-                      type="text"
-                      placeholder="Ex: Guapimirim, Santo Aleixo..."
-                      value={cityInputTemp}
-                      onChange={e => setCityInputTemp(e.target.value)}
-                      className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-medium focus:outline-none focus:border-orange-400 transition-all"
-                      autoFocus
-                    />
+                {/* Ver todos / Localização atual */}
+                {pickerStep === 'state' && (
+                  <div className="space-y-2 mb-4">
+                    {selectedCity && (
+                      <button
+                        onClick={() => { setSelectedCity(''); localStorage.removeItem('focinho_selected_city'); setShowCityPicker(false); setPickerStep('state'); }}
+                        className="w-full flex items-center gap-3 p-3 bg-gray-50 border border-gray-200 rounded-2xl hover:bg-gray-100 transition-colors text-left"
+                      >
+                        <Globe className="w-4 h-4 text-gray-400 shrink-0" />
+                        <span className="text-sm font-bold text-gray-500">Ver de todas as cidades</span>
+                      </button>
+                    )}
+                    {userCity && (
+                      <button
+                        onClick={() => {
+                          setSelectedCity(userCity);
+                          localStorage.setItem('focinho_selected_city', userCity);
+                          setShowCityPicker(false);
+                          setPickerStep('state');
+                        }}
+                        className="w-full flex items-center gap-3 p-3 bg-orange-50 border border-orange-200 rounded-2xl hover:bg-orange-100 transition-colors text-left"
+                      >
+                        <Navigation className="w-4 h-4 text-orange-500 shrink-0" />
+                        <div>
+                          <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">Minha localização atual</p>
+                          <p className="text-sm font-bold text-gray-800">{userCity.split(' - ')[0]}</p>
+                        </div>
+                      </button>
+                    )}
                   </div>
+                )}
 
-                  {userCity && userCity !== cityInputTemp && (
-                    <button
-                      onClick={() => setCityInputTemp(userCity)}
-                      className="w-full flex items-center gap-3 p-4 bg-orange-50 border border-orange-200 rounded-2xl hover:bg-orange-100 transition-colors text-left"
-                    >
-                      <Navigation className="w-5 h-5 text-orange-500 shrink-0" />
-                      <div>
-                        <p className="text-xs text-gray-400 font-bold uppercase tracking-wide">Minha locação atual</p>
-                        <p className="text-sm font-bold text-gray-800">{userCity.split(' - ')[0]}</p>
-                      </div>
-                    </button>
-                  )}
-
-                  {selectedCity && (
-                    <button
-                      onClick={() => { setSelectedCity(''); localStorage.removeItem('focinho_selected_city'); setCityInputTemp(''); setShowCityPicker(false); }}
-                      className="w-full flex items-center gap-3 p-4 bg-gray-50 border border-gray-200 rounded-2xl hover:bg-gray-100 transition-colors text-left"
-                    >
-                      <Globe className="w-5 h-5 text-gray-400 shrink-0" />
-                      <span className="text-sm font-bold text-gray-500">Ver de todas as cidades</span>
-                    </button>
-                  )}
+                {/* Search bar */}
+                <div className="relative mb-3">
+                  <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-orange-500" />
+                  <input
+                    type="text"
+                    placeholder={pickerStep === 'state' ? 'Buscar estado...' : 'Buscar cidade...'}
+                    value={pickerStep === 'state' ? pickerStateSearch : pickerCitySearch}
+                    onChange={e => pickerStep === 'state' ? setPickerStateSearch(e.target.value) : setPickerCitySearch(e.target.value)}
+                    className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-medium focus:outline-none focus:border-orange-400 transition-all"
+                    autoFocus
+                  />
                 </div>
 
-                <button
-                  onClick={() => {
-                    const trimmed = cityInputTemp.trim();
-                    const newCity = trimmed || '';
-                    setSelectedCity(newCity);
-                    if (newCity) localStorage.setItem('focinho_selected_city', newCity);
-                    else localStorage.removeItem('focinho_selected_city');
-                    setShowCityPicker(false);
-                  }}
-                  className="w-full py-4 bg-orange-500 text-white font-black text-lg rounded-2xl hover:bg-orange-600 transition-all shadow-xl shadow-orange-200 active:scale-[0.98]"
-                >
-                  Aplicar Filtro
-                </button>
+                {/* States list */}
+                {pickerStep === 'state' && (
+                  <div className="overflow-y-auto flex-1 space-y-1 pr-1">
+                    {([
+                      { sigla: 'AC', nome: 'Acre' },
+                      { sigla: 'AL', nome: 'Alagoas' },
+                      { sigla: 'AP', nome: 'Amapá' },
+                      { sigla: 'AM', nome: 'Amazonas' },
+                      { sigla: 'BA', nome: 'Bahia' },
+                      { sigla: 'CE', nome: 'Ceará' },
+                      { sigla: 'DF', nome: 'Distrito Federal' },
+                      { sigla: 'ES', nome: 'Espírito Santo' },
+                      { sigla: 'GO', nome: 'Goiás' },
+                      { sigla: 'MA', nome: 'Maranhão' },
+                      { sigla: 'MT', nome: 'Mato Grosso' },
+                      { sigla: 'MS', nome: 'Mato Grosso do Sul' },
+                      { sigla: 'MG', nome: 'Minas Gerais' },
+                      { sigla: 'PA', nome: 'Pará' },
+                      { sigla: 'PB', nome: 'Paraíba' },
+                      { sigla: 'PR', nome: 'Paraná' },
+                      { sigla: 'PE', nome: 'Pernambuco' },
+                      { sigla: 'PI', nome: 'Piauí' },
+                      { sigla: 'RJ', nome: 'Rio de Janeiro' },
+                      { sigla: 'RN', nome: 'Rio Grande do Norte' },
+                      { sigla: 'RS', nome: 'Rio Grande do Sul' },
+                      { sigla: 'RO', nome: 'Rondônia' },
+                      { sigla: 'RR', nome: 'Roraima' },
+                      { sigla: 'SC', nome: 'Santa Catarina' },
+                      { sigla: 'SP', nome: 'São Paulo' },
+                      { sigla: 'SE', nome: 'Sergipe' },
+                      { sigla: 'TO', nome: 'Tocantins' },
+                    ] as {sigla: string, nome: string}[])
+                      .filter(s => s.nome.toLowerCase().includes(pickerStateSearch.toLowerCase()) || s.sigla.toLowerCase().includes(pickerStateSearch.toLowerCase()))
+                      .map(state => (
+                        <button
+                          key={state.sigla}
+                          onClick={async () => {
+                            setPickerSelectedState(state);
+                            setPickerStep('city');
+                            setPickerCitySearch('');
+                            setIsLoadingCities(true);
+                            try {
+                              const res = await fetch(`https://servicodados.ibge.gov.br/api/v1/localidades/estados/${state.sigla}/municipios?orderBy=nome`);
+                              const data = await res.json();
+                              setPickerCities(data.map((m: {nome: string}) => m.nome));
+                            } catch {
+                              setPickerCities([]);
+                            } finally {
+                              setIsLoadingCities(false);
+                            }
+                          }}
+                          className="w-full flex items-center justify-between p-4 rounded-2xl hover:bg-orange-50 hover:border-orange-200 border border-transparent transition-all text-left active:scale-[0.98]"
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className="w-10 h-10 bg-orange-50 text-orange-600 font-black text-xs rounded-xl flex items-center justify-center shrink-0">{state.sigla}</span>
+                            <span className="font-bold text-gray-800 text-sm">{state.nome}</span>
+                          </div>
+                          <ChevronRight className="w-4 h-4 text-gray-300" />
+                        </button>
+                      ))}
+                  </div>
+                )}
+
+                {/* Cities list */}
+                {pickerStep === 'city' && (
+                  <div className="overflow-y-auto flex-1 pr-1">
+                    {isLoadingCities ? (
+                      <div className="flex flex-col items-center justify-center py-12 gap-3">
+                        <Loader2 className="w-8 h-8 text-orange-500 animate-spin" />
+                        <p className="text-sm text-gray-400 font-medium">Carregando cidades...</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-1">
+                        {pickerCities
+                          .filter(c => c.toLowerCase().includes(pickerCitySearch.toLowerCase()))
+                          .map(city => (
+                            <button
+                              key={city}
+                              onClick={() => {
+                                const newCity = `${city} - ${pickerSelectedState?.sigla}`;
+                                setSelectedCity(newCity);
+                                localStorage.setItem('focinho_selected_city', newCity);
+                                setShowCityPicker(false);
+                                setPickerStep('state');
+                                setPickerSelectedState(null);
+                                setPickerCities([]);
+                                setPickerCitySearch('');
+                                setPickerStateSearch('');
+                              }}
+                              className={`w-full flex items-center gap-3 p-4 rounded-2xl border transition-all text-left active:scale-[0.98] ${
+                                selectedCity === `${city} - ${pickerSelectedState?.sigla}`
+                                  ? 'bg-orange-50 border-orange-300 text-orange-700'
+                                  : 'border-transparent hover:bg-orange-50 hover:border-orange-200'
+                              }`}
+                            >
+                              <MapPin className="w-4 h-4 text-orange-400 shrink-0" />
+                              <span className="font-bold text-gray-800 text-sm">{city}</span>
+                              {selectedCity === `${city} - ${pickerSelectedState?.sigla}` && (
+                                <span className="ml-auto text-orange-500 text-xs font-black">✓ Selecionada</span>
+                              )}
+                            </button>
+                          ))}
+                        {pickerCities.filter(c => c.toLowerCase().includes(pickerCitySearch.toLowerCase())).length === 0 && (
+                          <div className="text-center py-8">
+                            <p className="text-gray-400 text-sm">Nenhuma cidade encontrada.</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </motion.div>
             </div>
           )}
