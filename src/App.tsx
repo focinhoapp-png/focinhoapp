@@ -3105,14 +3105,26 @@ export default function App() {
                 {/* ── Pet Selector Row ─────────────────────────── */}
                 <div className="mb-2">
                   <div className="flex gap-5 overflow-x-auto pb-3 pt-3 px-2 no-scrollbar">
-                    {userPets.map((pet) => {
+                    {userPets.map((pet, index) => {
                       const hasTag = !!pet.tagId;
+                      const isSelected = index === currentPetIndex;
+
                       return (
                         <motion.button
                           key={pet.id}
                           whileTap={{ scale: 0.93 }}
-                          onClick={() => { setSelectedPet(pet); setCurrentPetIndex(userPets.indexOf(pet)); setView('profile'); }}
-                          className="flex flex-col items-center gap-2 shrink-0 group"
+                          onClick={() => { 
+                            if (isSelected) {
+                              // Se já está selecionado, abrir perfil
+                              setSelectedPet(pet); setView('profile'); 
+                            } else {
+                              // Se não, seleciona e foca
+                              setCurrentPetIndex(index);
+                            }
+                          }}
+                          className={`flex flex-col items-center gap-2 shrink-0 group transition-all duration-300 ${
+                            isSelected ? 'scale-100 opacity-100' : 'scale-90 opacity-60 blur-[1px]'
+                          }`}
                         >
                           {/* Circle avatar */}
                           <div className="relative">
@@ -3152,7 +3164,9 @@ export default function App() {
                           </div>
 
                           {/* Name */}
-                          <span className="text-[12px] font-bold text-gray-700 group-hover:text-orange-500 transition-colors truncate max-w-[72px]">
+                          <span className={`text-[12px] font-bold truncate max-w-[72px] transition-colors ${
+                            isSelected ? 'text-orange-500' : 'text-gray-500 group-hover:text-gray-700'
+                          }`}>
                             {pet.name}
                           </span>
                         </motion.button>
