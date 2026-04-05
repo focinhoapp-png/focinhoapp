@@ -6829,19 +6829,23 @@ export default function App() {
                         ))}
                       </div>
                     )}
-                    <p className="text-orange-600 font-bold uppercase tracking-widest text-xs mb-3">
-                      {finderPet.breed || 'Pet Encontrado'}
-                    </p>
-                    
-                    {finderPet.ownerName && (
-                      <div className="bg-orange-50/50 rounded-2xl p-3 mb-6 inline-flex items-center justify-center gap-2 border border-orange-100">
-                        <UserIcon className="w-4 h-4 text-orange-500" />
-                        <span className="text-orange-900 text-xs font-bold uppercase tracking-wide">Tutor(a): {finderPet.ownerName}</span>
-                      </div>
-                    )}
+
 
                     <div className="bg-gray-50 rounded-3xl p-6 text-left space-y-4 mb-8">
                       <div className="grid grid-cols-2 gap-4 border-b border-gray-200 pb-4">
+                        {/* Row 1: Raça | Peso */}
+                        <div>
+                          <p className="text-[10px] text-gray-400 uppercase font-bold">Raça</p>
+                          <p className="text-sm font-bold">{finderPet.breed || 'Não informada'}</p>
+                        </div>
+                        {finderPet.privacySettings?.showAgeAndWeight !== false && finderPet.weight ? (
+                          <div>
+                            <p className="text-[10px] text-gray-400 uppercase font-bold">Peso</p>
+                            <p className="text-sm font-bold">{finderPet.weight} kg</p>
+                          </div>
+                        ) : <div />}
+
+                        {/* Row 2: Sexo | Cor */}
                         <div>
                           <p className="text-[10px] text-gray-400 uppercase font-bold">Sexo</p>
                           <p className="text-sm font-bold">{finderPet.gender || 'Não informado'}</p>
@@ -6850,6 +6854,8 @@ export default function App() {
                           <p className="text-[10px] text-gray-400 uppercase font-bold">Cor Predominante</p>
                           <p className="text-sm font-bold">{finderPet.color || 'Não informada'}</p>
                         </div>
+
+                        {/* Row 3: Porte | Aniversário */}
                         {finderPet.size && (
                           <div>
                             <p className="text-[10px] text-gray-400 uppercase font-bold">Porte</p>
@@ -6860,18 +6866,6 @@ export default function App() {
                           <div>
                             <p className="text-[10px] text-gray-400 uppercase font-bold">Aniversário</p>
                             <p className="text-sm font-bold">{new Date(finderPet.birthday).toLocaleDateString('pt-BR')}</p>
-                          </div>
-                        )}
-                        {finderPet.privacySettings?.showAgeAndWeight !== false && finderPet.weight && (
-                          <div>
-                            <p className="text-[10px] text-gray-400 uppercase font-bold">Peso</p>
-                            <p className="text-sm font-bold">{finderPet.weight} kg</p>
-                          </div>
-                        )}
-                        {finderPet.adoptionDate && (
-                          <div className="col-span-2">
-                            <p className="text-[10px] text-gray-400 uppercase font-bold">Data de Adoção</p>
-                            <p className="text-sm font-bold">{new Date(finderPet.adoptionDate).toLocaleDateString('pt-BR')}</p>
                           </div>
                         )}
                       </div>
