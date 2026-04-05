@@ -913,10 +913,9 @@ export default function App() {
         }
       }
 
-      // Tag not associated with any pet yet — direct to registration
-      setTagIdToActivate(normalizedId);
-      setSelectedPet({ tagId: normalizedId } as any);
-      setView('profile');
+      // Tag not associated with any pet yet — save tagId and redirect to install tutorial
+      localStorage.setItem('focinho_pending_tag', normalizedId);
+      window.location.href = '/?install=true';
     } catch (err) {
       console.error('Error processing scanned tag:', err);
       alert('Erro ao processar o QR Code. Tente novamente.');
@@ -1012,11 +1011,10 @@ export default function App() {
           }
         }
 
-        // Tag not associated with any pet yet — go to profile to register
+        // Tag not associated with any pet yet — save tagId and redirect to install tutorial
         tagResolved = true;
-        setTagIdToActivate(id);
-        setSelectedPet({ tagId: id } as any);
-        setView('profile');
+        localStorage.setItem('focinho_pending_tag', id);
+        window.location.href = '/?install=true';
       } catch (err) {
         console.error('Error checking tag:', err);
       } finally {
@@ -2813,12 +2811,7 @@ export default function App() {
                   </div>
                 </div>
 
-                <Button
-                  onClick={() => { setView('activate'); }}
-                  className="w-full py-4 text-base shadow-lg shadow-orange-500/20"
-                >
-                  Continuar Cadastro <ChevronRight className="w-5 h-5 ml-2" />
-                </Button>
+
               </motion.div>
             )}
 
