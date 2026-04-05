@@ -63,6 +63,7 @@ import type { User as SupabaseUser } from '@supabase/supabase-js';
 import QRScanner from './components/QRScanner';
 import { ImageCropperModal } from './components/ImageCropperModal';
 import { PhoneInputWithDDI } from './components/PhoneInputWithDDI';
+import { BannerCarousel } from './components/BannerCarousel';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 
@@ -722,6 +723,13 @@ export default function App() {
   const [storeItems, setStoreItems] = useState<any[]>([]); // Admin only
   const [storeForm, setStoreForm] = useState<{ id: string, name: string, price: string, url: string, gallery: string[] }>({ id: '', name: '', price: '', url: '', gallery: [] }); // Admin only
   const [storeMessage, setStoreMessage] = useState<string | null>(null); // Admin only
+  
+  // Admin Banners
+  const [adminBanners, setAdminBanners] = useState<any[]>([]);
+  const [adminBannersPage, setAdminBannersPage] = useState(1);
+  const [bannerForm, setBannerForm] = useState<{ image_url: string, link_url: string, expires_at: string, file: File | null }>({ image_url: '', link_url: '', expires_at: '', file: null });
+  const [bannerMessage, setBannerMessage] = useState<string | null>(null);
+
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const [ownerProfile, setOwnerProfile] = useState<OwnerProfile | null>(null);
   const [isFetchingOwnerProfile, setIsFetchingOwnerProfile] = useState(true);
@@ -1315,14 +1323,16 @@ export default function App() {
       setIsFetchingAllPets(true);
       setIsFetchingAllTags(true);
       try {
-        const [petsRes, tagsRes, storeRes] = await Promise.all([
+        const [petsRes, tagsRes, storeRes, bannersRes] = await Promise.all([
           supabase.from('pets').select('*').or('deleted.is.null,deleted.eq.false'),
           supabase.from('tags').select('*').order('id', { ascending: true }),
-          supabase.from('store_items').select('*').order('created_at', { ascending: false })
+          supabase.from('store_items').select('*').order('created_at', { ascending: false }),
+          supabase.from('banners').select('*').order('created_at', { ascending: false })
         ]);
         setAllPets((petsRes.data || []) as PetProfile[]);
         setAllTags(tagsRes.data || []);
         setStoreItems(storeRes.data || []);
+        setAdminBanners(bannersRes.data || []);
       } catch (err) {
         console.error('Error fetching admin data:', err);
       } finally {
@@ -3187,6 +3197,10 @@ export default function App() {
                 {/* ── Quick Actions ─────────────────────────────── */}
                 {userPets.length > 0 && (
                   <div className="mb-2">
+                    
+                    {/* Banners Carousel */}
+                    <BannerCarousel />
+
                     <div className="grid grid-cols-2 gap-4">
                       {/* Aniversário */}
                       {(() => {
@@ -5742,6 +5756,138 @@ export default function App() {
                           {allTags.length === 0 && !isFetchingAllTags && (
                              <p className="col-span-full text-center text-sm text-gray-400 py-8 font-medium">Nenhuma tag gerada ainda.</p>
                           )}
+                        </div>
+                      </div>
+
+                      {/* Banners Manager */}
+                      <div className="border border-orange-100 rounded-[2rem] p-6 bg-gradient-to-br from-indigo-50 to-white relative overflow-hidden">
+                        <div className="flex items-center justify-between mb-4 relative z-10">
+                          <div className="flex items-center gap-2">
+                            <ImageIcon className="w-5 h-5 text-indigo-600" />
+                            <h4 className="font-bold text-gray-800">Gerenciador de Banners</h4>
+                          </div>
+                        </div>
+                        <p className="text-xs text-gray-500 mb-6 relative z-10">
+                          Adicione banners para o carrossel do aplicativo. Resolução Recomendada: <strong>800x320 pixels (Proporção 2.5:1)</strong>.
+                        </p>
+
+                        <div className="bg-white p-4 rounded-3xl border border-gray-100 flex flex-col gap-4 mb-6 shadow-sm">
+                          {bannerMessage && <p className="text-xs text-indigo-600 font-bold bg-indigo-50 p-2 rounded-lg text-center">{bannerMessage}</p>}
+                          
+                          <input 
+                            type="file" 
+                            accept="image/*"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) setBannerForm(prev => ({ ...prev, file }));
+                            }}
+                            className="text-sm font-medium text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+                          />
+                          <div className="flex flex-col sm:flex-row gap-3">
+                            <input 
+                              type="text" 
+                              placeholder="URL Link do evento" 
+                              value={bannerForm.link_url}
+                              onChange={(e) => setBannerForm(prev => ({ ...prev, link_url: e.target.value }))}
+                              className="flex-1 bg-gray-50 border-none px-4 py-3 rounded-2xl outline-none text-sm focus:ring-2 focus:ring-indigo-100"
+                            />
+                            <div className="flex-1 max-w-[200px]">
+                              <span className="text-[10px] uppercase font-bold text-gray-400 mb-1 block px-2">Expira em:</span>
+                              <input 
+                                type="datetime-local" 
+                                value={bannerForm.expires_at}
+                                onChange={(e) => setBannerForm(prev => ({ ...prev, expires_at: e.target.value }))}
+                                className="w-full bg-gray-50 border-none px-4 py-3 rounded-2xl outline-none text-xs focus:ring-2 focus:ring-indigo-100"
+                              />
+                            </div>
+                          </div>
+
+                          <Button 
+                            loading={loading}
+                            onClick={async () => {
+                              if (!bannerForm.file || !bannerForm.link_url || !bannerForm.expires_at) {
+                                setError("Preencha a imagem, o link e a data de expiração.");
+                                return;
+                              }
+                              setLoading(true);
+                              try {
+                                const ext = bannerForm.file.name.split('.').pop();
+                                const filename = `${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
+                                
+                                const { data: uploadData, error: uploadError } = await supabase.storage
+                                  .from('banners')
+                                  .upload(filename, bannerForm.file);
+
+                                if (uploadError) throw uploadError;
+
+                                const { data: urlData } = supabase.storage.from('banners').getPublicUrl(uploadData.path);
+                                
+                                const { data: currData, error: insertError } = await supabase.from('banners').insert({
+                                  image_url: urlData.publicUrl,
+                                  link_url: bannerForm.link_url,
+                                  expires_at: new Date(bannerForm.expires_at).toISOString()
+                                }).select('*').single();
+
+                                if (insertError) throw insertError;
+
+                                setAdminBanners(prev => [currData, ...prev]);
+                                setBannerMessage("Banner adicionado com sucesso!");
+                                setBannerForm({ image_url: '', link_url: '', expires_at: '', file: null });
+                                setTimeout(() => setBannerMessage(null), 3000);
+                              } catch (err) {
+                                setError("Erro ao enviar banner.");
+                              } finally {
+                                setLoading(false);
+                              }
+                            }}
+                            className="bg-indigo-600 hover:bg-indigo-700 w-full md:w-auto self-end"
+                          >
+                            + Adicionar Banner
+                          </Button>
+                        </div>
+
+                        {/* List Banners */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {adminBanners.map(banner => {
+                            const isExpired = new Date(banner.expires_at).getTime() < Date.now();
+                            return (
+                              <div key={banner.id} className="bg-white rounded-3xl p-3 border border-gray-100 shadow-sm relative group">
+                                <span className={`absolute top-4 right-4 text-[9px] font-black uppercase px-2 py-1 rounded-md z-10 ${isExpired ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
+                                  {isExpired ? 'Expirado' : 'Ativo'}
+                                </span>
+                                <div className="w-full h-24 rounded-2xl overflow-hidden bg-gray-100 mb-3 relative">
+                                  <img src={banner.image_url} className="w-full h-full object-cover" />
+                                </div>
+                                <a href={banner.link_url} target="_blank" className="text-[10px] text-indigo-500 font-bold hover:underline truncate block mb-1">🔗 {banner.link_url}</a>
+                                <p className="text-[10px] text-gray-400 font-medium">Expira: {new Date(banner.expires_at).toLocaleString()}</p>
+                                
+                                {/* Hover Delete action */}
+                                <div className="absolute inset-0 bg-white/80 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity rounded-3xl flex items-center justify-center pointer-events-none group-hover:pointer-events-auto">
+                                  <button 
+                                    onClick={async () => {
+                                      if(!window.confirm('Excluir este banner permanentemente?')) return;
+                                      setLoading(true);
+                                      try {
+                                        // Delete from storage
+                                        const path = banner.image_url.split('/').pop();
+                                        if (path) await supabase.storage.from('banners').remove([path]);
+                                        // Delete from DB
+                                        await supabase.from('banners').delete().eq('id', banner.id);
+                                        setAdminBanners(prev => prev.filter(b => b.id !== banner.id));
+                                      } catch (e) {
+                                        setError('Erro ao deletar banner');
+                                      } finally {
+                                        setLoading(false);
+                                      }
+                                    }}
+                                    className="bg-red-100 text-red-500 p-3 rounded-2xl hover:bg-red-200 transition-colors shadow-lg"
+                                  >
+                                    <Trash2 className="w-5 h-5" />
+                                  </button>
+                                </div>
+                              </div>
+                            )
+                          })}
                         </div>
                       </div>
 
