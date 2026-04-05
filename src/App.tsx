@@ -862,66 +862,61 @@ export default function App() {
 
   const processScannedTag = async (id: string) => {
     setLoading(true);
+    const normalizedId = id.trim().toUpperCase();
     try {
-      // 1. Try tags table first
-      const { data: tagData } = await supabase.from('tags').select('*').eq('id', id).maybeSingle();
+      // 1. Try tags table first (case-insensitive)
+      const { data: tagData } = await supabase.from('tags').select('*').ilike('id', normalizedId).limit(1).maybeSingle();
       let petId: string | null = tagData?.petId || null;
 
-      // 2. Fallback: search pets table
+      // 2. Fallback: search pets table (case-insensitive)
       if (!petId) {
-        const { data: petData } = await supabase.from('pets').select('id').eq('tagId', id).maybeSingle();
+        const { data: petData } = await supabase.from('pets').select('id').ilike('tagId', normalizedId).limit(1).maybeSingle();
         if (petData) petId = petData.id;
       }
 
       if (petId) {
-        const { data: petSnap } = await supabase.from('pets').select('*').eq('id', petId).maybeSingle();
+        const { data: petSnap } = await supabase.from('pets').select('*').eq('id', petId).limit(1).maybeSingle();
         if (petSnap) {
           const { data: ownerData } = await supabase.from('owners').select('*').eq('uid', petSnap.ownerId).maybeSingle();
-          if (ownerData) {
-            petSnap.ownerPhone = ownerData.phone || petSnap.ownerPhone;
-            petSnap.ownerAddress = ownerData.address || petSnap.ownerAddress;
-            petSnap.ownerName = ownerData.name || '';
-            if (ownerData.privacySettings) {
-              petSnap.privacySettings = { ...(petSnap.privacySettings || {}), ...ownerData.privacySettings };
-            }
-          }
+          // Build merged object without mutating the readonly Supabase result
+          const mergedPet: PetProfile = {
+            ...petSnap,
+            ownerPhone: ownerData?.phone || petSnap.ownerPhone || '',
+            ownerAddress: ownerData?.address || petSnap.ownerAddress || '',
+            ownerName: ownerData?.name || '',
+            privacySettings: ownerData?.privacySettings
+              ? { ...(petSnap.privacySettings || {}), ...ownerData.privacySettings }
+              : petSnap.privacySettings,
+          };
 
           if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(async (pos) => {
               try {
                 await supabase.from('scan_history').insert({
-                  tag_id: id,
+                  tag_id: normalizedId,
                   pet_id: petId,
                   latitude: pos.coords.latitude,
                   longitude: pos.coords.longitude
                 });
               } catch(e) { console.error("Error saving scan location", e); }
             }, () => {
-              supabase.from('scan_history').insert({ tag_id: id, pet_id: petId }).then();
+              supabase.from('scan_history').insert({ tag_id: normalizedId, pet_id: petId }).then();
             });
           } else {
-             supabase.from('scan_history').insert({ tag_id: id, pet_id: petId }).then();
+             supabase.from('scan_history').insert({ tag_id: normalizedId, pet_id: petId }).then();
           }
 
-          setFinderPet(petSnap as PetProfile);
+          setFinderPet(mergedPet);
           setView('finder');
           setLoading(false);
           return;
         }
       }
 
-      setTagIdToActivate(id);
-      
-      // Check if user is logged in
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user) {
-        // Redireciona para o formulário do pet, indicando que deve ser preenchido
-        setSelectedPet({ tagId: id } as any);
-        setView('profile');
-      } else {
-        setAuthMode('register');
-        setView('activate');
-      }
+      // Tag not associated with any pet yet — direct to registration
+      setTagIdToActivate(normalizedId);
+      setSelectedPet({ tagId: normalizedId } as any);
+      setView('profile');
     } catch (err) {
       console.error('Error processing scanned tag:', err);
       alert('Erro ao processar o QR Code. Tente novamente.');
@@ -969,63 +964,59 @@ export default function App() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const tagParam = params.get('tag') || params.get('p');
-    const tag = tagParam ? tagParam.toUpperCase() : null;
+    const tag = tagParam ? tagParam.trim().toUpperCase() : null;
+
+    const installParam = params.get('install');
+
+    if (installParam === '1' || installParam === 'true') {
+      setView('install_pwa');
+      setLoading(false);
+      return;
+    }
+
+    // Local flag: once the tag flow determines the view, the auth handler must not override it
+    let tagResolved = false;
 
     const checkTagStatus = async (id: string) => {
       setLoading(true);
       try {
-        // 1. Try tags table first
-        const { data: tagData } = await supabase.from('tags').select('*').eq('id', id).maybeSingle();
+        // 1. Try tags table first (case-insensitive)
+        const { data: tagData } = await supabase.from('tags').select('*').ilike('id', id).limit(1).maybeSingle();
         let petId: string | null = tagData?.petId || null;
 
-        // 2. Fallback: search pets table
+        // 2. Fallback: search pets table (case-insensitive)
         if (!petId) {
-          const { data: petData } = await supabase.from('pets').select('id').eq('tagId', id).maybeSingle();
+          const { data: petData } = await supabase.from('pets').select('id').ilike('tagId', id).limit(1).maybeSingle();
           if (petData) petId = petData.id;
         }
 
         if (petId) {
-          const { data: petSnap } = await supabase.from('pets').select('*').eq('id', petId).maybeSingle();
+          const { data: petSnap } = await supabase.from('pets').select('*').eq('id', petId).limit(1).maybeSingle();
           if (petSnap) {
             const { data: ownerData } = await supabase.from('owners').select('*').eq('uid', petSnap.ownerId).maybeSingle();
-            if (ownerData) {
-              petSnap.ownerPhone = ownerData.phone || petSnap.ownerPhone;
-              petSnap.ownerAddress = ownerData.address || petSnap.ownerAddress;
-              petSnap.ownerName = ownerData.name || '';
-              // Owner's privacy settings override Pet's locally in frontend
-              if (ownerData.privacySettings) {
-                petSnap.privacySettings = { ...(petSnap.privacySettings || {}), ...ownerData.privacySettings };
-              }
-            }
-            setFinderPet(petSnap as PetProfile);
+            // Build merged object without mutating the readonly Supabase result
+            const mergedPet: PetProfile = {
+              ...petSnap,
+              ownerPhone: ownerData?.phone || petSnap.ownerPhone || '',
+              ownerAddress: ownerData?.address || petSnap.ownerAddress || '',
+              ownerName: ownerData?.name || '',
+              privacySettings: ownerData?.privacySettings
+                ? { ...(petSnap.privacySettings || {}), ...ownerData.privacySettings }
+                : petSnap.privacySettings,
+            };
+            tagResolved = true;
+            setFinderPet(mergedPet as PetProfile);
             setView('finder');
             setLoading(false);
             return;
           }
         }
 
-        // Tag not associated with any pet yet
+        // Tag not associated with any pet yet — go to profile to register
+        tagResolved = true;
         setTagIdToActivate(id);
-
-        // Checar sessão e PWA para decidir destino
-        const { data: { session } } = await supabase.auth.getSession();
-        const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (document as any).referrer.includes('android-app://') || (window.navigator as any).standalone === true;
-        const isPendingTagActivating = localStorage.getItem('focinho_pending_tag') === id;
-
-        if (isPendingTagActivating) {
-          setSelectedPet({ tagId: id } as any);
-          setView('profile');
-        } else if (!isStandalone) {
-          setSelectedPet({ tagId: id } as any);
-          setView('install_pwa');
-        } else if (!session?.user) {
-          setSelectedPet({ tagId: id } as any);
-          setView('profile');
-        } else {
-          setTagIdToActivate(''); // deixar o usuário digitar manualmente
-          setAuthMode('register');
-          setView('activate');
-        }
+        setSelectedPet({ tagId: id } as any);
+        setView('profile');
       } catch (err) {
         console.error('Error checking tag:', err);
       } finally {
@@ -1041,42 +1032,29 @@ export default function App() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       const u = session?.user ?? null;
-      const prevUserId = lastUserIdRef.current;
-      lastUserIdRef.current = u?.id ?? null;
-
       setUser(u);
 
-      // Only change view when auth STATUS truly changes:
-      //   undefined → anything  : first check on page load
-      //   null      → user.id   : user just logged in
-      //   user.id   → null      : user just logged out
-      // Everything else (same user, token refresh, tab focus) → keep current view
-      const firstCheck = prevUserId === undefined;
-      const statusChanged = (prevUserId === null) !== (u === null);
-      if (!firstCheck && !statusChanged) return;
+      // If a tag URL param exists or was resolved, the tag flow owns the view entirely — never override
+      if (tag || tagResolved) return;
 
-      // If we are currently loading (checking a tag), don't change the view yet
-      setLoading(currentLoading => {
-        if (!currentLoading) {
-          if (u) {
-            setView(currentView => {
-              if (currentView === 'finder') return 'finder';
-              if (tag) return 'activate';
-              if (localStorage.getItem('focinho_pending_tag')) return 'profile';
-              return 'dashboard';
-            });
-          } else {
-            setView(currentView => {
-              if (currentView === 'finder') return 'finder';
-              // Não limpar caso a pessoa esteja no instalador PWA ou criando perfil
-              if (currentView === 'install_pwa') return 'install_pwa';
-              if (currentView === 'profile' && selectedPet) return 'profile';
-              return 'home';
-            });
-          }
-        }
-        return currentLoading;
-      });
+      if (u) {
+        setView(currentView => {
+          if (currentView === 'finder') return 'finder';
+          if (currentView === 'activate') return 'activate';
+          if (currentView === 'profile') return 'profile';
+          if (currentView === 'install_pwa') return 'install_pwa';
+          if (localStorage.getItem('focinho_pending_tag')) return 'profile';
+          return 'dashboard';
+        });
+      } else {
+        setView(currentView => {
+          if (currentView === 'finder') return 'finder';
+          if (currentView === 'activate') return 'activate';
+          if (currentView === 'profile') return 'profile';
+          if (currentView === 'install_pwa') return 'install_pwa';
+          return 'home';
+        });
+      }
     });
     return () => subscription.unsubscribe();
   }, []);
@@ -1161,21 +1139,51 @@ export default function App() {
     if (!user) { setUserPets([]); setIsFetchingUserPets(false); return; }
     setIsFetchingUserPets(true);
     const fetchPets = async () => {
-      // Find user's families
-      const { data: memberships } = await supabase.from('family_members').select('family_id').eq('user_id', user.id);
-      let ownerIds = [user.id];
-      if (memberships && memberships.length > 0) {
-        const familyIds = memberships.map(m => m.family_id);
-        const { data: allMembers } = await supabase.from('family_members').select('user_id').in('family_id', familyIds);
-        if (allMembers) {
-          allMembers.forEach(m => ownerIds.push(m.user_id));
-        }
-      }
-      ownerIds = Array.from(new Set(ownerIds)); // unique IDs
+      try {
+        // Always fetch own pets first (direct, reliable)
+        const { data: ownPets, error: ownError } = await supabase
+          .from('pets')
+          .select('*')
+          .eq('ownerId', user.id)
+          .neq('deleted', true);
 
-      const { data } = await supabase.from('pets').select('*').in('ownerId', ownerIds).or('deleted.is.null,deleted.eq.false');
-      setUserPets((data || []) as PetProfile[]);
-      setIsFetchingUserPets(false);
+        if (ownError) console.error('Error fetching own pets:', ownError);
+
+        let allPets: PetProfile[] = (ownPets || []) as PetProfile[];
+
+        // Then fetch family pets (optional, extra)
+        try {
+          const { data: memberships } = await supabase.from('family_members').select('family_id').eq('user_id', user.id);
+          if (memberships && memberships.length > 0) {
+            const familyIds = memberships.map(m => m.family_id);
+            const { data: allMembers } = await supabase.from('family_members').select('user_id').in('family_id', familyIds);
+            if (allMembers) {
+              const familyOwnerIds = Array.from(new Set(
+                allMembers.map(m => m.user_id).filter(id => id !== user.id)
+              ));
+              if (familyOwnerIds.length > 0) {
+                const { data: familyPets } = await supabase
+                  .from('pets')
+                  .select('*')
+                  .in('ownerId', familyOwnerIds)
+                  .neq('deleted', true);
+                if (familyPets) {
+                  allPets = [...allPets, ...(familyPets as PetProfile[])];
+                }
+              }
+            }
+          }
+        } catch (familyErr) {
+          console.warn('Could not fetch family pets (non-critical):', familyErr);
+        }
+
+        setUserPets(allPets);
+      } catch (err) {
+        console.error('Critical error fetching pets:', err);
+        setUserPets([]);
+      } finally {
+        setIsFetchingUserPets(false);
+      }
     };
     fetchPets();
     // Subscrbe to pet changes (without filter to catch family pets, or keep simple)
@@ -2122,14 +2130,14 @@ export default function App() {
     setError(null);
     try {
       // 1. Check if tag is already in use
-      const { data: existingPet } = await supabase.from('pets').select('id').eq('tagId', tagIdToActivate).maybeSingle();
+      const { data: existingPet } = await supabase.from('pets').select('id').eq('tagId', tagIdToActivate).limit(1).maybeSingle();
       if (existingPet) {
         setError('Esta tag já está em uso por outro pet.');
         setLoading(false);
         return;
       }
       // 2. Check tags table
-      const { data: tagData } = await supabase.from('tags').select('*').eq('id', tagIdToActivate).maybeSingle();
+      const { data: tagData } = await supabase.from('tags').select('*').eq('id', tagIdToActivate).limit(1).maybeSingle();
       if (tagData?.activated) {
         setError('Esta tag já está em uso por outro pet.');
         setLoading(false);
@@ -2692,7 +2700,12 @@ export default function App() {
         {/* Header */}
         {user && view !== 'install_pwa' && (
           <header className="bg-white border-b border-gray-100 px-6 py-4 sticky top-0 z-50 flex justify-between items-center">
-            <div className="flex items-center gap-2 cursor-pointer" onClick={() => setView('dashboard')}>
+            <div className="flex items-center gap-2 cursor-pointer" onClick={() => {
+              setView('dashboard');
+              if (window.location.search) {
+                window.history.replaceState({}, '', window.location.pathname);
+              }
+            }}>
               <img src="./pwa-512x512.png" alt="FocinhoApp Logo" className="w-10 h-10 object-cover rounded-xl" />
               <div className="hidden sm:block">
                 <span translate="no" className="text-xl font-bold tracking-tight">FocinhoApp</span>
