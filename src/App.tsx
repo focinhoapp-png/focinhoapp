@@ -2976,227 +2976,222 @@ export default function App() {
                   <>
 
 
-                {/* SOS Alerts on Dashboard - MOVED TO ANIMAL PERDIDO VIEW */}
-
-                {userPets.length === 0 ? (
-                  <div className="bg-white border-2 border-dashed border-gray-200 rounded-[2.5rem] p-12 text-center space-y-4">
-                    <div className="bg-gray-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto">
-                      <Dog className="w-8 h-8 text-gray-300" />
-                    </div>
-                    <p className="text-gray-400">Você ainda não tem pets cadastrados.</p>
-                    <Button onClick={() => {
-                      setSelectedPet(null);
-                      setView('profile');
-                    }} className="mx-auto block w-full mb-3">
-                      <Plus className="w-5 h-5 inline-block mr-2" /> Adicionar um novo pet
-                    </Button>
-                    <Button onClick={() => {
-                      setSelectedPet(null);
-                      setView('activate');
-                    }} variant="outline" className="mx-auto block w-full">
-                      Ativar meu primeiro pingente
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="space-y-6">
-                    {/* Pet Carousel */}
-                    <div className="relative bg-white p-6 md:p-8 rounded-[2rem] md:rounded-[3rem] shadow-xl shadow-orange-100 border border-orange-50">
-                      <div className="flex items-center justify-between mb-6">
-                        <h3 className="font-black text-gray-900 text-lg uppercase tracking-tight">Seu Pet</h3>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => setCurrentPetIndex(prev => (prev > 0 ? prev - 1 : userPets.length - 1))}
-                            className="w-12 h-12 bg-gray-50 rounded-2xl flex items-center justify-center hover:bg-gray-100 transition-colors shadow-sm"
-                          >
-                            <ChevronLeft className="w-6 h-6 text-gray-600" />
-                          </button>
-                          <button
-                            onClick={() => setCurrentPetIndex(prev => (prev < userPets.length - 1 ? prev + 1 : 0))}
-                            className="w-12 h-12 bg-gray-50 rounded-2xl flex items-center justify-center hover:bg-gray-100 transition-colors shadow-sm"
-                          >
-                            <ChevronRight className="w-6 h-6 text-gray-600" />
-                          </button>
-                        </div>
-                      </div>
-
-                      <AnimatePresence mode="wait">
-                        <motion.div
-                          key={userPets[currentPetIndex]?.id}
-                          initial={{ opacity: 0, scale: 0.95 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          exit={{ opacity: 0, scale: 0.95 }}
-                          onClick={() => { setSelectedPet(userPets[currentPetIndex]); setView('profile'); }}
-                          className="bg-gray-50 p-4 md:p-6 rounded-[2rem] flex items-center gap-4 md:gap-6 cursor-pointer group hover:bg-orange-50 transition-all border-2 border-transparent hover:border-orange-200"
+                {/* ── Pet Selector Row ─────────────────────────── */}
+                <div className="mb-2">
+                  <div className="flex gap-5 overflow-x-auto pb-3 pt-3 px-2 no-scrollbar">
+                    {userPets.map((pet) => {
+                      const hasTag = !!pet.tagId;
+                      return (
+                        <motion.button
+                          key={pet.id}
+                          whileTap={{ scale: 0.93 }}
+                          onClick={() => { setSelectedPet(pet); setCurrentPetIndex(userPets.indexOf(pet)); setView('profile'); }}
+                          className="flex flex-col items-center gap-2 shrink-0 group"
                         >
-                          <div className="w-20 h-20 md:w-24 md:h-24 bg-white rounded-[1.5rem] md:rounded-[2rem] flex items-center justify-center overflow-hidden shadow-md border-2 border-white group-hover:scale-105 transition-transform">
-                            {userPets[currentPetIndex]?.photoUrl ? (
-                              <img src={userPets[currentPetIndex].photoUrl} alt={userPets[currentPetIndex].name} className="w-full h-full object-cover" />
-                            ) : (
-                              <Dog className="w-12 h-12 text-orange-200" />
-                            )}
-                          </div>
-                          <div className="flex-1">
-                            <div className="flex flex-col gap-1">
-                              <h3 className="font-black text-2xl text-gray-900">{userPets[currentPetIndex]?.name}</h3>
-                              {userPets[currentPetIndex]?.tagId ? (
-                                <span className="w-fit bg-green-500 text-white text-[9px] font-black px-2 py-1 rounded-lg flex items-center gap-1 shadow-sm">
-                                  <ShieldCheck className="w-3 h-3" /> PROTEGIDO
-                                </span>
-                              ) : (
-                                <span className="w-fit bg-gray-200 text-gray-500 text-[9px] font-black px-2 py-1 rounded-lg flex items-center gap-1">
-                                  <AlertCircle className="w-3 h-3" /> NÃO PROTEGIDO
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-sm text-gray-400 mt-2 font-medium">{userPets[currentPetIndex]?.breed || 'Sem raça definida'}</p>
-
-                            {userPets[currentPetIndex]?.tagId && (
-                              <div className="mt-2 flex items-center gap-2 bg-white w-fit px-3 py-1.5 rounded-xl border border-gray-100 shadow-sm relative z-10">
-                                <QrCode className="w-3 h-3 text-orange-500" />
-                                <span className="text-[10px] font-bold text-gray-600">ID: {userPets[currentPetIndex].tagId}</span>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    window.open(`${window.location.origin}/?tag=${userPets[currentPetIndex].tagId}`, '_blank');
-                                  }}
-                                  className="p-1.5 bg-orange-50 hover:bg-orange-100 rounded-lg transition-colors flex items-center justify-center"
-                                >
-                                  <ExternalLink className="w-3.5 h-3.5 text-orange-500" />
-                                </button>
-                              </div>
-                            )}
-
-                            <div className="flex items-center gap-1 text-orange-500 font-black text-[10px] mt-3 uppercase tracking-widest">
-                              Ver Perfil Completo <ChevronRight className="w-3 h-3" />
-                            </div>
-                          </div>
-                        </motion.div>
-                      </AnimatePresence>
-                    </div>
-
-                    {/* Quick Actions */}
-                    <div className="mb-2">
-                      <h3 className="font-black text-gray-900 text-lg mb-3 tracking-tight ml-1">Ações Rápidas</h3>
-                      <div className="grid grid-cols-2 gap-4">
-                        {/* Passeio */}
-                        <div
-                          onClick={() => setView('walk')}
-                          className="bg-orange-500 p-5 rounded-[2.5rem] flex flex-col items-center text-center gap-2 cursor-pointer hover:bg-orange-600 transition-all shadow-lg shadow-orange-200 h-40 justify-center"
-                        >
-                          <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center shadow-sm">
-                            <PawPrint className="w-6 h-6 text-white" />
-                          </div>
-                          <div>
-                            <h4 className="font-black text-sm text-white">Passeio</h4>
-                            <p className="text-[10px] text-white/80 font-medium">Rastrear percurso</p>
-                          </div>
-                        </div>
-
-                        {/* Aniversário — ao lado do Passeio */}
-                        {(() => {
-                          const currentPet = userPets[currentPetIndex];
-                          const birthdayInfo = currentPet ? getDaysUntilBirthday(currentPet.birthday) : null;
-                          return (
+                          {/* Circle avatar */}
+                          <div className="relative">
                             <div
-                              onClick={() => {
-                                if (currentPet) {
-                                  setSelectedPet(currentPet);
-                                  setView('pet_birthday');
-                                }
-                              }}
-                              className="bg-white p-5 rounded-[2.5rem] border border-gray-100 flex flex-col items-center text-center gap-2 cursor-pointer hover:border-purple-200 transition-all shadow-sm h-40 justify-center"
+                              className={`w-[72px] h-[72px] rounded-full p-[3px] transition-all duration-300
+                                ${hasTag
+                                  ? 'ring-[3px] ring-orange-500 ring-offset-2'
+                                  : 'ring-[3px] ring-gray-300 ring-offset-2'
+                                }`}
                             >
-                              <div className="w-12 h-12 bg-purple-50 rounded-2xl flex items-center justify-center shadow-sm">
-                                <Cake className="w-6 h-6 text-purple-500" />
-                              </div>
-                              <div>
-                                <h4 className="font-black text-sm text-gray-800">Aniversário</h4>
-                                <p className="text-[10px] text-gray-400 font-medium">
-                                  {birthdayInfo ? `${birthdayInfo.days} dia(s) restante(s)` : 'Sem data definida'}
-                                </p>
+                              <div className="w-full h-full rounded-full overflow-hidden bg-gray-100">
+                                {pet.photoUrl ? (
+                                  <img src={pet.photoUrl} alt={pet.name} className="w-full h-full object-cover" />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center">
+                                    <Dog className={`w-8 h-8 ${hasTag ? 'text-orange-300' : 'text-gray-300'}`} />
+                                  </div>
+                                )}
                               </div>
                             </div>
-                          );
-                        })()}
 
-                        {/* Animal Perdido */}
-                        <div
-                          onClick={() => {
-                            setView('lost_pets');
-                            setHasNewUnreadSOS(false);
-                          }}
-                          className={`p-5 rounded-[2.5rem] border flex flex-col items-center text-center gap-2 cursor-pointer transition-all shadow-sm h-40 justify-center 
-                          ${hasNewUnreadSOS
-                              ? 'bg-red-500 border-red-600 animate-pulse text-white'
-                              : 'bg-white border-gray-100 hover:border-red-200 text-gray-800'}`}
-                        >
-                          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm ${hasNewUnreadSOS ? 'bg-white/20' : 'bg-red-50'}`}>
-                            <Megaphone className={`w-6 h-6 ${hasNewUnreadSOS ? 'text-white' : 'text-red-500'}`} />
+                            {/* QR badge — only when tag active */}
+                            {hasTag && (
+                              <motion.button
+                                initial={{ scale: 0 }}
+                                animate={{ scale: 1 }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  window.open(`${window.location.origin}/?tag=${pet.tagId}`, '_blank');
+                                }}
+                                className="absolute -bottom-1 -right-1 w-6 h-6 bg-orange-500 rounded-full flex items-center justify-center shadow-md border-2 border-white hover:bg-orange-600 transition-colors"
+                                title={`Ver perfil público — ID: ${pet.tagId}`}
+                              >
+                                <QrCode className="w-3 h-3 text-white" />
+                              </motion.button>
+                            )}
                           </div>
-                          <div>
-                            <h4 className={`font-black text-sm ${hasNewUnreadSOS ? 'text-white' : 'text-gray-800'}`}>Alertas</h4>
-                            <p className={`text-[10px] font-medium ${hasNewUnreadSOS ? 'text-white/80' : 'text-gray-400'}`}>Alertas SOS ativos</p>
-                          </div>
+
+                          {/* Name */}
+                          <span className="text-[12px] font-bold text-gray-700 group-hover:text-orange-500 transition-colors truncate max-w-[72px]">
+                            {pet.name}
+                          </span>
+                        </motion.button>
+                      );
+                    })}
+
+                    {/* Add new pet button */}
+                    <motion.button
+                      whileTap={{ scale: 0.93 }}
+                      onClick={() => { setSelectedPet(null); setView('profile'); }}
+                      className="flex flex-col items-center gap-2 shrink-0 group"
+                    >
+                      <div className="w-[72px] h-[72px] rounded-full bg-gray-100 border-2 border-dashed border-gray-300 flex items-center justify-center group-hover:border-orange-400 group-hover:bg-orange-50 transition-all">
+                        <div className="flex flex-col items-center gap-0.5">
+                          <Plus className="w-5 h-5 text-gray-400 group-hover:text-orange-500 transition-colors" />
+                          <PawPrint className="w-3 h-3 text-gray-300 group-hover:text-orange-400 transition-colors" />
                         </div>
+                      </div>
+                      <span className="text-[12px] font-bold text-gray-400 group-hover:text-orange-500 transition-colors">
+                        Adicionar
+                      </span>
+                    </motion.button>
+                  </div>
 
-                        {/* Lembretes */}
-                        <div
-                          onClick={() => setView('reminders')}
-                          className="bg-white p-5 rounded-[2.5rem] border border-gray-100 flex flex-col items-center text-center gap-2 cursor-pointer hover:border-orange-200 transition-all shadow-sm h-40 justify-center"
-                        >
-                          <div className="w-12 h-12 bg-orange-50 rounded-2xl flex items-center justify-center shadow-sm">
-                            <Bell className="w-6 h-6 text-orange-500" />
-                          </div>
-                          <div>
-                            <h4 className="font-black text-sm text-gray-800">Lembretes</h4>
-                            <p className="text-[10px] text-gray-400 font-medium">Vacinas e remédios</p>
-                          </div>
+                  {/* Empty state — when user has zero pets, show centered add circle */}
+                  {userPets.length === 0 && (
+                    <div className="flex flex-col items-center justify-center py-10 gap-3">
+                      <motion.button
+                        whileTap={{ scale: 0.9 }}
+                        onClick={() => { setSelectedPet(null); setView('profile'); }}
+                        className="w-24 h-24 rounded-full bg-gray-100 border-2 border-dashed border-gray-300 flex flex-col items-center justify-center gap-1 hover:border-orange-400 hover:bg-orange-50 transition-all group"
+                      >
+                        <PawPrint className="w-7 h-7 text-gray-300 group-hover:text-orange-400 transition-colors" />
+                        <Plus className="w-5 h-5 text-gray-400 group-hover:text-orange-500 transition-colors" />
+                      </motion.button>
+                      <p className="text-sm font-bold text-gray-500">Adicionar meu primeiro pet</p>
+                      <p className="text-xs text-gray-400 text-center max-w-[200px]">Cadastre seu pet e mantenha-o seguro com o pingente FocinhoApp</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* ── Quick Actions ─────────────────────────────── */}
+                {userPets.length > 0 && (
+                  <div className="mb-2">
+                    <h3 className="font-black text-gray-900 text-base mb-3 tracking-tight ml-1 uppercase tracking-widest">Ações Rápidas</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      {/* Passeio */}
+                      <div
+                        onClick={() => setView('walk')}
+                        className="bg-orange-500 p-5 rounded-[2.5rem] flex flex-col items-center text-center gap-2 cursor-pointer hover:bg-orange-600 transition-all shadow-lg shadow-orange-200 h-40 justify-center"
+                      >
+                        <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center shadow-sm">
+                          <PawPrint className="w-6 h-6 text-white" />
                         </div>
-
-                        {/* Adoção — ao lado de Eventos */}
-                        <div
-                          onClick={() => {
-                            setView('account');
-                            setAccountSubView('adoption');
-                            setHasNewAdoption(false);
-                          }}
-                          className={`p-5 rounded-[2.5rem] border flex flex-col items-center text-center gap-2 cursor-pointer transition-all shadow-sm h-40 justify-center
-                          ${hasNewAdoption
-                              ? 'bg-pink-500 border-pink-600 animate-pulse text-white'
-                              : 'bg-white border-gray-100 hover:border-pink-200'}`}
-                        >
-                          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm ${hasNewAdoption ? 'bg-white/20' : 'bg-pink-50'}`}>
-                            <Heart className={`w-6 h-6 ${hasNewAdoption ? 'text-white' : 'text-pink-500'}`} />
-                          </div>
-                          <div>
-                            <h4 className={`font-black text-sm ${hasNewAdoption ? 'text-white' : 'text-gray-800'}`}>Adoção</h4>
-                            <p className={`text-[10px] font-medium ${hasNewAdoption ? 'text-white/80' : 'text-gray-400'}`}>
-                              {hasNewAdoption ? '🎉 Nova adoção!' : 'Encontre um amigo'}
-                            </p>
-                          </div>
+                        <div>
+                          <h4 className="font-black text-sm text-white">Passeio</h4>
+                          <p className="text-[10px] text-white/80 font-medium">Rastrear percurso</p>
                         </div>
+                      </div>
 
-                        {/* Eventos */}
-                        <div
-                          onClick={() => {
-                            setView('account');
-                            setAccountSubView('events');
-                          }}
-                          className="bg-white p-5 rounded-[2.5rem] border border-gray-100 flex flex-col items-center text-center gap-2 cursor-pointer hover:border-blue-200 transition-all shadow-sm h-40 justify-center"
-                        >
-                          <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center shadow-sm">
-                            <Calendar className="w-6 h-6 text-blue-500" />
+                      {/* Aniversário */}
+                      {(() => {
+                        const currentPet = userPets[currentPetIndex];
+                        const birthdayInfo = currentPet ? getDaysUntilBirthday(currentPet.birthday) : null;
+                        return (
+                          <div
+                            onClick={() => {
+                              if (currentPet) {
+                                setSelectedPet(currentPet);
+                                setView('pet_birthday');
+                              }
+                            }}
+                            className="bg-white p-5 rounded-[2.5rem] border border-gray-100 flex flex-col items-center text-center gap-2 cursor-pointer hover:border-purple-200 transition-all shadow-sm h-40 justify-center"
+                          >
+                            <div className="w-12 h-12 bg-purple-50 rounded-2xl flex items-center justify-center shadow-sm">
+                              <Cake className="w-6 h-6 text-purple-500" />
+                            </div>
+                            <div>
+                              <h4 className="font-black text-sm text-gray-800">Aniversário</h4>
+                              <p className="text-[10px] text-gray-400 font-medium">
+                                {birthdayInfo ? `${birthdayInfo.days} dia(s) restante(s)` : 'Sem data definida'}
+                              </p>
+                            </div>
                           </div>
-                          <div>
-                            <h4 className="font-black text-sm text-gray-800">Eventos</h4>
-                            <p className="text-[10px] text-gray-400 font-medium">Na sua região</p>
-                          </div>
+                        );
+                      })()}
+
+                      {/* Alertas SOS */}
+                      <div
+                        onClick={() => {
+                          setView('lost_pets');
+                          setHasNewUnreadSOS(false);
+                        }}
+                        className={`p-5 rounded-[2.5rem] border flex flex-col items-center text-center gap-2 cursor-pointer transition-all shadow-sm h-40 justify-center 
+                        ${hasNewUnreadSOS
+                            ? 'bg-red-500 border-red-600 animate-pulse text-white'
+                            : 'bg-white border-gray-100 hover:border-red-200 text-gray-800'}`}
+                      >
+                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm ${hasNewUnreadSOS ? 'bg-white/20' : 'bg-red-50'}`}>
+                          <Megaphone className={`w-6 h-6 ${hasNewUnreadSOS ? 'text-white' : 'text-red-500'}`} />
+                        </div>
+                        <div>
+                          <h4 className={`font-black text-sm ${hasNewUnreadSOS ? 'text-white' : 'text-gray-800'}`}>Alertas</h4>
+                          <p className={`text-[10px] font-medium ${hasNewUnreadSOS ? 'text-white/80' : 'text-gray-400'}`}>Alertas SOS ativos</p>
+                        </div>
+                      </div>
+
+                      {/* Lembretes */}
+                      <div
+                        onClick={() => setView('reminders')}
+                        className="bg-white p-5 rounded-[2.5rem] border border-gray-100 flex flex-col items-center text-center gap-2 cursor-pointer hover:border-orange-200 transition-all shadow-sm h-40 justify-center"
+                      >
+                        <div className="w-12 h-12 bg-orange-50 rounded-2xl flex items-center justify-center shadow-sm">
+                          <Bell className="w-6 h-6 text-orange-500" />
+                        </div>
+                        <div>
+                          <h4 className="font-black text-sm text-gray-800">Lembretes</h4>
+                          <p className="text-[10px] text-gray-400 font-medium">Vacinas e remédios</p>
+                        </div>
+                      </div>
+
+                      {/* Adoção */}
+                      <div
+                        onClick={() => {
+                          setView('account');
+                          setAccountSubView('adoption');
+                          setHasNewAdoption(false);
+                        }}
+                        className={`p-5 rounded-[2.5rem] border flex flex-col items-center text-center gap-2 cursor-pointer transition-all shadow-sm h-40 justify-center
+                        ${hasNewAdoption
+                            ? 'bg-pink-500 border-pink-600 animate-pulse text-white'
+                            : 'bg-white border-gray-100 hover:border-pink-200'}`}
+                      >
+                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm ${hasNewAdoption ? 'bg-white/20' : 'bg-pink-50'}`}>
+                          <Heart className={`w-6 h-6 ${hasNewAdoption ? 'text-white' : 'text-pink-500'}`} />
+                        </div>
+                        <div>
+                          <h4 className={`font-black text-sm ${hasNewAdoption ? 'text-white' : 'text-gray-800'}`}>Adoção</h4>
+                          <p className={`text-[10px] font-medium ${hasNewAdoption ? 'text-white/80' : 'text-gray-400'}`}>
+                            {hasNewAdoption ? '🎉 Nova adoção!' : 'Encontre um amigo'}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Eventos */}
+                      <div
+                        onClick={() => {
+                          setView('account');
+                          setAccountSubView('events');
+                        }}
+                        className="bg-white p-5 rounded-[2.5rem] border border-gray-100 flex flex-col items-center text-center gap-2 cursor-pointer hover:border-blue-200 transition-all shadow-sm h-40 justify-center"
+                      >
+                        <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center shadow-sm">
+                          <Calendar className="w-6 h-6 text-blue-500" />
+                        </div>
+                        <div>
+                          <h4 className="font-black text-sm text-gray-800">Eventos</h4>
+                          <p className="text-[10px] text-gray-400 font-medium">Na sua região</p>
                         </div>
                       </div>
                     </div>
-                    <div className="h-20" /> {/* Spacer to avoid bottom nav overlap */}
                   </div>
                 )}
+                <div className="h-20" /> {/* Spacer */}
+
                   </>
                 )}
               </motion.div>
