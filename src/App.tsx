@@ -966,11 +966,17 @@ export default function App() {
     const tag = tagParam ? tagParam.trim().toUpperCase() : null;
 
     const installParam = params.get('install');
+    const loginParam = params.get('login');
 
     if (installParam === '1' || installParam === 'true') {
       setView('install_pwa');
       setLoading(false);
       return;
+    }
+
+    // Vindo do tutorial de instalação: forçar tela de login
+    if (loginParam === 'true') {
+      setView('home');
     }
 
     // Local flag: once the tag flow determines the view, the auth handler must not override it
@@ -1048,7 +1054,8 @@ export default function App() {
         setView(currentView => {
           if (currentView === 'finder') return 'finder';
           if (currentView === 'activate') return 'activate';
-          if (currentView === 'profile') return 'profile';
+          // Se vier de /?login=true, nunca preservar 'profile' — mostrar login
+          if (currentView === 'profile' && loginParam !== 'true') return 'profile';
           if (currentView === 'install_pwa') return 'install_pwa';
           return 'home';
         });
@@ -2770,7 +2777,7 @@ export default function App() {
                       <span className="bg-green-100 text-green-600 w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-black shrink-0 mt-0.5">1</span>
                       <p className="text-[13px] text-gray-600 font-medium leading-snug">
                         Abra o FocinhoApp no Chrome:{' '}
-                        <a href="/" className="text-orange-600 font-black underline underline-offset-2 hover:text-orange-700" target="_self">
+                        <a href="/?login=true" className="text-orange-600 font-black underline underline-offset-2 hover:text-orange-700" target="_self">
                           Clique aqui
                         </a>
                       </p>
@@ -2809,7 +2816,7 @@ export default function App() {
                       <span className="bg-blue-100 text-blue-600 w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-black shrink-0 mt-0.5">1</span>
                       <p className="text-[13px] text-gray-600 font-medium leading-snug">
                         Abra o FocinhoApp no Safari:{' '}
-                        <a href="/" className="text-orange-600 font-black underline underline-offset-2 hover:text-orange-700" target="_self">
+                        <a href="/?login=true" className="text-orange-600 font-black underline underline-offset-2 hover:text-orange-700" target="_self">
                           Clique aqui
                         </a>
                       </p>
