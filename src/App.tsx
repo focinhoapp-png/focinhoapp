@@ -4131,13 +4131,7 @@ export default function App() {
                                     Gerado em: {new Date(alert.createdAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
                                   </span>
                                 </div>
-                                {alert.reward && (
-                                  <div className="mt-3 bg-green-50 border border-green-200 p-2.5 rounded-xl text-green-700 font-bold text-sm shadow-[inset_0_2px_4px_rgba(0,0,0,0.05)] border-t border-green-300 flex items-center justify-center gap-2">
-                                    <DollarSign className="w-5 h-5 text-green-600" />
-                                    Recompensa Agendada: <span className="font-black text-lg">{alert.reward}</span>
-                                  </div>
-                                )}
-                              </div>
+                                </div>
 
                               <div className="flex flex-col gap-2">
                                 <div className="flex gap-2">
@@ -4294,13 +4288,6 @@ export default function App() {
                             value={newSOS.lastSeen}
                             onChange={(v: string) => setNewSOS(prev => ({ ...prev, lastSeen: v }))}
                             icon={AlertCircle}
-                          />
-                          <Input
-                            label="Recompensa (Opcional)"
-                            placeholder="Ex: R$ 500,00"
-                            value={newSOS.reward || ''}
-                            onChange={(v: string) => setNewSOS(prev => ({ ...prev, reward: v }))}
-                            icon={DollarSign}
                           />
                         </div>
 
