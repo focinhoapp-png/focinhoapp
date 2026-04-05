@@ -2765,13 +2765,23 @@ export default function App() {
                     </div>
                   </div>
                   <div className="space-y-3">
+                    {/* Passo 1: abrir o link */}
+                    <div className="flex gap-3 items-start">
+                      <span className="bg-green-100 text-green-600 w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-black shrink-0 mt-0.5">1</span>
+                      <p className="text-[13px] text-gray-600 font-medium leading-snug">
+                        Abra o FocinhoApp no Chrome:{' '}
+                        <a href="/" className="text-orange-600 font-black underline underline-offset-2 hover:text-orange-700" target="_self">
+                          Clique aqui
+                        </a>
+                      </p>
+                    </div>
                     {[
                       'Toque nos três pontinhos no canto superior direito',
                       'Toque em "Adicionar à tela inicial"',
                       'Confirme o nome do app e toque em "Adicionar"',
                     ].map((step, i) => (
                       <div key={i} className="flex gap-3 items-start">
-                        <span className="bg-green-100 text-green-600 w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-black shrink-0 mt-0.5">{i + 1}</span>
+                        <span className="bg-green-100 text-green-600 w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-black shrink-0 mt-0.5">{i + 2}</span>
                         <p className="text-[13px] text-gray-600 font-medium leading-snug">{step}</p>
                       </div>
                     ))}
@@ -2794,13 +2804,23 @@ export default function App() {
                     </div>
                   </div>
                   <div className="space-y-3">
+                    {/* Passo 1: abrir o link */}
+                    <div className="flex gap-3 items-start">
+                      <span className="bg-blue-100 text-blue-600 w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-black shrink-0 mt-0.5">1</span>
+                      <p className="text-[13px] text-gray-600 font-medium leading-snug">
+                        Abra o FocinhoApp no Safari:{' '}
+                        <a href="/" className="text-orange-600 font-black underline underline-offset-2 hover:text-orange-700" target="_self">
+                          Clique aqui
+                        </a>
+                      </p>
+                    </div>
                     {[
                       'Toque no botão de compartilhar na barra inferior do Safari',
                       'Role para baixo e toque em "Adicionar à Tela de Início"',
                       'Confirme o nome do app e toque em "Adicionar"',
                     ].map((step, i) => (
                       <div key={i} className="flex gap-3 items-start">
-                        <span className="bg-blue-100 text-blue-600 w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-black shrink-0 mt-0.5">{i + 1}</span>
+                        <span className="bg-blue-100 text-blue-600 w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-black shrink-0 mt-0.5">{i + 2}</span>
                         <p className="text-[13px] text-gray-600 font-medium leading-snug">{step}</p>
                       </div>
                     ))}
