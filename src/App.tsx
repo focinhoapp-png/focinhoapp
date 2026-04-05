@@ -3071,22 +3071,7 @@ export default function App() {
                 {/* ── Quick Actions ─────────────────────────────── */}
                 {userPets.length > 0 && (
                   <div className="mb-2">
-                    <h3 className="font-black text-gray-900 text-base mb-3 tracking-tight ml-1 uppercase tracking-widest">Ações Rápidas</h3>
                     <div className="grid grid-cols-2 gap-4">
-                      {/* Passeio */}
-                      <div
-                        onClick={() => setView('walk')}
-                        className="bg-orange-500 p-5 rounded-[2.5rem] flex flex-col items-center text-center gap-2 cursor-pointer hover:bg-orange-600 transition-all shadow-lg shadow-orange-200 h-40 justify-center"
-                      >
-                        <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center shadow-sm">
-                          <PawPrint className="w-6 h-6 text-white" />
-                        </div>
-                        <div>
-                          <h4 className="font-black text-sm text-white">Passeio</h4>
-                          <p className="text-[10px] text-white/80 font-medium">Rastrear percurso</p>
-                        </div>
-                      </div>
-
                       {/* Aniversário */}
                       {(() => {
                         const currentPet = userPets[currentPetIndex];
@@ -3113,63 +3098,6 @@ export default function App() {
                           </div>
                         );
                       })()}
-
-                      {/* Alertas SOS */}
-                      <div
-                        onClick={() => {
-                          setView('lost_pets');
-                          setHasNewUnreadSOS(false);
-                        }}
-                        className={`p-5 rounded-[2.5rem] border flex flex-col items-center text-center gap-2 cursor-pointer transition-all shadow-sm h-40 justify-center 
-                        ${hasNewUnreadSOS
-                            ? 'bg-red-500 border-red-600 animate-pulse text-white'
-                            : 'bg-white border-gray-100 hover:border-red-200 text-gray-800'}`}
-                      >
-                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm ${hasNewUnreadSOS ? 'bg-white/20' : 'bg-red-50'}`}>
-                          <Megaphone className={`w-6 h-6 ${hasNewUnreadSOS ? 'text-white' : 'text-red-500'}`} />
-                        </div>
-                        <div>
-                          <h4 className={`font-black text-sm ${hasNewUnreadSOS ? 'text-white' : 'text-gray-800'}`}>Alertas</h4>
-                          <p className={`text-[10px] font-medium ${hasNewUnreadSOS ? 'text-white/80' : 'text-gray-400'}`}>Alertas SOS ativos</p>
-                        </div>
-                      </div>
-
-                      {/* Lembretes */}
-                      <div
-                        onClick={() => setView('reminders')}
-                        className="bg-white p-5 rounded-[2.5rem] border border-gray-100 flex flex-col items-center text-center gap-2 cursor-pointer hover:border-orange-200 transition-all shadow-sm h-40 justify-center"
-                      >
-                        <div className="w-12 h-12 bg-orange-50 rounded-2xl flex items-center justify-center shadow-sm">
-                          <Bell className="w-6 h-6 text-orange-500" />
-                        </div>
-                        <div>
-                          <h4 className="font-black text-sm text-gray-800">Lembretes</h4>
-                          <p className="text-[10px] text-gray-400 font-medium">Vacinas e remédios</p>
-                        </div>
-                      </div>
-
-                      {/* Adoção */}
-                      <div
-                        onClick={() => {
-                          setView('account');
-                          setAccountSubView('adoption');
-                          setHasNewAdoption(false);
-                        }}
-                        className={`p-5 rounded-[2.5rem] border flex flex-col items-center text-center gap-2 cursor-pointer transition-all shadow-sm h-40 justify-center
-                        ${hasNewAdoption
-                            ? 'bg-pink-500 border-pink-600 animate-pulse text-white'
-                            : 'bg-white border-gray-100 hover:border-pink-200'}`}
-                      >
-                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm ${hasNewAdoption ? 'bg-white/20' : 'bg-pink-50'}`}>
-                          <Heart className={`w-6 h-6 ${hasNewAdoption ? 'text-white' : 'text-pink-500'}`} />
-                        </div>
-                        <div>
-                          <h4 className={`font-black text-sm ${hasNewAdoption ? 'text-white' : 'text-gray-800'}`}>Adoção</h4>
-                          <p className={`text-[10px] font-medium ${hasNewAdoption ? 'text-white/80' : 'text-gray-400'}`}>
-                            {hasNewAdoption ? '🎉 Nova adoção!' : 'Encontre um amigo'}
-                          </p>
-                        </div>
-                      </div>
 
                       {/* Eventos */}
                       <div
