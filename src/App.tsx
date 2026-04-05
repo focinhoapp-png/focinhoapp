@@ -62,6 +62,7 @@ import { supabase } from './supabase';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 import QRScanner from './components/QRScanner';
 import { ImageCropperModal } from './components/ImageCropperModal';
+import { PhoneInputWithDDI } from './components/PhoneInputWithDDI';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 
@@ -811,12 +812,20 @@ export default function App() {
   const [authPassword, setAuthPassword] = useState('');
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [authName, setAuthName] = useState('');
+  const [authDDI, setAuthDDI] = useState('+55');
   const [authPhone, setAuthPhone] = useState('');
   const [authState, setAuthState] = useState('');
   const [authCity, setAuthCity] = useState('');
   const [authAddress, setAuthAddress] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+
+  // OTP state (email verification on register)
+  const [otpCode, setOtpCode] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpSending, setOtpSending] = useState(false);
+  const [otpSuccess, setOtpSuccess] = useState<string | null>(null);
+  const [otpCooldown, setOtpCooldown] = useState(0); // seconds until resend allowed
 
   // Family State
   const [userFamilies, setUserFamilies] = useState<any[]>([]);
@@ -1924,14 +1933,57 @@ export default function App() {
     }
   };
 
+  const handleSendOtp = async () => {
+    if (!authEmail || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(authEmail)) {
+      setAuthError('Por favor, insira um email válido.');
+      return;
+    }
+    if (!authPhone || authPhone.replace(/\D/g, '').length < 8) {
+      setAuthError('Por favor, insira um telefone válido.');
+      return;
+    }
+    setOtpSending(true);
+    setAuthError(null);
+    setOtpSuccess(null);
+    try {
+      const fullPhone = `${authDDI}${authPhone}`;
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY },
+        body: JSON.stringify({ email: authEmail, phone: fullPhone }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Erro ao enviar o código.');
+      setOtpSent(true);
+      setOtpSuccess(`Código enviado para ${authEmail}! Verifique sua caixa de entrada.`);
+      // Start 60s cooldown
+      setOtpCooldown(60);
+      const timer = setInterval(() => {
+        setOtpCooldown(prev => { if (prev <= 1) { clearInterval(timer); return 0; } return prev - 1; });
+      }, 1000);
+    } catch (err: any) {
+      setAuthError(err.message);
+    } finally {
+      setOtpSending(false);
+    }
+  };
+
   const handleLogin = async () => {
     setAuthLoading(true);
     setAuthError(null);
     try {
       if (authMode === 'register') {
-        if (!authName || !authPhone || !authState || !authCity || !authAddress) {
-          throw new Error('Por favor, preencha todos os campos do perfil.');
-        }
+        if (!authName) { setAuthError('Por favor, informe seu nome.'); setAuthLoading(false); return; }
+        if (!otpSent || !otpCode) { setAuthError('Envie e confirme o código de verificação antes de continuar.'); setAuthLoading(false); return; }
+
+        // Validate OTP first
+        const verifyRes = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-otp`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY },
+          body: JSON.stringify({ email: authEmail, action: 'verify', code: otpCode }),
+        });
+        const verifyData = await verifyRes.json();
+        if (!verifyData.valid) throw new Error(verifyData.error || 'Código inválido ou expirado.');
 
         const { error, data } = await supabase.auth.signUp({ 
           email: authEmail, 
@@ -1949,7 +2001,7 @@ export default function App() {
           const ownerPayload: OwnerProfile = {
             uid: data.user.id,
             name: authName,
-            phone: authPhone,
+            phone: `${authDDI}${authPhone}`,
             state: authState,
             city: authCity,
             address: authAddress,
@@ -2876,102 +2928,146 @@ export default function App() {
 
                 <div className="w-full space-y-4 pt-4">
                   <div className="space-y-3 w-full">
+                    {/* ── REGISTER FORM ─────────────────────────── */}
                     {authMode === 'register' && (
-                      <div className="space-y-3 pt-2 pb-4 border-b border-gray-100 mb-4">
-                        <p className="text-sm font-bold text-gray-800 text-center px-1">Seus Dados</p>
-                        <Input
-                          label="Nome Completo"
+                      <div className="space-y-3">
+                        {/* Back + Title */}
+                        <div className="flex items-center gap-3 mb-4">
+                          <button
+                            onClick={() => { setAuthMode('login'); setAuthError(null); setOtpSent(false); setOtpCode(''); setOtpSuccess(null); setOtpCooldown(0); }}
+                            className="p-2 bg-gray-100 rounded-full hover:bg-gray-200 transition-colors"
+                          >
+                            <ChevronLeft className="w-5 h-5 text-gray-600" />
+                          </button>
+                          <h2 className="text-2xl font-black text-gray-900">Cadastrar-se</h2>
+                        </div>
+
+                        {/* Name */}
+                        <input
+                          type="text"
                           value={authName}
-                          onChange={setAuthName}
-                          placeholder="Seu nome"
-                          icon={UserIcon}
+                          onChange={e => setAuthName(e.target.value)}
+                          placeholder="Nome"
+                          className="w-full clay-input outline-none px-4 py-4 text-base"
                         />
-                        <Input
-                          label="Telefone (WhatsApp)"
-                          placeholder="(00) 00000-0000"
-                          value={authPhone}
-                          onChange={(v) => setAuthPhone(formatPhoneMask(v))}
-                          icon={Phone}
+
+                        {/* Email */}
+                        <input
+                          type="email"
+                          value={authEmail}
+                          onChange={e => { setAuthEmail(e.target.value); setOtpSent(false); setOtpCode(''); setOtpSuccess(null); }}
+                          placeholder="Email"
+                          className="w-full clay-input outline-none px-4 py-4 text-base"
                         />
-                        <CityStatePicker
-                          label="Estado / Cidade"
-                          state={authState}
-                          city={authCity}
-                          onStateChange={setAuthState}
-                          onCityChange={setAuthCity}
+
+                        {/* WhatsApp Phone */}
+                        <PhoneInputWithDDI
+                          ddi={authDDI}
+                          phone={authPhone}
+                          onDDIChange={setAuthDDI}
+                          onPhoneChange={(v) => setAuthPhone(formatPhoneMask(v))}
                         />
-                        <Input
-                          label="Endereço"
-                          value={authAddress}
-                          onChange={setAuthAddress}
-                          placeholder="Rua, Número, Bairro"
-                          icon={MapPin}
+
+                        {/* OTP row */}
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            maxLength={6}
+                            value={otpCode}
+                            onChange={e => setOtpCode(e.target.value.replace(/\D/g, ''))}
+                            placeholder="Código de 6 dígitos"
+                            className="flex-1 clay-input outline-none px-4 py-4 text-base tracking-widest"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleSendOtp}
+                            disabled={otpSending || otpCooldown > 0}
+                            className="px-4 py-4 text-sm font-black text-orange-500 hover:text-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                          >
+                            {otpSending ? <Loader2 className="w-4 h-4 animate-spin" /> : otpCooldown > 0 ? `${otpCooldown}s` : 'Enviar Código'}
+                          </button>
+                        </div>
+
+                        {otpSuccess && (
+                          <p className="text-sm text-green-600 font-medium px-1">✓ {otpSuccess}</p>
+                        )}
+
+                        {/* Password */}
+                        <input
+                          type="password"
+                          value={authPassword}
+                          onChange={e => setAuthPassword(e.target.value)}
+                          placeholder="Senha"
+                          className="w-full clay-input outline-none px-4 py-4 text-base"
                         />
-                      </div>
-                    )}
-                    {authMode === 'login' && (
-                      <p className="text-xl font-bold text-gray-800 text-center pb-1">Entrar no FocinhoApp</p>
-                    )}
-                    <Input
-                      type="email"
-                      value={authEmail}
-                      onChange={setAuthEmail}
-                      placeholder="seu@email.com"
-                    />
-                    <Input
-                      type="password"
-                      value={authPassword}
-                      onChange={setAuthPassword}
-                      placeholder="Senha"
-                    />
-                    {authError && (
-                      <p className="text-sm text-red-500 text-center px-1 font-medium">{authError}</p>
-                    )}
-                  </div>
-                  <Button onClick={handleLogin} className="w-full py-4 text-lg" loading={authLoading}>
-                    {authMode === 'login' ? 'Entrar' : 'Criar Conta'}
-                  </Button>
-                  {authMode === 'login' ? (
-                    <>
-                      <button
-                        onClick={async () => { 
-                          if (!authEmail) {
-                            setAuthError('Problema: Digite seu email para recuperar a senha.');
-                            return;
-                          }
-                          try {
-                            const { error } = await supabase.auth.resetPasswordForEmail(authEmail);
-                            if (error) throw error;
-                            alert('Email de recuperação enviado! Verifique sua caixa de entrada.');
-                          } catch (err: any) {
-                            setAuthError(err.message);
-                          }
-                        }}
-                        className="w-full text-sm text-gray-500 hover:text-orange-500 transition-colors py-1 font-medium"
-                      >
-                        Esqueceu a senha?
-                      </button>
-                      <div className="pt-4 pb-2 mt-2 w-full">
-                        <Button
-                          onClick={() => { setAuthMode('register'); setAuthError(null); }}
-                          variant="outline"
-                          className="w-full py-4 text-lg border-2 text-gray-800 font-bold"
-                        >
-                          Criar uma nova conta
+
+                        {authError && (
+                          <p className="text-sm text-red-500 text-center px-1 font-medium">{authError}</p>
+                        )}
+
+                        <Button onClick={handleLogin} className="w-full py-4 text-lg" loading={authLoading}>
+                          Cadastrar-se
                         </Button>
+
+                        <p className="text-xs text-gray-400 text-center px-4 leading-relaxed">
+                          Ao se cadastrar, você concorda com os{' '}
+                          <span className="text-orange-500 font-semibold">Termos de Serviço</span>{' '}e a{' '}
+                          <span className="text-orange-500 font-semibold">Política de Privacidade</span>
+                        </p>
                       </div>
-                    </>
-                  ) : (
-                    <button
-                      onClick={() => { setAuthMode('login'); setAuthError(null); }}
-                      className="w-full text-sm text-gray-500 hover:text-orange-500 transition-colors py-1 font-medium"
-                    >
-                      Já tem conta? Fazer login
-                    </button>
-                  )}
-                  <div className="flex items-center justify-center gap-2 text-sm text-gray-400">
-                    <ShieldCheck className="w-4 h-4" />
-                    <span>Seguro e gratuito para usuários</span>
+                    )}
+
+                    {/* ── LOGIN FORM ─────────────────────────── */}
+                    {authMode === 'login' && (
+                      <div className="space-y-3">
+                        <p className="text-xl font-black text-gray-900 text-center pb-1">Entrar no FocinhoApp</p>
+                        <Input
+                          type="email"
+                          value={authEmail}
+                          onChange={setAuthEmail}
+                          placeholder="seu@email.com"
+                        />
+                        <Input
+                          type="password"
+                          value={authPassword}
+                          onChange={setAuthPassword}
+                          placeholder="Senha"
+                        />
+                        {authError && (
+                          <p className="text-sm text-red-500 text-center px-1 font-medium">{authError}</p>
+                        )}
+                        <Button onClick={handleLogin} className="w-full py-4 text-lg" loading={authLoading}>
+                          Entrar
+                        </Button>
+                        <button
+                          onClick={async () => {
+                            if (!authEmail) { setAuthError('Digite seu email para recuperar a senha.'); return; }
+                            try {
+                              const { error } = await supabase.auth.resetPasswordForEmail(authEmail);
+                              if (error) throw error;
+                              alert('Email de recuperação enviado! Verifique sua caixa de entrada.');
+                            } catch (err: any) { setAuthError(err.message); }
+                          }}
+                          className="w-full text-sm text-gray-500 hover:text-orange-500 transition-colors py-1 font-medium"
+                        >
+                          Esqueceu a senha?
+                        </button>
+                        <div className="pt-4 pb-2 mt-2 w-full">
+                          <Button
+                            onClick={() => { setAuthMode('register'); setAuthError(null); setOtpCode(''); setOtpSent(false); setOtpSuccess(null); setOtpCooldown(0); }}
+                            variant="outline"
+                            className="w-full py-4 text-lg border-2 text-gray-800 font-bold"
+                          >
+                            Criar uma nova conta
+                          </Button>
+                        </div>
+                        <div className="flex items-center justify-center gap-2 text-sm text-gray-400">
+                          <ShieldCheck className="w-4 h-4" />
+                          <span>Seguro e gratuito para usuários</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
