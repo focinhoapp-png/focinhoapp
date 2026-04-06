@@ -51,7 +51,8 @@ import {
   Smartphone,
   MoreVertical,
   Clock,
-  DollarSign
+  DollarSign,
+  Star
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap } from 'react-leaflet';
@@ -64,6 +65,8 @@ import QRScanner from './components/QRScanner';
 import { ImageCropperModal } from './components/ImageCropperModal';
 import { PhoneInputWithDDI } from './components/PhoneInputWithDDI';
 import { BannerCarousel } from './components/BannerCarousel';
+import { EventCarousel } from './components/EventCarousel';
+import { MyEventsCarousel } from './components/MyEventsCarousel';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 
@@ -211,6 +214,15 @@ interface PetEvent {
   event_date?: string;
   location?: string;
   created_at: any;
+}
+
+export interface PromoEvent {
+  id: string;
+  title?: string;
+  image_url: string;
+  link_url: string;
+  expires_at: string;
+  created_at?: any;
 }
 
 interface Walk {
@@ -752,6 +764,11 @@ export default function App() {
   const [petEvents, setPetEvents] = useState<PetEvent[]>([]);
   const [eventForm, setEventForm] = useState<Partial<PetEvent>>({ id: '', title: '', description: '', imageUrl: '', event_date: '', location: '' });
   const [eventMessage, setEventMessage] = useState<string | null>(null);
+
+  // Promo Events State (Admin)
+  const [promoEvents, setPromoEvents] = useState<PromoEvent[]>([]);
+  const [promoEventForm, setPromoEventForm] = useState<Partial<PromoEvent>>({ id: '', title: '', image_url: '', link_url: '', expires_at: '' });
+  const [promoMessage, setPromoMessage] = useState<string | null>(null);
 
   // Tag editing state (admin)
   const [editingTag, setEditingTag] = useState<{ id: string; newId: string } | null>(null);
@@ -1312,6 +1329,19 @@ export default function App() {
     fetchEvents();
     const channel = supabase.channel('events-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, fetchEvents)
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, []);
+
+  // Fetch Promo Events
+  useEffect(() => {
+    const fetchPromoEvents = async () => {
+      const { data } = await supabase.from('promo_events').select('*').order('created_at', { ascending: false });
+      setPromoEvents((data || []) as PromoEvent[]);
+    };
+    fetchPromoEvents();
+    const channel = supabase.channel('promo-events-admin')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'promo_events' }, fetchPromoEvents)
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, []);
@@ -3288,6 +3318,58 @@ export default function App() {
                         </div>
                       </div>
                     </div>
+
+                    {/* Novo Slider de Eventos com Auto-scroll */}
+                    <EventCarousel />
+
+                    {/* App Features Grid */}
+                    <div className="grid grid-cols-4 gap-3 mt-6 pb-2 px-1">
+                      <div 
+                        onClick={() => { setView('account'); setAccountSubView('adoption'); }}
+                        className="bg-white py-3 px-1 rounded-[1.5rem] border border-gray-100 flex flex-col items-center text-center gap-2 cursor-pointer hover:border-orange-200 transition-all shadow-sm active:scale-95"
+                      >
+                        <div className="w-12 h-12 bg-orange-50 rounded-[1rem] flex items-center justify-center">
+                          <Heart className="w-6 h-6 text-orange-500" />
+                        </div>
+                        <span className="text-[10px] font-black text-gray-700 leading-tight tracking-tight">Adoção</span>
+                      </div>
+                      
+                      <div 
+                        onClick={() => { setView('account'); setAccountSubView('partners'); }}
+                        className="bg-white py-3 px-1 rounded-[1.5rem] border border-gray-100 flex flex-col items-center text-center gap-2 cursor-pointer hover:border-emerald-200 transition-all shadow-sm active:scale-95"
+                      >
+                        <div className="w-12 h-12 bg-emerald-50 rounded-[1rem] flex items-center justify-center">
+                          <HeartHandshake className="w-6 h-6 text-emerald-500" />
+                        </div>
+                        <span className="text-[10px] font-black text-gray-700 leading-tight tracking-tight">Parceiros</span>
+                      </div>
+
+                      <div 
+                        onClick={() => setView('lost_pets')}
+                        className="bg-white py-3 px-1 rounded-[1.5rem] border border-gray-100 flex flex-col items-center text-center gap-2 cursor-pointer hover:border-red-200 transition-all shadow-sm active:scale-95 relative"
+                      >
+                        {hasNewUnreadSOS && (
+                          <div className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white z-10 animate-pulse" />
+                        )}
+                        <div className="w-12 h-12 bg-red-50 rounded-[1rem] flex items-center justify-center">
+                          <Megaphone className="w-6 h-6 text-red-500" />
+                        </div>
+                        <span className="text-[10px] font-black text-gray-700 leading-tight tracking-tight">Alerta SOS</span>
+                      </div>
+
+                      <div 
+                        onClick={() => { setView('account'); setAccountSubView('store'); }}
+                        className="bg-white py-3 px-1 rounded-[1.5rem] border border-gray-100 flex flex-col items-center text-center gap-2 cursor-pointer hover:border-indigo-200 transition-all shadow-sm active:scale-95"
+                      >
+                        <div className="w-12 h-12 bg-indigo-50 rounded-[1rem] flex items-center justify-center">
+                          <ShoppingBag className="w-6 h-6 text-indigo-500" />
+                        </div>
+                        <span className="text-[10px] font-black text-gray-700 leading-tight tracking-tight">Lojinha</span>
+                      </div>
+                    </div>
+                    
+                    {/* Eventos Destacados pelo Admin */}
+                    <MyEventsCarousel />
                   </div>
                 )}
                 <div className="h-20" /> {/* Spacer */}
@@ -6394,6 +6476,162 @@ export default function App() {
                               </div>
                             ))}
                             {petEvents.length === 0 && <p className="text-center text-xs text-gray-400 font-medium py-4">Nenhum evento cadastrado.</p>}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Promo Events Management */}
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between mb-4">
+                          <h4 className="font-bold text-gray-800 flex items-center gap-2">
+                            <Star className="w-5 h-5 text-gray-400" /> Banners Destaque ({promoEvents.length})
+                          </h4>
+                        </div>
+                        <div className="bg-gray-50/50 border border-gray-100 rounded-[2rem] p-4">
+                          <form
+                            onSubmit={async (e) => {
+                              e.preventDefault();
+                              if (!promoEventForm.image_url || !promoEventForm.link_url || !promoEventForm.expires_at) return;
+                              try {
+                                const payload = {
+                                  title: promoEventForm.title || null,
+                                  image_url: promoEventForm.image_url,
+                                  link_url: promoEventForm.link_url,
+                                  expires_at: promoEventForm.expires_at
+                                };
+                                if (promoEventForm.id) {
+                                  await supabase.from('promo_events').update(payload).eq('id', promoEventForm.id);
+                                  setPromoMessage('Banner atualizado!');
+                                } else {
+                                  await supabase.from('promo_events').insert(payload);
+                                  setPromoMessage('Banner criado!');
+                                }
+                                setPromoEventForm({ id: '', title: '', image_url: '', link_url: '', expires_at: '' });
+                                setTimeout(() => setPromoMessage(null), 3000);
+                              } catch { setError('Erro ao salvar banner em destaque'); }
+                            }}
+                            className="flex flex-col gap-3 mb-6"
+                          >
+                            <Input
+                              placeholder="Título Interno (ex: Mega Feirão)"
+                              value={promoEventForm.title || ''}
+                              onChange={(v: string) => setPromoEventForm(prev => ({ ...prev, title: v }))}
+                            />
+                            
+                            <Input
+                              placeholder="Link de Redirecionamento (https://...)"
+                              value={promoEventForm.link_url || ''}
+                              onChange={(v: string) => setPromoEventForm(prev => ({ ...prev, link_url: v }))}
+                            />
+
+                            <div className="flex flex-col">
+                              <label className="text-xs text-gray-500 ml-2 mb-1 font-bold">Data/Hora de Expiração (Quando vai sair do formato DD/MM/AAAA HH:MM):</label>
+                              <div className="bg-white border rounded-2xl flex items-center px-4 relative overflow-hidden transition-all duration-300">
+                                <input
+                                  type="datetime-local"
+                                  className="w-full py-4 bg-transparent outline-none text-gray-800 font-medium placeholder-gray-400"
+                                  value={promoEventForm.expires_at || ''}
+                                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPromoEventForm(prev => ({ ...prev, expires_at: e.target.value }))}
+                                />
+                              </div>
+                            </div>
+
+                            {/* Image Upload */}
+                            <div className="flex flex-col gap-1.5">
+                              <label className="text-sm font-medium text-gray-600 ml-1">Imagem do Banner</label>
+                              <div className="flex gap-2">
+                                {promoEventForm.image_url && (
+                                  <div className="w-full h-32 rounded-xl overflow-hidden relative group shrink-0 border border-gray-200">
+                                    <img src={promoEventForm.image_url} className="w-full h-full object-cover" alt="Banner" />
+                                    <button
+                                      type="button"
+                                      onClick={() => setPromoEventForm(prev => ({ ...prev, image_url: '' }))}
+                                      className="absolute inset-0 bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                                    >
+                                      <X className="w-5 h-5" />
+                                    </button>
+                                  </div>
+                                )}
+                                {!promoEventForm.image_url && (
+                                  <label className="w-full h-24 bg-gray-50 rounded-xl flex flex-col items-center justify-center border-2 border-dashed border-gray-200 hover:border-orange-300 transition-all cursor-pointer shrink-0">
+                                    <input
+                                      type="file"
+                                      accept="image/*"
+                                      className="hidden"
+                                      onChange={async (e) => {
+                                        const file = e.target.files?.[0];
+                                        if (!file) return;
+                                        const reader = new FileReader();
+                                        reader.onload = (ev) => setPromoEventForm(prev => ({ ...prev, image_url: ev.target?.result as string }));
+                                        reader.readAsDataURL(file);
+                                      }}
+                                    />
+                                    <Camera className="w-5 h-5 text-gray-300" />
+                                    <span className="text-[10px] text-gray-400 font-bold uppercase mt-1">Carregar Banner Destaque</span>
+                                  </label>
+                                )}
+                              </div>
+                            </div>
+
+                            {promoMessage && (
+                              <div className="bg-green-50 text-green-600 p-3 rounded-xl text-center text-sm font-bold border border-green-200 mt-1">
+                                {promoMessage}
+                              </div>
+                            )}
+
+                            <div className="flex gap-2 mt-1">
+                              <Button type="submit" className="w-full bg-indigo-500 hover:bg-indigo-600 shadow-indigo-100">
+                                {promoEventForm.id ? 'Salvar Alterações' : 'Criar Banner Destaque'}
+                              </Button>
+                              {promoEventForm.id && (
+                                <button
+                                  type="button"
+                                  onClick={() => setPromoEventForm({ id: '', title: '', image_url: '', link_url: '', expires_at: '' })}
+                                  className="px-6 rounded-2xl border-2 border-gray-100 text-gray-500 font-bold hover:bg-gray-50"
+                                >
+                                  Cancelar
+                                </button>
+                              )}
+                            </div>
+                          </form>
+
+                          <div className="flex flex-col gap-3">
+                            {promoEvents.map(ev => (
+                              <div key={ev.id} className="bg-white p-4 rounded-3xl border border-gray-200 flex justify-between items-center shadow-sm gap-3">
+                                {ev.image_url ? (
+                                  <img src={ev.image_url} className="w-14 h-14 rounded-2xl object-cover border border-gray-100 shrink-0" alt={ev.title} />
+                                ) : (
+                                  <div className="w-14 h-14 rounded-2xl bg-indigo-50 border border-gray-100 flex items-center justify-center shrink-0">
+                                    <Star className="w-6 h-6 text-indigo-300" />
+                                  </div>
+                                )}
+                                <div className="min-w-0 flex-1">
+                                  <h5 className="font-bold text-gray-900 truncate text-sm">{ev.title || 'Sem título'}</h5>
+                                  <p className="text-[10px] text-gray-500 font-bold truncate">
+                                    Expira em: {new Date(ev.expires_at).toLocaleString()}
+                                  </p>
+                                </div>
+                                <div className="flex gap-2 shrink-0">
+                                  <button
+                                    onClick={() => setPromoEventForm({ id: ev.id, title: ev.title || '', image_url: ev.image_url || '', link_url: ev.link_url || '', expires_at: new Date(ev.expires_at).toISOString().slice(0,16) })}
+                                    className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-100 transition-colors"
+                                  >
+                                    <Edit2 className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={async () => {
+                                      if (!window.confirm('Excluir este banner?')) return;
+                                      await supabase.from('promo_events').delete().eq('id', ev.id);
+                                      setPromoEvents(prev => prev.filter(e => e.id !== ev.id));
+                                    }}
+                                    className="p-2.5 bg-red-50 text-red-500 rounded-xl hover:bg-red-100 transition-colors"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                            {promoEvents.length === 0 && <p className="text-center text-xs text-gray-400 font-medium py-4">Nenhum banner ativo.</p>}
                           </div>
                         </div>
                       </div>
