@@ -2764,8 +2764,8 @@ export default function App() {
   return (
     <ErrorBoundary>
       <div className={`min-h-screen ${!user && view === 'home' ? 'bg-white' : 'bg-gray-50'} font-sans text-gray-900 pb-32 md:pb-0`}>
-        {/* Header */}
-        {user && view !== 'install_pwa' && (
+        {/* Main App Header */}
+        {user && view !== 'install_pwa' && view !== 'finder' && (
           <header className="bg-white border-b border-gray-100 px-6 py-4 sticky top-0 z-50 flex justify-between items-center">
             <div className="flex items-center gap-2 cursor-pointer" onClick={() => {
               setView('dashboard');
@@ -2797,6 +2797,35 @@ export default function App() {
                 <LogOut className="w-6 h-6" />
               </button>
             </div>
+          </header>
+        )}
+
+        {/* Finder App Header (Public & Logged) */}
+        {view === 'finder' && (
+          <header className="bg-[#f9fafb] border-b border-gray-100 px-6 py-4 sticky top-0 z-50 flex items-center justify-between relative shadow-sm">
+            {user ? (
+              <button 
+                onClick={() => {
+                  setView('dashboard');
+                  if (window.location.search) {
+                    window.history.replaceState({}, '', window.location.pathname);
+                  }
+                }}
+                className="w-10 h-10 bg-orange-50 text-orange-600 rounded-xl flex items-center justify-center hover:bg-orange-100 transition-colors"
+                title="Voltar ao início"
+              >
+                <ChevronLeft className="w-6 h-6 -ml-1" />
+              </button>
+            ) : (
+              <div className="w-10 h-10" />
+            )}
+            
+            <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2">
+              <img src="./pwa-512x512.png" alt="FocinhoApp Logo" className="w-9 h-9 object-cover rounded-xl" />
+              <span translate="no" className="text-xl font-bold tracking-tight text-orange-500">FocinhoApp</span>
+            </div>
+
+            <div className="w-10 h-10" />
           </header>
         )}
 
