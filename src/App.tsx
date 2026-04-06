@@ -2775,17 +2775,16 @@ export default function App() {
             }}>
               <img src="./pwa-512x512.png" alt="FocinhoApp Logo" className="w-10 h-10 object-cover rounded-xl" />
               <div className="hidden sm:block">
-                <span translate="no" className="text-xl font-bold tracking-tight">FocinhoApp</span>
+                <span translate="no" className="text-xl font-bold tracking-tight text-orange-500">FocinhoApp</span>
               </div>
             </div>
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setShowCityPicker(true)}
-                className="flex items-center gap-1.5 px-3 py-2 bg-orange-50 border border-orange-100 text-orange-600 rounded-xl hover:bg-orange-100 transition-colors text-xs font-bold shadow-sm"
+                className="w-10 h-10 bg-orange-50 border border-orange-100 rounded-xl flex items-center justify-center text-orange-600 hover:bg-orange-100 transition-colors shrink-0"
                 title="Mudar localização global"
               >
-                <MapPin className="w-4 h-4 shrink-0" />
-                <span className="max-w-[70px] sm:max-w-[100px] truncate">{selectedCity ? selectedCity.split(' - ')[0] : 'Todas'}</span>
+                <MapPin className="w-5 h-5" />
               </button>
               <button
                 onClick={() => setShowScanner(true)}
