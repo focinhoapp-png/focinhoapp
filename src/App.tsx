@@ -4081,9 +4081,9 @@ export default function App() {
                   </div>
 
                   <div className="space-y-2 relative z-10">
-                    <h3 className="text-2xl font-black uppercase tracking-tight">Pet Desaparecido?</h3>
+                    <h3 className="text-2xl font-black uppercase tracking-tight">Seu amigo está desaparecido?</h3>
                     <p className="text-white/90 text-sm font-medium leading-relaxed">
-                      Não perca tempo. Gere um alerta SOS agora para notificar todos os usuários em sua região.
+                      Crie um alerta e deixe a comunidade do FocinhoApp te ajudar a trazer seu amigo de volta.
                     </p>
                   </div>
 
@@ -4114,11 +4114,6 @@ export default function App() {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between ml-1">
                     <h3 className="font-bold text-gray-800">Alertas na Região</h3>
-                    {selectedCity && !isAdmin && (
-                      <span className="text-xs text-orange-500 font-bold bg-orange-50 px-3 py-1 rounded-full border border-orange-200">
-                        📍 {selectedCity.split(' - ')[0]}
-                      </span>
-                    )}
                   </div>
                   {(() => {
                     const filteredAlerts = lostAlerts.filter(alert => {
