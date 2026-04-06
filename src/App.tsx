@@ -4599,21 +4599,7 @@ export default function App() {
                       <ChevronRight className="text-gray-300" />
                     </button>
 
-                    {isAdmin && (
-                      <button
-                        onClick={() => setAccountSubView('admin')}
-                        className="bg-white p-6 rounded-[2rem] shadow-sm border-2 border-orange-200 flex items-center gap-4 hover:border-orange-400 transition-all text-left bg-gradient-to-r from-orange-50/50 to-transparent"
-                      >
-                        <div className="w-12 h-12 bg-orange-100 rounded-2xl flex items-center justify-center">
-                          <ShieldCheck className="w-6 h-6 text-orange-600" />
-                        </div>
-                        <div className="flex-1">
-                          <h4 className="font-bold text-gray-800">Painel Admin</h4>
-                          <p className="text-xs text-orange-500 font-bold">Gestão, tags e pets</p>
-                        </div>
-                        <ChevronRight className="text-gray-300" />
-                      </button>
-                    )}
+
                     <div className="h-20" /> {/* Spacer to avoid bottom nav overlap */}
                   </div>
                 )}
