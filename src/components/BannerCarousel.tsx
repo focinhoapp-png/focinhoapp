@@ -67,7 +67,7 @@ export function BannerCarousel() {
   if (loading || banners.length === 0) return null;
 
   return (
-    <div className="w-full mt-4 mb-4">
+    <div className="w-full mb-4">
       <div 
         ref={scrollRef}
         className="flex gap-4 overflow-x-auto snap-x snap-mandatory no-scrollbar"

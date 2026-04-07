@@ -3270,6 +3270,52 @@ export default function App() {
                 {userPets.length > 0 && (
                   <div className="mb-2">
                     
+                    {/* App Features Grid */}
+                    <div className="grid grid-cols-4 gap-3 mb-6 pb-2 px-1">
+                      <div 
+                        onClick={() => { setView('account'); setAccountSubView('adoption'); }}
+                        className="bg-white py-3 px-1 rounded-[1.5rem] border border-gray-100 flex flex-col items-center text-center gap-2 cursor-pointer hover:border-orange-200 transition-all shadow-sm active:scale-95"
+                      >
+                        <div className="w-12 h-12 bg-orange-50 rounded-[1rem] flex items-center justify-center">
+                          <Heart className="w-6 h-6 text-orange-500" />
+                        </div>
+                        <span className="text-[10px] font-black text-gray-700 leading-tight tracking-tight">Adoção</span>
+                      </div>
+                      
+                      <div 
+                        onClick={() => { setView('account'); setAccountSubView('partners'); }}
+                        className="bg-white py-3 px-1 rounded-[1.5rem] border border-gray-100 flex flex-col items-center text-center gap-2 cursor-pointer hover:border-emerald-200 transition-all shadow-sm active:scale-95"
+                      >
+                        <div className="w-12 h-12 bg-emerald-50 rounded-[1rem] flex items-center justify-center">
+                          <HeartHandshake className="w-6 h-6 text-emerald-500" />
+                        </div>
+                        <span className="text-[10px] font-black text-gray-700 leading-tight tracking-tight">Parceiros</span>
+                      </div>
+
+                      <div 
+                        onClick={() => setView('lost_pets')}
+                        className="bg-white py-3 px-1 rounded-[1.5rem] border border-gray-100 flex flex-col items-center text-center gap-2 cursor-pointer hover:border-red-200 transition-all shadow-sm active:scale-95 relative"
+                      >
+                        {hasNewUnreadSOS && (
+                          <div className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white z-10 animate-pulse" />
+                        )}
+                        <div className="w-12 h-12 bg-red-50 rounded-[1rem] flex items-center justify-center">
+                          <Megaphone className="w-6 h-6 text-red-500" />
+                        </div>
+                        <span className="text-[10px] font-black text-gray-700 leading-tight tracking-tight">Alerta SOS</span>
+                      </div>
+
+                      <div 
+                        onClick={() => { setView('account'); setAccountSubView('store'); }}
+                        className="bg-white py-3 px-1 rounded-[1.5rem] border border-gray-100 flex flex-col items-center text-center gap-2 cursor-pointer hover:border-indigo-200 transition-all shadow-sm active:scale-95"
+                      >
+                        <div className="w-12 h-12 bg-indigo-50 rounded-[1rem] flex items-center justify-center">
+                          <ShoppingBag className="w-6 h-6 text-indigo-500" />
+                        </div>
+                        <span className="text-[10px] font-black text-gray-700 leading-tight tracking-tight">Lojinha</span>
+                      </div>
+                    </div>
+
                     {/* Banners Carousel */}
                     <BannerCarousel />
 
@@ -3321,52 +3367,6 @@ export default function App() {
 
                     {/* Novo Slider de Eventos com Auto-scroll */}
                     <EventCarousel />
-
-                    {/* App Features Grid */}
-                    <div className="grid grid-cols-4 gap-3 mt-6 pb-2 px-1">
-                      <div 
-                        onClick={() => { setView('account'); setAccountSubView('adoption'); }}
-                        className="bg-white py-3 px-1 rounded-[1.5rem] border border-gray-100 flex flex-col items-center text-center gap-2 cursor-pointer hover:border-orange-200 transition-all shadow-sm active:scale-95"
-                      >
-                        <div className="w-12 h-12 bg-orange-50 rounded-[1rem] flex items-center justify-center">
-                          <Heart className="w-6 h-6 text-orange-500" />
-                        </div>
-                        <span className="text-[10px] font-black text-gray-700 leading-tight tracking-tight">Adoção</span>
-                      </div>
-                      
-                      <div 
-                        onClick={() => { setView('account'); setAccountSubView('partners'); }}
-                        className="bg-white py-3 px-1 rounded-[1.5rem] border border-gray-100 flex flex-col items-center text-center gap-2 cursor-pointer hover:border-emerald-200 transition-all shadow-sm active:scale-95"
-                      >
-                        <div className="w-12 h-12 bg-emerald-50 rounded-[1rem] flex items-center justify-center">
-                          <HeartHandshake className="w-6 h-6 text-emerald-500" />
-                        </div>
-                        <span className="text-[10px] font-black text-gray-700 leading-tight tracking-tight">Parceiros</span>
-                      </div>
-
-                      <div 
-                        onClick={() => setView('lost_pets')}
-                        className="bg-white py-3 px-1 rounded-[1.5rem] border border-gray-100 flex flex-col items-center text-center gap-2 cursor-pointer hover:border-red-200 transition-all shadow-sm active:scale-95 relative"
-                      >
-                        {hasNewUnreadSOS && (
-                          <div className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white z-10 animate-pulse" />
-                        )}
-                        <div className="w-12 h-12 bg-red-50 rounded-[1rem] flex items-center justify-center">
-                          <Megaphone className="w-6 h-6 text-red-500" />
-                        </div>
-                        <span className="text-[10px] font-black text-gray-700 leading-tight tracking-tight">Alerta SOS</span>
-                      </div>
-
-                      <div 
-                        onClick={() => { setView('account'); setAccountSubView('store'); }}
-                        className="bg-white py-3 px-1 rounded-[1.5rem] border border-gray-100 flex flex-col items-center text-center gap-2 cursor-pointer hover:border-indigo-200 transition-all shadow-sm active:scale-95"
-                      >
-                        <div className="w-12 h-12 bg-indigo-50 rounded-[1rem] flex items-center justify-center">
-                          <ShoppingBag className="w-6 h-6 text-indigo-500" />
-                        </div>
-                        <span className="text-[10px] font-black text-gray-700 leading-tight tracking-tight">Lojinha</span>
-                      </div>
-                    </div>
                     
                     {/* Eventos Destacados pelo Admin */}
                     <MyEventsCarousel />
