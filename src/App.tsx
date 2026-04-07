@@ -1589,6 +1589,26 @@ export default function App() {
               }));
             }
           }
+
+          // Buscar foto do pet direto da tabela pets quando petPhoto estiver vazio
+          const alertsSemFoto = allAlerts.filter(a => !a.petPhoto && a.petId);
+          if (alertsSemFoto.length > 0) {
+            const petIds = alertsSemFoto.map(a => a.petId).filter(Boolean);
+            const { data: petsData } = await supabase
+              .from('pets')
+              .select('id, photoUrl')
+              .in('id', petIds);
+            if (petsData && petsData.length > 0) {
+              const petsMap = petsData.reduce((acc: any, pet: any) => {
+                acc[pet.id] = pet;
+                return acc;
+              }, {});
+              allAlerts = allAlerts.map(a => ({
+                ...a,
+                petPhoto: a.petPhoto || petsMap[a.petId]?.photoUrl || '',
+              }));
+            }
+          }
         }
 
         // City-level filter: compare only the city portion from both sides
