@@ -52,7 +52,8 @@ import {
   MoreVertical,
   Clock,
   DollarSign,
-  Star
+  Star,
+  AtSign
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap } from 'react-leaflet';
@@ -135,6 +136,7 @@ interface PetProfile {
 interface OwnerProfile {
   uid: string;
   name?: string;
+  username?: string;
   photoUrl?: string;
   gender?: string;
   birthday?: string;
@@ -182,6 +184,7 @@ interface AdoptionPet {
   createdAt: any;
   ownerId?: string;
   ownerName?: string;
+  ownerUsername?: string;
   ownerPhotoUrl?: string;
 }
 
@@ -192,6 +195,7 @@ interface LostAlert {
   petName: string;
   petPhoto: string;
   ownerName?: string;
+  ownerUsername?: string;
   ownerPhotoUrl?: string;
   city: string;
   lastSeen: string;
@@ -728,7 +732,7 @@ function SOSAlertCard({ alert, user, onEdit, onFound, onShare }: {
             </div>
           </div>
           <div>
-            <p className="font-bold text-sm text-gray-900 leading-tight">{alert.ownerName || 'Tutor do Pet'}</p>
+            <p className="font-bold text-sm text-gray-900 leading-tight">{alert.ownerUsername ? `@${alert.ownerUsername}` : (alert.ownerName || 'Tutor do Pet')}</p>
             <p className="text-[10px] text-gray-500 font-bold leading-tight mt-0.5">
                Procura por: <span className="text-red-500 font-black">{alert.petName}</span>
             </p>
@@ -1445,7 +1449,7 @@ export default function App() {
       const ownerIds = [...new Set(adoptionData.map(p => p.ownerId).filter(Boolean))];
       
       if (ownerIds.length > 0) {
-        const { data: ownersData } = await supabase.from('owners').select('uid, name, photoUrl').in('uid', ownerIds);
+        const { data: ownersData } = await supabase.from('owners').select('uid, name, username, photoUrl').in('uid', ownerIds);
         if (ownersData) {
           const ownersMap = ownersData.reduce((acc: any, owner: any) => {
             acc[owner.uid] = owner;
@@ -1455,6 +1459,7 @@ export default function App() {
           adoptionData.forEach(pet => {
             if (pet.ownerId && ownersMap[pet.ownerId]) {
               pet.ownerName = ownersMap[pet.ownerId].name;
+              pet.ownerUsername = ownersMap[pet.ownerId].username;
               pet.ownerPhotoUrl = ownersMap[pet.ownerId].photoUrl;
             }
           });
@@ -1568,7 +1573,7 @@ export default function App() {
           if (ownerIds.length > 0) {
             const { data: ownersData } = await supabase
               .from('owners')
-              .select('uid, name, photoUrl')
+              .select('uid, name, username, photoUrl')
               .in('uid', ownerIds);
             if (ownersData && ownersData.length > 0) {
               const ownersMap = ownersData.reduce((acc: any, owner: any) => {
@@ -1579,6 +1584,7 @@ export default function App() {
               allAlerts = allAlerts.map(a => ({
                 ...a,
                 ownerName: ownersMap[a.ownerId]?.name || undefined,
+                ownerUsername: ownersMap[a.ownerId]?.username || undefined,
                 ownerPhotoUrl: ownersMap[a.ownerId]?.photoUrl || undefined,
               }));
             }
@@ -2708,6 +2714,12 @@ export default function App() {
     setLoading(true);
     setSuccessMessage(null);
     try {
+      if (ownerProfile.username && !/^[a-z0-9_.]+$/.test(ownerProfile.username)) {
+        setError('O nome de usuário (ex: ruan_silva) deve conter apenas letras minúsculas, números, ponto (.) ou underline (_). Sem espaços.');
+        setLoading(false);
+        return;
+      }
+
       // Always write all 4 privacy settings explicitly so the DB never has partial data
       const fullPrivacySettings = {
         showPhone:        ownerProfile.privacySettings?.showPhone        ?? true,
@@ -2715,13 +2727,20 @@ export default function App() {
         showObservations: ownerProfile.privacySettings?.showObservations ?? true,
         showAgeAndWeight: ownerProfile.privacySettings?.showAgeAndWeight ?? true,
       };
+      
       const { error } = await supabase.from('owners').upsert({
         ...ownerProfile,
         privacySettings: fullPrivacySettings,
         uid: user.id,
         updatedAt: new Date().toISOString()
       });
-      if (error) throw error;
+      
+      if (error) {
+        if (error.code === '23505') { // Postgres unique constraint violation
+          throw new Error('Eita! Este nome de usuário já está sendo usado por outra pessoa. Tente um diferente.');
+        }
+        throw error;
+      }
       setOwnerProfile(prev => prev ? { ...prev, privacySettings: fullPrivacySettings } : prev);
       
       if (ownerProfile.city && ownerProfile.state) {
@@ -5006,6 +5025,13 @@ export default function App() {
                           onChange={(v: string) => setOwnerProfile(prev => ({ ...prev, name: v } as any))}
                           icon={UserIcon}
                         />
+                        <Input
+                          label="Nome de Usuário (@)"
+                          placeholder="ex: seunome123"
+                          value={ownerProfile?.username || ''}
+                          onChange={(v: string) => setOwnerProfile(prev => ({ ...prev, username: v.toLowerCase().replace(/[^a-z0-9_.]/g, '') } as any))}
+                          icon={AtSign}
+                        />
                         <Select
                           label="Sexo"
                           value={ownerProfile?.gender || ''}
@@ -5603,7 +5629,7 @@ export default function App() {
                                     </div>
                                     <div>
                                       <h4 className="font-bold text-gray-900 text-sm flex items-center gap-1">
-                                        {pet.ownerName || 'Tutor do Pet'}
+                                        {pet.ownerUsername ? `@${pet.ownerUsername}` : (pet.ownerName || 'Tutor do Pet')}
                                         <CheckCircle2 className="w-4 h-4 text-pink-500" />
                                       </h4>
                                       <p className="text-[10px] text-gray-500 font-bold">{pet.city || 'Desconhecido'}</p>
