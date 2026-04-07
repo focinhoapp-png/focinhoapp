@@ -82,7 +82,7 @@ export function EventCarousel() {
   if (loading || events.length === 0) return null;
 
   return (
-    <div className="mt-8 -mx-4 sm:mx-0">
+    <div className="-mx-4 sm:mx-0">
       <h2 className="font-semibold text-[22px] leading-[28px] mx-4 sm:mx-0 text-gray-800">
         Eventos
       </h2>

@@ -3519,10 +3519,10 @@ export default function App() {
 
                 {/* ── Quick Actions ─────────────────────────────── */}
                 {userPets.length > 0 && (
-                  <div className="mb-2">
+                  <div className="mb-2 flex flex-col gap-5">
                     
                     {/* App Features Grid */}
-                    <div className="grid grid-cols-4 gap-3 mb-6 pb-2 px-1">
+                    <div className="grid grid-cols-4 gap-3 px-1">
                       <div 
                         onClick={() => { setView('account'); setAccountSubView('adoption'); }}
                         className="bg-white py-3 px-1 rounded-[1.5rem] border border-gray-100 flex flex-col items-center text-center gap-2 cursor-pointer hover:border-orange-200 transition-all shadow-sm active:scale-95"
@@ -3574,7 +3574,7 @@ export default function App() {
                     <MyEventsCarousel />
 
                     {/* Timeline Feed (Alerts + Adoptions) */}
-                    <div className="mt-8 space-y-6">
+                    <div className="space-y-6">
                       
                       {(() => {
                         // Merge and sort alerts and available adoptions

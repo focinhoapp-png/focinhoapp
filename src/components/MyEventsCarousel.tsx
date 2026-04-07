@@ -69,7 +69,7 @@ export function MyEventsCarousel() {
   if (loading || events.length === 0) return null;
 
   return (
-    <div className="w-full mt-2 mb-6">
+    <div className="w-full">
       <div 
         ref={scrollRef}
         className="flex gap-4 overflow-x-auto snap-x snap-mandatory no-scrollbar"
