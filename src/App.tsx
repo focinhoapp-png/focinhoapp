@@ -692,6 +692,126 @@ function CityStatePicker({ state, city, onStateChange, onCityChange, label = 'Lo
   );
 }
 
+// --- SOS Alert Card (Instagram-style) ---
+
+function SOSAlertCard({ alert, user, onEdit, onFound, onShare }: {
+  key?: string;
+  alert: LostAlert;
+  user: any;
+  onEdit: () => void;
+  onFound: () => void | Promise<void>;
+  onShare: () => void | Promise<void>;
+}) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  return (
+    <div className="bg-white border border-gray-100 rounded-[2rem] overflow-hidden shadow-sm">
+      {/* ── Header ── */}
+      <div className="flex items-center justify-between px-4 py-3">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-red-400 shrink-0">
+            {alert.petPhoto ? (
+              <img src={alert.petPhoto} alt={alert.petName} className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full bg-red-50 flex items-center justify-center">
+                <Dog className="w-5 h-5 text-red-400" />
+              </div>
+            )}
+          </div>
+          <div>
+            <p className="font-black text-sm text-gray-900 leading-tight">{alert.petName}</p>
+            <p className="text-xs text-gray-400 font-medium flex items-center gap-1 leading-tight">
+              <MapPin className="w-3 h-3" />{alert.city || 'Localização não informada'}
+            </p>
+          </div>
+        </div>
+
+        {/* 3-dot menu — only for owner */}
+        {user && alert.ownerId === user.id && (
+          <div className="relative">
+            <button
+              onClick={() => setMenuOpen(v => !v)}
+              className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+            >
+              <MoreVertical className="w-5 h-5 text-gray-500" />
+            </button>
+            {menuOpen && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
+                <div className="absolute right-0 top-10 bg-white border border-gray-100 rounded-2xl shadow-xl z-20 overflow-hidden min-w-[160px]">
+                  <button
+                    onClick={() => { setMenuOpen(false); onEdit(); }}
+                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-sm font-bold text-gray-700"
+                  >
+                    <Edit2 className="w-4 h-4 text-orange-500" /> Editar
+                  </button>
+                  <button
+                    onClick={() => { setMenuOpen(false); onFound(); }}
+                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-green-50 transition-colors text-sm font-bold text-green-600 border-t border-gray-50"
+                  >
+                    <ShieldCheck className="w-4 h-4" /> Encontrado!
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ── Full-width photo ── */}
+      <div className="w-full aspect-square bg-gray-100 relative">
+        <img src={alert.petPhoto} alt={alert.petName} className="w-full h-full object-cover" />
+        <div className="absolute top-3 left-3 bg-red-600 text-white text-[10px] font-black px-3 py-1.5 rounded-full uppercase shadow-lg animate-pulse flex items-center gap-1">
+          <span className="w-1.5 h-1.5 bg-white rounded-full inline-block" />
+          Desaparecido
+        </div>
+      </div>
+
+      {/* ── Action buttons ── */}
+      <div className="flex items-center gap-4 px-4 pt-3 pb-1">
+        <button
+          onClick={onFound}
+          className="flex items-center gap-1.5 text-green-600 font-bold text-sm hover:text-green-700 transition-colors"
+        >
+          <CheckCircle2 className="w-6 h-6" />
+          Encontrado
+        </button>
+        <button
+          onClick={onShare}
+          className="flex items-center gap-1.5 text-gray-500 font-bold text-sm hover:text-gray-700 transition-colors"
+        >
+          <Share2 className="w-5 h-5" />
+          Compartilhar
+        </button>
+        <button
+          onClick={() => {
+            const phone = (alert.contactPhone || '').replace(/\D/g, '');
+            if (!phone) { window.alert('Este alerta não possui telefone de contato.'); return; }
+            window.open(`https://wa.me/55${phone}?text=${encodeURIComponent(`Olá! Queria falar sobre o alerta do animal perdido: ${alert.petName}`)}`, '_blank');
+          }}
+          className="ml-auto flex items-center gap-1.5 text-gray-500 font-bold text-sm hover:text-gray-700 transition-colors"
+        >
+          <MessageCircle className="w-5 h-5" />
+          Contato
+        </button>
+      </div>
+
+      {/* ── Caption ── */}
+      <div className="px-4 pb-4 pt-1 space-y-1">
+        <p className="text-sm text-gray-800 font-medium leading-snug">
+          <span className="font-black text-gray-900">{alert.petName}</span>{' '}
+          Visto por último em: <span className="text-gray-600">{alert.lastSeen}</span>
+        </p>
+        {alert.reward && (
+          <p className="text-xs text-orange-500 font-bold">🏆 Recompensa: {alert.reward}</p>
+        )}
+        <p className="text-[11px] text-gray-400 font-medium pt-1">
+          {new Date(alert.createdAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 // --- Main App ---
 
 export default function App() {
@@ -4231,104 +4351,39 @@ export default function App() {
                       const cityName = selectedCity.split(' - ')[0].trim().toLowerCase();
                       return alert.city.toLowerCase().includes(cityName);
                     });
-                    
+
                     return filteredAlerts.length > 0 ? (
-                      <div className="grid grid-cols-1 gap-6">
+                      <div className="grid grid-cols-1 gap-4">
                         {filteredAlerts.map((alert) => (
-                          <div key={alert.id} className="bg-red-50 p-6 rounded-[2.5rem] border-2 border-red-500 space-y-4 shadow-xl shadow-red-100 relative overflow-hidden">
-                            <div className="aspect-video bg-white rounded-3xl overflow-hidden relative border-2 border-red-200">
-                              <img src={alert.petPhoto} alt={alert.petName} className="w-full h-full object-cover" />
-                              <div className="absolute top-4 right-4 bg-red-600 text-white text-[10px] font-black px-3 py-1.5 rounded-full uppercase shadow-lg animate-pulse">
-                                Desaparecido
-                              </div>
-                            </div>
-                            <div className="px-2 space-y-3">
-                              <div className="flex justify-between items-start">
-                                <div>
-                                  <h4 className="font-black text-2xl text-red-700">{alert.petName}</h4>
-                                  <p className="text-sm text-red-500 font-bold flex items-center gap-1">
-                                    <MapPin className="w-4 h-4" /> {alert.city}
-                                  </p>
-                                </div>
-                                <div className="bg-red-100 text-red-600 px-3 py-1 rounded-full text-[10px] font-black uppercase">
-                                  SOS
-                                </div>
-                              </div>
-
-                              <div className="bg-white/50 p-4 rounded-2xl border border-red-100">
-                                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">Visto por último em:</p>
-                                <p className="text-sm text-gray-700 font-medium">{alert.lastSeen}</p>
-                                <div className="flex items-center gap-2 mt-3 pt-3 border-t border-red-100/50">
-                                  <Clock className="w-4 h-4 text-red-400" />
-                                  <span className="text-[11px] text-red-500 font-bold tracking-wide uppercase">
-                                    Gerado em: {new Date(alert.createdAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
-                                  </span>
-                                </div>
-                                </div>
-
-                              <div className="flex flex-col gap-2">
-                                <div className="flex gap-2">
-                                  <button
-                                    onClick={() => {
-                                      const phone = (alert.contactPhone || '').replace(/\D/g, '');
-                                      if (!phone) { alert('Este alerta não possui telefone de contato.'); return; }
-                                      window.open(`https://wa.me/55${phone}?text=${encodeURIComponent(`Olá! Queria falar sobre o alerta do animal perdido: ${alert.petName}`)}`, '_blank');
-                                    }}
-                                    className="flex-1 py-5 bg-red-600 text-white text-lg font-black rounded-2xl hover:bg-red-700 transition-all shadow-xl shadow-red-200 flex items-center justify-center gap-3 active:scale-95"
-                                  >
-                                    <MessageCircle className="w-6 h-6" /> ENTRAR EM CONTATO
-                                  </button>
-                                  <button
-                                    onClick={async () => {
-                                      if (navigator.share) {
-                                        try {
-                                          await navigator.share({
-                                            title: `Alerta SOS: ${alert.petName}`,
-                                            text: `Alerta SOS: ${alert.petName} desapareceu${alert.city ? ` em ${alert.city}` : ''}. Ajude a encontrar!`,
-                                            url: window.location.href,
-                                          });
-                                        } catch (err) {
-                                          console.log('Error sharing:', err);
-                                        }
-                                      } else {
-                                        alert('O compartilhamento não é suportado neste dispositivo.');
-                                      }
-                                    }}
-                                    className="py-5 px-6 bg-red-50 text-red-600 rounded-2xl hover:bg-red-100 transition-all shadow-xl flex items-center justify-center active:scale-95 border-2 border-red-200"
-                                    title="Compartilhar"
-                                  >
-                                    <Share2 className="w-6 h-6" />
-                                  </button>
-                                </div>
-
-                                {user && alert.ownerId === user.id && (
-                                  <div className="grid grid-cols-2 gap-2 mt-2">
-                                    <button
-                                      onClick={() => {
-                                        setEditingSOSId(alert.id);
-                                        setNewSOS({
-                                          petId: alert.petId,
-                                          city: alert.city,
-                                          lastSeen: alert.lastSeen,
-                                          reward: alert.reward
-                                        });
-                                        setIsAddingSOS(true);
-                                      }}
-                                      className="py-3 bg-white border-2 border-orange-500 text-orange-500 rounded-xl font-bold text-sm hover:bg-orange-50 transition-all flex items-center justify-center gap-2"
-                                    >
-                                      <Plus className="w-4 h-4" /> Editar
-                                    </button>
-                                    <button
-                                      onClick={() => handleDeleteSOS(alert.id)}
-                                      className="py-3 bg-white border-2 border-green-600 text-green-600 rounded-xl font-bold text-sm hover:bg-green-50 transition-all flex items-center justify-center gap-2"
-                                    >
-                                      <ShieldCheck className="w-4 h-4" /> Encontrado
-                                    </button>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
+                          <SOSAlertCard
+                            key={alert.id}
+                            alert={alert}
+                            user={user}
+                            onEdit={() => {
+                              setEditingSOSId(alert.id);
+                              setNewSOS({
+                                petId: alert.petId,
+                                city: alert.city,
+                                lastSeen: alert.lastSeen,
+                                reward: alert.reward
+                              });
+                              setIsAddingSOS(true);
+                            }}
+                            onFound={() => handleDeleteSOS(alert.id)}
+                            onShare={async () => {
+                              if (navigator.share) {
+                                try {
+                                  await navigator.share({
+                                    title: `Alerta SOS: ${alert.petName}`,
+                                    text: `Alerta SOS: ${alert.petName} desapareceu${alert.city ? ` em ${alert.city}` : ''}. Ajude a encontrar!`,
+                                    url: window.location.href,
+                                  });
+                                } catch (err) { console.log('Error sharing:', err); }
+                              } else {
+                                window.alert('O compartilhamento não é suportado neste dispositivo.');
+                              }
+                            }}
+                          />
                         ))}
                       </div>
                     ) : (
