@@ -3544,16 +3544,13 @@ export default function App() {
                       </div>
 
                       <div 
-                        onClick={() => setView('lost_pets')}
-                        className="bg-white py-3 px-1 rounded-[1.5rem] border border-gray-100 flex flex-col items-center text-center gap-2 cursor-pointer hover:border-red-200 transition-all shadow-sm active:scale-95 relative"
+                        onClick={() => { setView('account'); setAccountSubView('events'); }}
+                        className="bg-white py-3 px-1 rounded-[1.5rem] border border-gray-100 flex flex-col items-center text-center gap-2 cursor-pointer hover:border-blue-200 transition-all shadow-sm active:scale-95 relative"
                       >
-                        {hasNewUnreadSOS && (
-                          <div className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white z-10 animate-pulse" />
-                        )}
-                        <div className="w-12 h-12 bg-red-50 rounded-[1rem] flex items-center justify-center">
-                          <Megaphone className="w-6 h-6 text-red-500" />
+                        <div className="w-12 h-12 bg-blue-50 rounded-[1rem] flex items-center justify-center">
+                          <Calendar className="w-6 h-6 text-blue-500" />
                         </div>
-                        <span className="text-[10px] font-black text-gray-700 leading-tight tracking-tight">Alerta SOS</span>
+                        <span className="text-[10px] font-black text-gray-700 leading-tight tracking-tight">Eventos</span>
                       </div>
 
                       <div 
@@ -3570,52 +3567,6 @@ export default function App() {
                     {/* Banners Carousel */}
                     <BannerCarousel />
 
-                    <div className="grid grid-cols-2 gap-4">
-                      {/* Aniversário */}
-                      {(() => {
-                        const currentPet = userPets[currentPetIndex];
-                        const birthdayInfo = currentPet ? getDaysUntilBirthday(currentPet.birthday) : null;
-                        return (
-                          <div
-                            onClick={() => {
-                              if (currentPet) {
-                                setSelectedPet(currentPet);
-                                setView('pet_birthday');
-                              }
-                            }}
-                            className="bg-white p-5 rounded-[2.5rem] border border-gray-100 flex flex-col items-center text-center gap-2 cursor-pointer hover:border-purple-200 transition-all shadow-sm h-40 justify-center"
-                          >
-                            <div className="w-12 h-12 bg-purple-50 rounded-2xl flex items-center justify-center shadow-sm">
-                              <Cake className="w-6 h-6 text-purple-500" />
-                            </div>
-                            <div>
-                              <h4 className="font-black text-sm text-gray-800">Aniversário</h4>
-                              <p className="text-[10px] text-gray-400 font-medium">
-                                {birthdayInfo ? `${birthdayInfo.days} dia(s) restante(s)` : 'Sem data definida'}
-                              </p>
-                            </div>
-                          </div>
-                        );
-                      })()}
-
-                      {/* Eventos */}
-                      <div
-                        onClick={() => {
-                          setView('account');
-                          setAccountSubView('events');
-                        }}
-                        className="bg-white p-5 rounded-[2.5rem] border border-gray-100 flex flex-col items-center text-center gap-2 cursor-pointer hover:border-blue-200 transition-all shadow-sm h-40 justify-center"
-                      >
-                        <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center shadow-sm">
-                          <Calendar className="w-6 h-6 text-blue-500" />
-                        </div>
-                        <div>
-                          <h4 className="font-black text-sm text-gray-800">Eventos</h4>
-                          <p className="text-[10px] text-gray-400 font-medium">Na sua região</p>
-                        </div>
-                      </div>
-                    </div>
-
                     {/* Novo Slider de Eventos com Auto-scroll */}
                     <EventCarousel />
                     
@@ -3624,12 +3575,6 @@ export default function App() {
 
                     {/* Timeline Feed (Alerts + Adoptions) */}
                     <div className="mt-8 space-y-6">
-                      <div className="flex items-center gap-2 mb-4 px-2">
-                         <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center">
-                           <Clock className="w-4 h-4 text-orange-500" />
-                         </div>
-                         <h3 className="text-xl font-black text-gray-800">No FocinhoApp</h3>
-                      </div>
                       
                       {(() => {
                         // Merge and sort alerts and available adoptions
@@ -3939,6 +3884,36 @@ export default function App() {
                     <Plus className="w-6 h-6" />
                   </button>
                 </div>
+
+                {/* Quick Actions inside Lembretes */}
+                {(() => {
+                  const currentPet = selectedPet || userPets[currentPetIndex];
+                  const birthdayInfo = currentPet ? getDaysUntilBirthday(currentPet.birthday) : null;
+                  return (
+                    <div
+                      onClick={() => {
+                        if (currentPet) {
+                          setSelectedPet(currentPet);
+                          setView('pet_birthday');
+                        }
+                      }}
+                      className="bg-white p-5 rounded-[2.5rem] border border-gray-100 flex items-center justify-between cursor-pointer hover:border-purple-200 transition-all shadow-sm"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-purple-50 rounded-2xl flex items-center justify-center shadow-sm shrink-0">
+                          <Cake className="w-6 h-6 text-purple-500" />
+                        </div>
+                        <div>
+                          <h4 className="font-black text-sm text-gray-800">Aniversário</h4>
+                          <p className="text-[11px] text-gray-400 font-medium mt-0.5">
+                            {birthdayInfo ? `${birthdayInfo.days} dia(s) restante(s)` : 'Sem data definida'}
+                          </p>
+                        </div>
+                      </div>
+                      <ChevronRight className="w-5 h-5 text-gray-300" />
+                    </div>
+                  );
+                })()}
 
                 {/* Dynamic Calendar UI */}
                 <div className="bg-gradient-to-br from-orange-400 to-orange-500 p-6 rounded-[2.5rem] shadow-lg text-white border-4 border-white">
