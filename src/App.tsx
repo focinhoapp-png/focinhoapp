@@ -880,6 +880,7 @@ export default function App() {
   const [bannerMessage, setBannerMessage] = useState<string | null>(null);
 
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+  const [adoptionTab, setAdoptionTab] = useState<'available'|'adopted'>('available');
   const [ownerProfile, setOwnerProfile] = useState<OwnerProfile | null>(null);
   const [isFetchingOwnerProfile, setIsFetchingOwnerProfile] = useState(true);
   const [currentPetIndex, setCurrentPetIndex] = useState(0);
@@ -5555,19 +5556,36 @@ export default function App() {
                       </div>
 
                       <div className="space-y-8">
-                        {/* Available Pets */}
+                        {/* Tabs */}
+                        <div className="flex bg-gray-100 p-1.5 rounded-2xl mb-6">
+                          <button
+                            onClick={() => setAdoptionTab('available')}
+                            className={`flex-1 py-3 text-sm font-bold rounded-xl transition-all ${adoptionTab === 'available' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                          >
+                            Disponíveis
+                          </button>
+                          <button
+                            onClick={() => setAdoptionTab('adopted')}
+                            className={`flex-1 py-3 text-sm font-bold rounded-xl transition-all ${adoptionTab === 'adopted' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                          >
+                            Já Adotados ❤️
+                          </button>
+                        </div>
+
+                        {/* Pets Loop */}
                         <div className="space-y-4">
-                          <h4 className="font-black text-xs text-gray-400 uppercase tracking-widest ml-1">Pets Disponíveis</h4>
+                          <h4 className="font-black text-xs text-gray-400 uppercase tracking-widest ml-1">{adoptionTab === 'available' ? 'Pets Disponíveis' : 'Finais Felizes 🎉'}</h4>
                           <div className="grid grid-cols-1 gap-6">
                             {(() => {
                               const cityName = selectedCity && !isAdmin ? selectedCity.split(' - ')[0].trim().toLowerCase() : '';
                               const visiblePets = adoptionPets.filter(p => {
-                                if (p.status === 'adopted') return false;
+                                const isTargetTab = adoptionTab === 'adopted' ? p.status === 'adopted' : (p.status === 'available' || p.status === undefined);
+                                if (!isTargetTab) return false;
                                 if (!cityName) return true;
                                 return (p.location || '').toLowerCase().includes(cityName) || (p.city || '').toLowerCase().includes(cityName);
                               });
                               return visiblePets.length > 0 ? visiblePets.map((pet, i) => (
-                              <div key={i} className="bg-white border border-gray-100 rounded-[2rem] overflow-hidden shadow-sm mb-6">
+                              <div key={i} className={`bg-white border border-gray-100 rounded-[2rem] overflow-hidden shadow-sm mb-6 ${adoptionTab === 'adopted' ? 'opacity-80 grayscale-[0.2]' : ''}`}>
                                 {/* ── Header: Owner Info ── */}
                                 <div className="flex items-center justify-between px-4 py-3 border-b border-gray-50">
                                   <div className="flex items-center gap-3">
@@ -5609,10 +5627,10 @@ export default function App() {
                                           <Edit2 className="w-4 h-4" /> Editar
                                         </button>
                                         <button
-                                          onClick={() => handleUpdateAdoptionStatus(pet.id, 'adopted')}
+                                          onClick={() => handleUpdateAdoptionStatus(pet.id, adoptionTab === 'available' ? 'adopted' : 'available')}
                                           className="w-full px-4 py-2 text-left text-sm font-bold text-gray-700 hover:bg-gray-50 flex items-center gap-2"
                                         >
-                                          <CheckCircle2 className="w-4 h-4 text-green-500" /> Marcar Adotado
+                                          <CheckCircle2 className={`w-4 h-4 ${adoptionTab === 'available' ? 'text-green-500' : 'text-gray-400'}`} /> {adoptionTab === 'available' ? 'Marcar Adotado' : 'Voltar p/ Disponível'}
                                         </button>
                                         <button
                                           onClick={async () => {
@@ -5657,9 +5675,9 @@ export default function App() {
 
                                 {/* ── Action Buttons ── */}
                                 <div className="flex items-center gap-4 px-4 pt-3 pb-1">
-                                  <div className="flex items-center gap-1.5 text-green-600 font-bold text-sm">
+                                  <div className={`flex items-center gap-1.5 font-bold text-sm ${adoptionTab === 'available' ? 'text-green-600' : 'text-gray-500'}`}>
                                     <CheckCircle2 className="w-6 h-6" />
-                                    Disponível
+                                    {adoptionTab === 'available' ? 'Disponível' : 'Já Adotado'}
                                   </div>
                                   <button
                                     onClick={async () => {
@@ -5667,7 +5685,7 @@ export default function App() {
                                         try {
                                           await navigator.share({
                                             title: `Ação de Adoção: ${pet.name}`,
-                                            text: `Conheça ${pet.name}, um pet incrível disponível para adoção!`,
+                                            text: `Conheça ${pet.name}, um pet lindo que está na plataforma!`,
                                             url: window.location.href,
                                           });
                                         } catch (err) {
@@ -5682,17 +5700,19 @@ export default function App() {
                                     <Share2 className="w-5 h-5" />
                                     Compartilhar
                                   </button>
-                                  <button
-                                    onClick={() => {
-                                      const phone = (pet.contactPhone || '').replace(/\D/g, '');
-                                      if (!phone) { alert('Este pet não possui telefone de contato.'); return; }
-                                      window.open(`https://wa.me/55${phone}?text=${encodeURIComponent(`Olá! Queria falar sobre a adoção do ${pet.name}.`)}`, '_blank');
-                                    }}
-                                    className="ml-auto flex items-center gap-1.5 text-pink-600 font-bold text-sm hover:text-pink-700 transition-colors"
-                                  >
-                                    <MessageCircle className="w-5 h-5" />
-                                    Adotar
-                                  </button>
+                                  {adoptionTab === 'available' && (
+                                    <button
+                                      onClick={() => {
+                                        const phone = (pet.contactPhone || '').replace(/\D/g, '');
+                                        if (!phone) { alert('Este pet não possui telefone de contato.'); return; }
+                                        window.open(`https://wa.me/55${phone}?text=${encodeURIComponent(`Olá! Queria falar sobre a adoção do ${pet.name}.`)}`, '_blank');
+                                      }}
+                                      className="ml-auto flex items-center gap-1.5 text-pink-600 font-bold text-sm hover:text-pink-700 transition-colors"
+                                    >
+                                      <MessageCircle className="w-5 h-5" />
+                                      Adotar
+                                    </button>
+                                  )}
                                 </div>
 
                                 {/* ── Caption ── */}
@@ -5723,39 +5743,6 @@ export default function App() {
                             })()}
                           </div>
                         </div>
-
-                        {/* Adopted Pets */}
-                        {adoptionPets.filter(p => p.status === 'adopted').length > 0 && (
-                          <div className="space-y-4">
-                            <h4 className="font-black text-xs text-gray-400 uppercase tracking-widest ml-1">Já Adotados ❤️</h4>
-                            <div className="grid grid-cols-1 gap-6 opacity-75">
-                              {adoptionPets.filter(p => p.status === 'adopted').map((pet, i) => (
-                                <div key={i} className="bg-gray-50 p-6 rounded-[2.5rem] border border-gray-100 space-y-4 grayscale-[0.5]">
-                                  <div className="aspect-video bg-white rounded-3xl overflow-hidden relative">
-                                    <img src={pet.photoUrl || 'https://picsum.photos/seed/pet/800/600'} className="w-full h-full object-cover" />
-                                    <div className="absolute top-4 right-4 bg-gray-400 text-white text-[10px] font-black px-3 py-1.5 rounded-full uppercase shadow-lg">
-                                      Adotado
-                                    </div>
-                                  </div>
-                                  <div className="px-2 flex justify-between items-center">
-                                    <div>
-                                      <h4 className="font-black text-lg text-gray-600">{pet.name}</h4>
-                                      <p className="text-xs text-gray-400 font-bold">{pet.breed}</p>
-                                    </div>
-                                    {isAdmin && (
-                                      <button
-                                        onClick={() => handleUpdateAdoptionStatus(pet.id, 'available')}
-                                        className="py-2 px-4 bg-white border border-gray-200 text-gray-400 text-[10px] font-bold rounded-xl hover:bg-gray-50 transition-all"
-                                      >
-                                        Voltar para Disponível
-                                      </button>
-                                    )}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
                       </div>
                     </div>
 
