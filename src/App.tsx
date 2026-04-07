@@ -3621,6 +3621,149 @@ export default function App() {
                     
                     {/* Eventos Destacados pelo Admin */}
                     <MyEventsCarousel />
+
+                    {/* Timeline Feed (Alerts + Adoptions) */}
+                    <div className="mt-8 space-y-6">
+                      <div className="flex items-center gap-2 mb-4 px-2">
+                         <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center">
+                           <Clock className="w-4 h-4 text-orange-500" />
+                         </div>
+                         <h3 className="text-xl font-black text-gray-800">No FocinhoApp</h3>
+                      </div>
+                      
+                      {(() => {
+                        // Merge and sort alerts and available adoptions
+                        const timelineItems = [
+                          ...lostAlerts.map(a => ({ type: 'alert' as const, data: a, date: new Date(a.createdAt).getTime() })),
+                          ...adoptionPets.filter(p => (p.status === 'available' || p.status === undefined)).map(p => ({ type: 'adoption' as const, data: p, date: new Date(p.createdAt).getTime() }))
+                        ].sort((a, b) => b.date - a.date);
+
+                        if (timelineItems.length === 0) {
+                          return (
+                            <div className="text-center py-10 bg-white border border-gray-100 rounded-[2rem]">
+                               <p className="text-gray-400 font-medium text-sm">Nenhuma atualização recente na sua região.</p>
+                            </div>
+                          );
+                        }
+
+                        return timelineItems.map((item, idx) => {
+                          if (item.type === 'alert') {
+                            const alert = item.data;
+                            return (
+                               <div key={`alert-${alert.id}-${idx}`}>
+                                  <SOSAlertCard
+                                    alert={alert}
+                                    user={user}
+                                    onEdit={() => {}} /* feed uses read-only */
+                                    onFound={async () => {
+                                       if (window.confirm(`Você encontrou ${alert.petName}?`)) {
+                                          await supabase.from('lost_alerts').delete().eq('id', alert.id);
+                                          setLostAlerts(prev => prev.filter(a => a.id !== alert.id));
+                                       }
+                                    }}
+                                    onShare={async () => {
+                                       if (navigator.share) {
+                                          try {
+                                             await navigator.share({
+                                                title: `Alerta SOS: ${alert.petName}`,
+                                                text: `Ajude a encontrar ${alert.petName}!`,
+                                                url: window.location.href,
+                                             });
+                                          } catch {}
+                                       }
+                                    }}
+                                  />
+                               </div>
+                            )
+                          } else {
+                            const pet = item.data;
+                            return (
+                               <div key={`adopt-${pet.id}-${idx}`} className="bg-white border border-gray-100 rounded-[2rem] overflow-hidden shadow-sm">
+                                  {/* Header */}
+                                  <div className="flex items-center justify-between px-4 py-3">
+                                    <div className="flex items-center gap-3">
+                                      <div className="relative">
+                                        {pet.ownerPhotoUrl ? (
+                                          <img src={pet.ownerPhotoUrl} alt="Tutor" className="w-10 h-10 rounded-full object-cover border border-gray-100" />
+                                        ) : (
+                                          <div className="w-10 h-10 rounded-full bg-pink-50 flex items-center justify-center border border-pink-100">
+                                            <UserIcon className="w-5 h-5 text-pink-300" />
+                                          </div>
+                                        )}
+                                        <div className="absolute -bottom-1 -right-1 bg-gradient-to-r from-pink-500 to-rose-500 rounded-full p-1 border-2 border-white">
+                                          <Heart className="w-2.5 h-2.5 text-white" />
+                                        </div>
+                                      </div>
+                                      <div>
+                                        <p className="font-bold text-sm text-gray-900 leading-tight">{pet.ownerUsername ? `@${pet.ownerUsername}` : (pet.ownerName || 'Tutor do Pet')}</p>
+                                        <p className="text-[10px] text-gray-500 font-bold leading-tight mt-0.5">
+                                           Adoção em: <span className="text-pink-500 font-black">{pet.city || 'Desconhecido'}</span>
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* Photo */}
+                                  <div className="w-full aspect-square bg-gray-100 relative">
+                                    <img src={pet.photoUrl || 'https://picsum.photos/seed/pet/800/600'} alt={pet.name} className="w-full h-full object-cover" />
+                                    <div className="absolute top-3 left-3 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-[10px] font-black px-3 py-1.5 rounded-full uppercase shadow-lg flex items-center gap-1">
+                                      Para Adoção
+                                    </div>
+                                  </div>
+
+                                  {/* Buttons */}
+                                  <div className="flex items-center gap-4 px-4 pt-3 pb-1">
+                                     <div className="flex items-center gap-1.5 font-bold text-sm text-green-600">
+                                       <CheckCircle2 className="w-6 h-6" />
+                                       Disponível
+                                     </div>
+                                     <button
+                                       onClick={async () => {
+                                         if (navigator.share) {
+                                           try {
+                                              await navigator.share({
+                                                 title: `Ação de Adoção: ${pet.name}`,
+                                                 text: `Conheça ${pet.name}, para adoção!`,
+                                                 url: window.location.href,
+                                              });
+                                           } catch {}
+                                         }
+                                       }}
+                                       className="flex items-center gap-1.5 text-gray-500 font-bold text-sm hover:text-gray-700 transition-colors"
+                                     >
+                                       <Share2 className="w-5 h-5" />
+                                       Compartilhar
+                                     </button>
+                                     <button
+                                       onClick={() => {
+                                          const phone = (pet.contactPhone || '').replace(/\D/g, '');
+                                          if (!phone) { window.alert('Este pet não possui telefone de contato.'); return; }
+                                          window.open(`https://wa.me/55${phone}?text=${encodeURIComponent(`Olá! Queria falar sobre a adoção do ${pet.name}.`)}`, '_blank');
+                                       }}
+                                       className="ml-auto flex items-center gap-1.5 text-pink-600 font-bold text-sm hover:text-pink-700 transition-colors"
+                                     >
+                                       <MessageCircle className="w-5 h-5" />
+                                       Quero Adotar
+                                     </button>
+                                  </div>
+
+                                  {/* Caption */}
+                                  <div className="px-4 pb-4 pt-1 space-y-1">
+                                    <p className="text-sm text-gray-800 font-medium leading-snug">
+                                      <span className="font-black text-gray-900">{pet.name}</span>{' '}
+                                      <span className="text-gray-600 font-bold">({pet.breed} • {pet.gender})</span>{' '}
+                                      {pet.description}
+                                    </p>
+                                    <p className="text-[11px] text-gray-400 font-medium pt-1">
+                                      {pet.createdAt ? new Date(pet.createdAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : 'Recentemente'}
+                                    </p>
+                                  </div>
+                               </div>
+                            )
+                          }
+                        });
+                      })()}
+                    </div>
                   </div>
                 )}
                 <div className="h-20" /> {/* Spacer */}
@@ -3779,19 +3922,28 @@ export default function App() {
             {view === 'reminders' && (
               <motion.div key="reminders" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
                 <div className="flex justify-between items-center">
-                  <h2 className="text-2xl font-bold">Lembretes</h2>
+                  <div className="flex items-center gap-3">
+                    {selectedPet?.photoUrl && (
+                      <img 
+                        src={selectedPet.photoUrl} 
+                        alt={selectedPet.name} 
+                        className="w-12 h-12 rounded-full object-cover border-2 border-orange-500 shadow-sm"
+                      />
+                    )}
+                    <h2 className="text-2xl font-bold text-gray-800">Lembretes</h2>
+                  </div>
                   <button
                     onClick={() => setIsAddingReminder(true)}
-                    className="p-2 bg-orange-100 text-orange-600 rounded-xl hover:bg-orange-200 transition-colors"
+                    className="p-2 bg-orange-100 text-orange-600 rounded-xl hover:bg-orange-200 transition-colors shadow-sm"
                   >
-                    <Plus className="w-5 h-5" />
+                    <Plus className="w-6 h-6" />
                   </button>
                 </div>
 
                 {/* Dynamic Calendar UI */}
-                <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-gray-100">
+                <div className="bg-gradient-to-br from-orange-400 to-orange-500 p-6 rounded-[2.5rem] shadow-lg text-white border-4 border-white">
                   <div className="flex justify-between items-center mb-6 px-2">
-                    <h3 className="font-bold text-gray-800">
+                    <h3 className="font-bold text-lg capitalize">
                       {new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(new Date(calendarYear, calendarMonth))}
                     </h3>
                     <div className="flex gap-2">
@@ -3804,9 +3956,9 @@ export default function App() {
                             setCalendarMonth(prev => prev - 1);
                           }
                         }}
-                        className="p-1.5 bg-gray-50 rounded-lg"
+                        className="p-1.5 bg-white/20 hover:bg-white/30 rounded-lg transition-colors"
                       >
-                        <ChevronLeft className="w-4 h-4" />
+                        <ChevronLeft className="w-5 h-5 text-white" />
                       </button>
                       <button
                         onClick={() => {
@@ -3817,15 +3969,15 @@ export default function App() {
                             setCalendarMonth(prev => prev + 1);
                           }
                         }}
-                        className="p-1.5 bg-gray-50 rounded-lg"
+                        className="p-1.5 bg-white/20 hover:bg-white/30 rounded-lg transition-colors"
                       >
-                        <ChevronRight className="w-4 h-4" />
+                        <ChevronRight className="w-5 h-5 text-white" />
                       </button>
                     </div>
                   </div>
-                  <div className="grid grid-cols-7 gap-2 text-center mb-2">
+                  <div className="grid grid-cols-7 gap-2 text-center mb-3">
                     {['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map(d => (
-                      <span key={d} className="text-[10px] font-bold text-gray-400 uppercase">{d}</span>
+                      <span key={d} className="text-[11px] font-bold text-orange-100 uppercase">{d}</span>
                     ))}
                   </div>
                   <div className="grid grid-cols-7 gap-2">
@@ -3850,14 +4002,15 @@ export default function App() {
                           <div
                             key={day}
                             onClick={() => setSelectedDate(dateStr)}
-                            className={`aspect-square flex flex-col items-center justify-center text-xs font-bold relative cursor-pointer transition-all ${
-                              isSelected ? 'bg-orange-500 text-white shadow-lg shadow-orange-200 rounded-xl' :
-                              isToday ? 'bg-orange-50 text-orange-500 rounded-xl' : 'hover:bg-gray-50 text-gray-700 rounded-xl'
-                            } ${hasEvent && !isSelected ? 'border-2 border-orange-500 rounded-lg' : ''}`}
+                            className={`aspect-square flex flex-col items-center justify-center text-sm font-bold relative cursor-pointer transition-all ${
+                              isSelected ? 'bg-white text-orange-600 shadow-md rounded-xl transform scale-110' :
+                              hasEvent ? 'bg-white/90 text-orange-600 shadow-sm rounded-xl' :
+                              isToday ? 'bg-orange-300 text-white rounded-xl' : 'hover:bg-white/20 text-orange-50 rounded-xl'
+                            }`}
                           >
                             {day}
                             {hasEvent && !isSelected && (
-                              <div className="absolute bottom-1 w-1 h-1 bg-orange-500 rounded-full" />
+                              <div className="absolute bottom-1 w-1.5 h-1.5 bg-orange-400 rounded-full" />
                             )}
                           </div>
                         );
