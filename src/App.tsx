@@ -5567,7 +5567,7 @@ export default function App() {
                         </Button>
                       )}
                     </div>
-                    <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 space-y-6">
+                    <div className="space-y-5">
                       <div className="flex items-center gap-3">
                         <div className="w-12 h-12 bg-pink-50 rounded-2xl flex items-center justify-center">
                           <Heart className="w-6 h-6 text-pink-500" />
@@ -5611,7 +5611,7 @@ export default function App() {
                                 return (p.location || '').toLowerCase().includes(cityName) || (p.city || '').toLowerCase().includes(cityName);
                               });
                               return visiblePets.length > 0 ? visiblePets.map((pet, i) => (
-                              <div key={i} className={`bg-white border border-gray-100 rounded-[2rem] overflow-hidden shadow-sm mb-6 ${adoptionTab === 'adopted' ? 'opacity-80 grayscale-[0.2]' : ''}`}>
+                              <div key={i} className={`bg-white rounded-[2rem] overflow-hidden shadow-sm mb-6 ${adoptionTab === 'adopted' ? 'opacity-80 grayscale-[0.2]' : ''}`}>
                                 {/* ── Header: Owner Info ── */}
                                 <div className="flex items-center justify-between px-4 py-3 border-b border-gray-50">
                                   <div className="flex items-center gap-3">
