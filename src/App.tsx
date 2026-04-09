@@ -3048,32 +3048,27 @@ export default function App() {
       <div className={`min-h-screen ${!user && view === 'home' ? 'bg-white' : 'bg-gray-50'} font-sans text-gray-900 pb-32 md:pb-0`}>
         {/* Main App Header */}
         {user && view === 'dashboard' && (
-          <header className="bg-white border-b border-gray-100 px-6 py-4 sticky top-0 z-50 flex justify-between items-center">
-            <div className="flex items-center gap-2 cursor-pointer" onClick={() => {
-              setView('dashboard');
-              if (window.location.search) {
-                window.history.replaceState({}, '', window.location.pathname);
-              }
-            }}>
-              <img src="./pwa-512x512.png" alt="FocinhoApp Logo" className="w-10 h-10 object-cover rounded-xl" />
-              <div className="hidden sm:block">
-                <span translate="no" className="text-xl font-bold tracking-tight text-orange-500">FocinhoApp</span>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
+          <header className="bg-white border-b border-gray-100 px-4 py-4 sticky top-0 z-50 flex items-center justify-between relative">
+            {/* Left: QR Scanner */}
+            <button
+              onClick={() => setShowScanner(true)}
+              className="w-10 h-10 bg-gray-50 border border-gray-200 rounded-xl flex items-center justify-center text-gray-600 hover:bg-gray-100 transition-colors shrink-0"
+              title="Escanear QR Code ou Tag"
+            >
+              <QrCode className="w-5 h-5" />
+            </button>
+
+            {/* Center: name */}
+            <span translate="no" className="absolute left-1/2 -translate-x-1/2 text-xl font-bold tracking-tight text-orange-500">FocinhoApp</span>
+
+            {/* Right: Location + Logout */}
+            <div className="flex items-center gap-2">
               <button
                 onClick={() => setShowCityPicker(true)}
                 className="w-10 h-10 bg-orange-50 border border-orange-100 rounded-xl flex items-center justify-center text-orange-600 hover:bg-orange-100 transition-colors shrink-0"
                 title="Mudar localização global"
               >
                 <MapPin className="w-5 h-5" />
-              </button>
-              <button
-                onClick={() => setShowScanner(true)}
-                className="w-10 h-10 bg-gray-50 border border-gray-200 rounded-xl flex items-center justify-center text-gray-600 hover:bg-gray-100 transition-colors shrink-0"
-                title="Escanear QR Code ou Tag"
-              >
-                <QrCode className="w-5 h-5" />
               </button>
               <button onClick={handleLogout} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors shrink-0" title="Sair da conta">
                 <LogOut className="w-6 h-6" />
@@ -4919,6 +4914,40 @@ export default function App() {
               <motion.div key="account" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
                 <div className="flex items-center justify-between">
                   <h2 className="text-2xl font-bold">Sua Conta</h2>
+                  <div className="relative">
+                    <button
+                      onClick={() => setOpenMenuId(openMenuId === 'account-settings' ? null : 'account-settings')}
+                      className="w-10 h-10 bg-white border border-gray-200 rounded-xl flex items-center justify-center text-gray-500 hover:bg-gray-50 transition-colors shadow-sm"
+                      title="Configurações"
+                    >
+                      <Settings className="w-5 h-5" />
+                    </button>
+                    {openMenuId === 'account-settings' && (
+                      <>
+                        <div className="fixed inset-0 z-40" onClick={() => setOpenMenuId(null)} />
+                        <div className="absolute right-0 mt-2 w-52 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 z-50">
+                          <button
+                            onClick={() => { setOpenMenuId(null); setAccountSubView('support'); }}
+                            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 text-sm font-bold text-gray-700 transition-colors"
+                          >
+                            <HelpCircle className="w-4 h-4 text-green-500" /> Suporte
+                          </button>
+                          <button
+                            onClick={() => { setOpenMenuId(null); setAccountSubView('config'); }}
+                            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 text-sm font-bold text-gray-700 transition-colors border-t border-gray-50"
+                          >
+                            <Settings className="w-4 h-4 text-gray-500" /> Configurações
+                          </button>
+                          <button
+                            onClick={() => { setOpenMenuId(null); setAccountSubView('sobre'); }}
+                            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 text-sm font-bold text-gray-700 transition-colors border-t border-gray-50"
+                          >
+                            <Info className="w-4 h-4 text-orange-400" /> Sobre
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </div>
 
                 {accountSubView === 'menu' && (
@@ -4951,19 +4980,6 @@ export default function App() {
                       <ChevronRight className="text-gray-300" />
                     </button>
 
-                    <button
-                      onClick={() => setAccountSubView('support')}
-                      className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 flex items-center gap-4 hover:border-orange-200 transition-all text-left"
-                    >
-                      <div className="w-12 h-12 bg-green-50 rounded-2xl flex items-center justify-center">
-                        <HelpCircle className="w-6 h-6 text-green-500" />
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="font-bold text-gray-800">Suporte</h4>
-                        <p className="text-xs text-gray-400">Dúvidas e ajuda</p>
-                      </div>
-                      <ChevronRight className="text-gray-300" />
-                    </button>
 
                     <button
                       onClick={() => setAccountSubView('store')}
@@ -4981,7 +4997,7 @@ export default function App() {
 
                     <button
                       onClick={() => setAccountSubView('family')}
-                      className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 flex items-center gap-4 hover:border-orange-200 transition-all text-left mb-4"
+                      className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 flex items-center gap-4 hover:border-orange-200 transition-all text-left"
                     >
                       <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center">
                         <Users className="w-6 h-6 text-indigo-500" />
@@ -4995,7 +5011,7 @@ export default function App() {
 
                     <button
                       onClick={() => setAccountSubView('adoption')}
-                      className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 flex items-center gap-4 hover:border-orange-200 transition-all text-left mb-4"
+                      className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 flex items-center gap-4 hover:border-orange-200 transition-all text-left"
                     >
                       <div className="w-12 h-12 bg-pink-50 rounded-2xl flex items-center justify-center">
                         <Heart className="w-6 h-6 text-pink-500" />
@@ -5009,7 +5025,7 @@ export default function App() {
 
                     <button
                       onClick={() => setAccountSubView('events')}
-                      className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 flex items-center gap-4 hover:border-orange-200 transition-all text-left mb-4"
+                      className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 flex items-center gap-4 hover:border-orange-200 transition-all text-left"
                     >
                       <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center">
                         <Calendar className="w-6 h-6 text-blue-500" />
@@ -5023,7 +5039,7 @@ export default function App() {
 
                     <button
                       onClick={() => setAccountSubView('partners')}
-                      className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 flex items-center gap-4 hover:border-orange-200 transition-all text-left mb-4"
+                      className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 flex items-center gap-4 hover:border-orange-200 transition-all text-left"
                     >
                       <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center">
                         <Briefcase className="w-6 h-6 text-blue-500" />
@@ -5035,38 +5051,8 @@ export default function App() {
                       <ChevronRight className="text-gray-300" />
                     </button>
 
-
-
-                    <button
-                      onClick={() => setAccountSubView('config')}
-                      className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 flex items-center gap-4 hover:border-orange-200 transition-all text-left mb-4"
-                    >
-                      <div className="w-12 h-12 bg-gray-100 rounded-2xl flex items-center justify-center">
-                        <Settings className="w-6 h-6 text-gray-500" />
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="font-bold text-gray-800">Configuração</h4>
-                        <p className="text-xs text-gray-400">Privacidade global do pet</p>
-                      </div>
-                      <ChevronRight className="text-gray-300" />
-                    </button>
-
-                    <button
-                      onClick={() => setAccountSubView('sobre')}
-                      className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 flex items-center gap-4 hover:border-orange-200 transition-all text-left mb-4"
-                    >
-                      <div className="w-12 h-12 bg-orange-50 rounded-2xl flex items-center justify-center">
-                        <Info className="w-6 h-6 text-orange-400" />
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="font-bold text-gray-800">Sobre</h4>
-                        <p className="text-xs text-gray-400">Termos, privacidade e cache</p>
-                      </div>
-                      <ChevronRight className="text-gray-300" />
-                    </button>
-
-
                     <div className="h-20" /> {/* Spacer to avoid bottom nav overlap */}
+
                   </div>
                 )}
 
