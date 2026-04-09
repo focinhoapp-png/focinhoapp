@@ -732,7 +732,7 @@ function SOSAlertCard({ alert, user, onEdit, onFound, onShare }: {
             </div>
           </div>
           <div>
-            <p className="font-bold text-sm text-gray-900 leading-tight">{alert.ownerUsername ? `@${alert.ownerUsername}` : (alert.ownerName || 'Tutor do Pet')}</p>
+            <p className="font-bold text-sm text-gray-900 leading-tight">{alert.ownerUsername || alert.ownerName || 'Tutor do Pet'}</p>
             <p className="text-[10px] text-gray-500 font-bold leading-tight mt-0.5">
                Procura por: <span className="text-red-500 font-black">{alert.petName}</span>
             </p>
@@ -3642,7 +3642,7 @@ export default function App() {
                                         </div>
                                       </div>
                                       <div>
-                                        <p className="font-bold text-sm text-gray-900 leading-tight">{pet.ownerUsername ? `@${pet.ownerUsername}` : (pet.ownerName || 'Tutor do Pet')}</p>
+                                        <p className="font-bold text-sm text-gray-900 leading-tight">{pet.ownerUsername || pet.ownerName || 'Tutor do Pet'}</p>
                                         <p className="text-[10px] text-gray-500 font-bold leading-tight mt-0.5">
                                            Adoção em: <span className="text-pink-500 font-black">{pet.city || 'Desconhecido'}</span>
                                         </p>
@@ -3720,7 +3720,7 @@ export default function App() {
                                         </div>
                                       </div>
                                       <div>
-                                        <p className="font-bold text-sm text-gray-900 leading-tight">{(post.userName || 'Tutor').split('@')[0] || 'Tutor'}</p>
+                                        <p className="font-bold text-sm text-gray-900 leading-tight">{post.userName || 'Tutor'}</p>
                                         <p className="text-[10px] text-gray-500 font-bold leading-tight mt-0.5">
                                            {post.petName ? `Com ${post.petName}` : 'Passeador'}
                                         </p>
@@ -5939,10 +5939,12 @@ export default function App() {
                                     </div>
                                     <div>
                                       <h4 className="font-bold text-gray-900 text-sm flex items-center gap-1">
-                                        {pet.ownerUsername ? `@${pet.ownerUsername}` : (pet.ownerName || 'Tutor do Pet')}
+                                        {pet.ownerUsername || pet.ownerName || 'Tutor do Pet'}
                                         <CheckCircle2 className="w-4 h-4 text-pink-500" />
                                       </h4>
-                                      <p className="text-[10px] text-gray-500 font-bold">{pet.city || 'Desconhecido'}</p>
+                                      <p className="text-[10px] text-gray-500 font-bold">
+                                        {pet.city || 'Desconhecido'}
+                                      </p>
                                     </div>
                                   </div>
                                   {/* 3 dots menu for admin */}
