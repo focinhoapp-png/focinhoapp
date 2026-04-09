@@ -137,6 +137,7 @@ interface OwnerProfile {
   uid: string;
   name?: string;
   username?: string;
+  bio?: string;
   photoUrl?: string;
   gender?: string;
   birthday?: string;
@@ -732,9 +733,11 @@ function SOSAlertCard({ alert, user, onEdit, onFound, onShare }: {
             </div>
           </div>
           <div>
-            <p className="font-bold text-sm text-gray-900 leading-tight">{alert.ownerUsername || alert.ownerName || 'Tutor do Pet'}</p>
-            <p className="text-[10px] text-gray-500 font-bold leading-tight mt-0.5">
-               Procura por: <span className="text-red-500 font-black">{alert.petName}</span>
+            <p className="text-[14px] text-gray-900 leading-tight">
+              <span className="font-bold">{alert.ownerUsername || alert.ownerName || 'Tutor do Pet'}</span> procurando por <span className="font-bold">{alert.petName}</span>
+            </p>
+            <p className="text-[12px] text-gray-500 font-medium leading-tight mt-0.5">
+               {alert.city || 'Localização não informada'}
             </p>
           </div>
         </div>
@@ -3637,9 +3640,11 @@ export default function App() {
                                         </div>
                                       </div>
                                       <div>
-                                        <p className="font-bold text-sm text-gray-900 leading-tight">{pet.ownerUsername || pet.ownerName || 'Tutor do Pet'}</p>
-                                        <p className="text-[10px] text-gray-500 font-bold leading-tight mt-0.5">
-                                           Adoção em: <span className="text-pink-500 font-black">{pet.city || 'Desconhecido'}</span>
+                                        <p className="text-[14px] text-gray-900 leading-tight">
+                                          <span className="font-bold">{pet.ownerUsername || pet.ownerName || 'Tutor do Pet'}</span> busca um lar pra <span className="font-bold">{pet.name}</span>
+                                        </p>
+                                        <p className="text-[12px] text-gray-500 font-medium leading-tight mt-0.5">
+                                           {pet.city || 'Localização não informada'}
                                         </p>
                                       </div>
                                     </div>
@@ -3715,9 +3720,13 @@ export default function App() {
                                         </div>
                                       </div>
                                       <div>
-                                        <p className="font-bold text-sm text-gray-900 leading-tight">{post.userName || 'Tutor'}</p>
-                                        <p className="text-[10px] text-gray-500 font-bold leading-tight mt-0.5">
-                                           {post.petName ? `Com ${post.petName}` : 'Passeador'}
+                                        <p className="text-[14px] text-gray-900 leading-tight">
+                                          <span className="font-bold">{post.userName || 'Tutor'}</span>{' '}
+                                          {post.type === 'alert' ? 'procurando por ' : post.type === 'adoption' ? 'busca um lar pra ' : 'passeando com '}
+                                          <span className="font-bold">{post.petName || 'Pet'}</span>
+                                        </p>
+                                        <p className="text-[12px] text-gray-500 font-medium leading-tight mt-0.5">
+                                           {selectedCity || userCity || 'Perto de você'}
                                         </p>
                                       </div>
                                     </div>
@@ -4911,68 +4920,115 @@ export default function App() {
 
             {/* Conta (Account) */}
             {view === 'account' && user && (
-              <motion.div key="account" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-2xl font-bold">Sua Conta</h2>
-                  <div className="relative">
-                    <button
-                      onClick={() => setOpenMenuId(openMenuId === 'account-settings' ? null : 'account-settings')}
-                      className="w-10 h-10 bg-white border border-gray-200 rounded-xl flex items-center justify-center text-gray-500 hover:bg-gray-50 transition-colors shadow-sm"
-                      title="Configurações"
-                    >
-                      <Settings className="w-5 h-5" />
-                    </button>
-                    {openMenuId === 'account-settings' && (
-                      <>
-                        <div className="fixed inset-0 z-40" onClick={() => setOpenMenuId(null)} />
-                        <div className="absolute right-0 mt-2 w-52 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 z-50">
+              <motion.div key="account" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="pb-24">
+                
+                {accountSubView === 'menu' && (
+                  <div className="bg-white rounded-[2rem] shadow-sm border border-gray-100 flex flex-col overflow-hidden mb-6">
+                    {/* Facebook-style Profile Header */}
+                    <div className="relative">
+                      {/* Cover Photo */}
+                      <div className="h-32 bg-gradient-to-r from-orange-400 to-pink-500 w-full relative">
+                        {/* Settings Dropdown */}
+                        <div className="absolute top-4 right-4 z-20">
                           <button
-                            onClick={() => { setOpenMenuId(null); setAccountSubView('support'); }}
-                            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 text-sm font-bold text-gray-700 transition-colors"
+                            onClick={() => setOpenMenuId(openMenuId === 'account-settings' ? null : 'account-settings')}
+                            className="w-10 h-10 bg-black/20 backdrop-blur-md rounded-full flex items-center justify-center text-white hover:bg-black/30 transition-colors"
+                            title="Configurações"
                           >
-                            <HelpCircle className="w-4 h-4 text-green-500" /> Suporte
+                            <Settings className="w-5 h-5" />
                           </button>
-                          <button
-                            onClick={() => { setOpenMenuId(null); setAccountSubView('config'); }}
-                            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 text-sm font-bold text-gray-700 transition-colors border-t border-gray-50"
+                          {openMenuId === 'account-settings' && (
+                            <>
+                              <div className="fixed inset-0 z-40" onClick={() => setOpenMenuId(null)} />
+                              <div className="absolute right-0 mt-2 w-52 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 z-50">
+                                <button
+                                  onClick={() => { setOpenMenuId(null); setAccountSubView('support'); }}
+                                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 text-sm font-bold text-gray-700 transition-colors"
+                                >
+                                  <HelpCircle className="w-4 h-4 text-green-500" /> Suporte
+                                </button>
+                                <button
+                                  onClick={() => { setOpenMenuId(null); setAccountSubView('config'); }}
+                                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 text-sm font-bold text-gray-700 transition-colors border-t border-gray-50"
+                                >
+                                  <Settings className="w-4 h-4 text-gray-500" /> Configurações
+                                </button>
+                                <button
+                                  onClick={() => { setOpenMenuId(null); setAccountSubView('sobre'); }}
+                                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 text-sm font-bold text-gray-700 transition-colors border-t border-gray-50"
+                                >
+                                  <Info className="w-4 h-4 text-orange-400" /> Sobre
+                                </button>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <div className="px-4 pt-0 pb-6 border-b border-gray-100">
+                        {/* Profile Photo and Name/Stats row */}
+                        <div className="flex items-end gap-3 -mt-12 mb-3 relative z-10">
+                          <div className="w-[104px] h-[104px] rounded-full border-4 border-white bg-gray-100 overflow-hidden shrink-0 shadow-sm relative">
+                            {ownerProfile?.photoUrl ? (
+                              <img src={ownerProfile.photoUrl} alt="Perfil" className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center bg-gray-50">
+                                <UserIcon className="w-12 h-12 text-gray-300" />
+                              </div>
+                            )}
+                          </div>
+                          
+                          <div className="flex-1 pb-2">
+                            <h2 className="text-2xl font-bold text-gray-900 leading-tight">
+                              {ownerProfile?.name || user?.user_metadata?.full_name || 'Tutor do Pet'}
+                            </h2>
+                            <div className="text-[15px] font-semibold text-gray-800 mt-0.5">
+                              0 amigos <span className="font-normal text-gray-500 mx-1">•</span> 0 posts
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Bio */}
+                        <div className="text-[15px] text-gray-900 mb-2 px-1 whitespace-pre-wrap">
+                          {ownerProfile?.bio || (ownerProfile?.username ? `INSTAGRAM @${ownerProfile.username}` : 'Escreva algo sobre você...')}
+                        </div>
+                        
+                        {/* Location */}
+                        {ownerProfile?.city && (
+                          <div className="flex items-center gap-1.5 mb-4 px-1 text-[15px] font-semibold text-gray-900">
+                            <MapPin className="w-5 h-5 text-gray-900" style={{ fill: 'currentColor', stroke: 'white', strokeWidth: 1.5 }} />
+                            {ownerProfile.city}
+                          </div>
+                        )}
+
+                        {/* Buttons (Full Width) */}
+                        <div className="flex gap-2 px-1 mt-4">
+                          <button 
+                            className="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors active:scale-[0.98]"
                           >
-                            <Settings className="w-4 h-4 text-gray-500" /> Configurações
+                            <Plus className="w-5 h-5" /> Adicionar amigo
                           </button>
-                          <button
-                            onClick={() => { setOpenMenuId(null); setAccountSubView('sobre'); }}
-                            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 text-sm font-bold text-gray-700 transition-colors border-t border-gray-50"
+                          <button 
+                            onClick={() => setAccountSubView('profile')} 
+                            className="flex-1 bg-[#E4E6EB] hover:bg-[#D8DADF] text-gray-900 font-semibold py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors active:scale-[0.98]"
                           >
-                            <Info className="w-4 h-4 text-orange-400" /> Sobre
+                            <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+                              <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
+                            </svg>
+                            Editar perfil
                           </button>
                         </div>
-                      </>
-                    )}
-                  </div>
-                </div>
+                      </div>
+                    </div>
 
-                {accountSubView === 'menu' && (
-                  <div className="grid gap-4">
-                    <button
-                      onClick={() => setAccountSubView('profile')}
-                      className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 flex items-center gap-4 hover:border-orange-200 transition-all text-left"
-                    >
-                      <div className="w-12 h-12 bg-orange-50 rounded-2xl flex items-center justify-center">
-                        <UserIcon className="w-6 h-6 text-orange-500" />
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="font-bold text-gray-800">Meu Perfil</h4>
-                        <p className="text-xs text-gray-400">Suas informações pessoais</p>
-                      </div>
-                      <ChevronRight className="text-gray-300" />
-                    </button>
+                    {/* Menu List */}
+                    <div className="flex flex-col">
 
                     <button
                       onClick={() => setAccountSubView('pets')}
-                      className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 flex items-center gap-4 hover:border-orange-200 transition-all text-left"
+                      className="p-5 md:p-6 flex items-center gap-4 hover:bg-gray-50 transition-all text-left border-b border-gray-50 last:border-b-0 relative group"
                     >
-                      <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center">
-                        <Dog className="w-6 h-6 text-blue-500" />
-                      </div>
+                      <Dog className="w-6 h-6 text-gray-900 shrink-0 group-hover:scale-110 transition-transform" />
                       <div className="flex-1">
                         <h4 className="font-bold text-gray-800">Meus Pets</h4>
                         <p className="text-xs text-gray-400">Gerenciar todos os seus pets</p>
@@ -4980,14 +5036,11 @@ export default function App() {
                       <ChevronRight className="text-gray-300" />
                     </button>
 
-
                     <button
                       onClick={() => setAccountSubView('store')}
-                      className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 flex items-center gap-4 hover:border-orange-200 transition-all text-left"
+                      className="p-5 md:p-6 flex items-center gap-4 hover:bg-gray-50 transition-all text-left border-b border-gray-50 last:border-b-0 relative group"
                     >
-                      <div className="w-12 h-12 bg-purple-50 rounded-2xl flex items-center justify-center">
-                        <ShoppingBag className="w-6 h-6 text-purple-500" />
-                      </div>
+                      <ShoppingBag className="w-6 h-6 text-gray-900 shrink-0 group-hover:scale-110 transition-transform" />
                       <div className="flex-1">
                         <h4 className="font-bold text-gray-800">Loja</h4>
                         <p className="text-xs text-gray-400">Acessórios e novas tags</p>
@@ -4997,11 +5050,9 @@ export default function App() {
 
                     <button
                       onClick={() => setAccountSubView('family')}
-                      className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 flex items-center gap-4 hover:border-orange-200 transition-all text-left"
+                      className="p-5 md:p-6 flex items-center gap-4 hover:bg-gray-50 transition-all text-left border-b border-gray-50 last:border-b-0 relative group"
                     >
-                      <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center">
-                        <Users className="w-6 h-6 text-indigo-500" />
-                      </div>
+                      <Users className="w-6 h-6 text-gray-900 shrink-0 group-hover:scale-110 transition-transform" />
                       <div className="flex-1">
                         <h4 className="font-bold text-gray-800">Minha Família</h4>
                         <p className="text-xs text-gray-400">Gerenciar membros e convites</p>
@@ -5011,11 +5062,9 @@ export default function App() {
 
                     <button
                       onClick={() => setAccountSubView('adoption')}
-                      className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 flex items-center gap-4 hover:border-orange-200 transition-all text-left"
+                      className="p-5 md:p-6 flex items-center gap-4 hover:bg-gray-50 transition-all text-left border-b border-gray-50 last:border-b-0 relative group"
                     >
-                      <div className="w-12 h-12 bg-pink-50 rounded-2xl flex items-center justify-center">
-                        <Heart className="w-6 h-6 text-pink-500" />
-                      </div>
+                      <Heart className="w-6 h-6 text-gray-900 shrink-0 group-hover:scale-110 transition-transform" />
                       <div className="flex-1">
                         <h4 className="font-bold text-gray-800">Adoção</h4>
                         <p className="text-xs text-gray-400">Encontre um novo amigo</p>
@@ -5025,11 +5074,9 @@ export default function App() {
 
                     <button
                       onClick={() => setAccountSubView('events')}
-                      className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 flex items-center gap-4 hover:border-orange-200 transition-all text-left"
+                      className="p-5 md:p-6 flex items-center gap-4 hover:bg-gray-50 transition-all text-left border-b border-gray-50 last:border-b-0 relative group"
                     >
-                      <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center">
-                        <Calendar className="w-6 h-6 text-blue-500" />
-                      </div>
+                      <Calendar className="w-6 h-6 text-gray-900 shrink-0 group-hover:scale-110 transition-transform" />
                       <div className="flex-1">
                         <h4 className="font-bold text-gray-800">Eventos</h4>
                         <p className="text-xs text-gray-400">Encontros na comunidade</p>
@@ -5039,20 +5086,16 @@ export default function App() {
 
                     <button
                       onClick={() => setAccountSubView('partners')}
-                      className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 flex items-center gap-4 hover:border-orange-200 transition-all text-left"
+                      className="p-5 md:p-6 flex items-center gap-4 hover:bg-gray-50 transition-all text-left border-b border-gray-50 last:border-b-0 relative group"
                     >
-                      <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center">
-                        <Briefcase className="w-6 h-6 text-blue-500" />
-                      </div>
+                      <Briefcase className="w-6 h-6 text-gray-900 shrink-0 group-hover:scale-110 transition-transform" />
                       <div className="flex-1">
                         <h4 className="font-bold text-gray-800">Parceiros</h4>
                         <p className="text-xs text-gray-400">Apoiam a causa animal</p>
                       </div>
                       <ChevronRight className="text-gray-300" />
                     </button>
-
-                    <div className="h-20" /> {/* Spacer to avoid bottom nav overlap */}
-
+                    </div>
                   </div>
                 )}
 
@@ -5318,6 +5361,17 @@ export default function App() {
                           onChange={(v: string) => setOwnerProfile(prev => ({ ...prev, username: v.toLowerCase().replace(/[^a-z0-9_.]/g, '') } as any))}
                           icon={AtSign}
                         />
+                        <div className="w-full">
+                          <label className="block text-sm font-bold text-gray-700 mb-2 ml-1">
+                            Biografia
+                          </label>
+                          <textarea
+                            className="w-full bg-gray-50 border border-gray-200 text-gray-800 rounded-2xl px-5 py-3.5 outline-none focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 transition-all text-[15px] font-medium resize-none h-24"
+                            placeholder="Escreva algo sobre você..."
+                            value={ownerProfile?.bio || ''}
+                            onChange={(e) => setOwnerProfile(prev => ({ ...prev, bio: e.target.value } as any))}
+                          />
+                        </div>
                         <Select
                           label="Sexo"
                           value={ownerProfile?.gender || ''}
