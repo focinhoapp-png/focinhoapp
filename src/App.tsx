@@ -3047,7 +3047,7 @@ export default function App() {
     <ErrorBoundary>
       <div className={`min-h-screen ${!user && view === 'home' ? 'bg-white' : 'bg-gray-50'} font-sans text-gray-900 pb-32 md:pb-0`}>
         {/* Main App Header */}
-        {user && view !== 'install_pwa' && view !== 'finder' && (
+        {user && view === 'dashboard' && (
           <header className="bg-white border-b border-gray-100 px-6 py-4 sticky top-0 z-50 flex justify-between items-center">
             <div className="flex items-center gap-2 cursor-pointer" onClick={() => {
               setView('dashboard');
