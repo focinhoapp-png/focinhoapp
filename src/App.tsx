@@ -4474,18 +4474,17 @@ export default function App() {
                         </div>
                       ) : (
                         <div className="space-y-4">
-                          <div className="bg-white p-6 rounded-[2.5rem] shadow-xl border border-gray-100 mb-6">
+                          <div className="bg-white p-6 rounded-[2.5rem] shadow-xl mb-6">
                             <h3 className="font-bold text-gray-800 mb-4 ml-1">Quem vai passear hoje?</h3>
                             <div className="flex flex-col gap-3">
                               {userPets.map(pet => (
-                                <label key={pet.id} className="flex relative items-center justify-between p-4 rounded-2xl border border-gray-100 hover:bg-orange-50 hover:border-orange-200 cursor-pointer transition-all">
+                                <label key={pet.id} className="flex relative items-center justify-between p-4 rounded-2xl hover:bg-orange-50 cursor-pointer transition-all">
                                   <div className="flex items-center gap-4">
                                     <div className="w-12 h-12 rounded-[1rem] overflow-hidden bg-gray-100 border border-gray-200">
                                       <img src={pet.photoUrl || 'https://picsum.photos/seed/pet/100/100'} alt={pet.name} className="w-full h-full object-cover" />
                                     </div>
                                     <div>
-                                      <span className="font-black text-gray-700 block">{pet.name}</span>
-                                      <span className="text-[10px] uppercase font-bold text-orange-400">{pet.breed}</span>
+                                      <span className="font-black text-gray-700 block text-lg">{pet.name}</span>
                                     </div>
                                   </div>
                                   <div className="flex items-center justify-center w-6 h-6 mr-1">
@@ -4519,6 +4518,7 @@ export default function App() {
                           >
                             Iniciar Passeio
                           </Button>
+                          <div className="h-32" />
                         </div>
                       )}
                     </div>
