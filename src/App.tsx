@@ -8154,7 +8154,15 @@ export default function App() {
               }}
               className={`flex flex-col items-center gap-1 transition-colors flex-1 min-h-[44px] justify-center ${view === 'account' ? 'text-orange-500' : 'text-gray-300'}`}
             >
-              <UserIcon className="w-6 h-6" />
+              <div className={`w-7 h-7 rounded-full overflow-hidden border-2 transition-all ${view === 'account' ? 'border-orange-500' : 'border-gray-200'}`}>
+                {ownerProfile?.photoUrl ? (
+                  <img src={ownerProfile.photoUrl} alt="Minha conta" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full bg-gray-100 flex items-center justify-center">
+                    <UserIcon className="w-4 h-4 text-gray-400" />
+                  </div>
+                )}
+              </div>
               <span translate="no" className="text-[11px] font-bold uppercase">Conta</span>
             </button>
           </nav>
