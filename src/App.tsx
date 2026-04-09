@@ -916,6 +916,7 @@ export default function App() {
   const [editingTag, setEditingTag] = useState<{ id: string; newId: string } | null>(null);
   const [tagVerifiedSuccess, setTagVerifiedSuccess] = useState(false);
 
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
   const [activeNotification, setActiveNotification] = useState<{ title: string, message: string } | null>(null);
 
@@ -2173,7 +2174,7 @@ export default function App() {
       const postData: Post = {
         id: postId,
         userId: user.id,
-        userName: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Usuário',
+        userName: ownerProfile?.username || ownerProfile?.name || user.user_metadata?.full_name || user.email?.split('@')[0] || 'Usuário',
         userPhoto: user.user_metadata?.avatar_url || '',
         type: newPost.type,
         content: newPost.content,
@@ -3580,7 +3581,8 @@ export default function App() {
                         // Merge and sort alerts and available adoptions
                         const timelineItems = [
                           ...lostAlerts.map(a => ({ type: 'alert' as const, data: a, date: new Date(a.createdAt).getTime() })),
-                          ...adoptionPets.filter(p => (p.status === 'available' || p.status === undefined)).map(p => ({ type: 'adoption' as const, data: p, date: new Date(p.createdAt).getTime() }))
+                          ...adoptionPets.filter(p => (p.status === 'available' || p.status === undefined)).map(p => ({ type: 'adoption' as const, data: p, date: new Date(p.createdAt).getTime() })),
+                          ...posts.map(p => ({ type: 'post' as const, data: p, date: new Date(p.createdAt).getTime() }))
                         ].sort((a, b) => b.date - a.date);
 
                         if (timelineItems.length === 0) {
@@ -3620,7 +3622,7 @@ export default function App() {
                                   />
                                </div>
                             )
-                          } else {
+                          } else if (item.type === 'adoption') {
                             const pet = item.data;
                             return (
                                <div key={`adopt-${pet.id}-${idx}`} className="bg-white border border-gray-100 rounded-[2rem] overflow-hidden shadow-sm">
@@ -3705,7 +3707,99 @@ export default function App() {
                                   </div>
                                </div>
                             )
+                          } else if (item.type === 'post') {
+                            const post = item.data;
+                            return (
+                               <div key={`post-${post.id}-${idx}`} className="bg-white rounded-[2rem] overflow-hidden shadow-sm border border-gray-100 mb-6 flex flex-col">
+                                  {/* Header */}
+                                  <div className="flex items-center justify-between p-4 bg-white/50 backdrop-blur-sm z-10 w-full rounded-t-[2rem]">
+                                    <div className="flex items-center gap-3">
+                                      <div className="relative">
+                                        <div className="w-10 h-10 rounded-full border-2 border-orange-100 overflow-hidden bg-gray-50 p-0.5">
+                                          <img src={post.userPhoto || 'https://picsum.photos/seed/user/100/100'} className="w-full h-full rounded-full object-cover" alt="User" />
+                                        </div>
+                                      </div>
+                                      <div>
+                                        <p className="font-bold text-sm text-gray-900 leading-tight">{(post.userName || 'Tutor').split('@')[0] || 'Tutor'}</p>
+                                        <p className="text-[10px] text-gray-500 font-bold leading-tight mt-0.5">
+                                           {post.petName ? `Com ${post.petName}` : 'Passeador'}
+                                        </p>
+                                      </div>
+                                    </div>
+                                    {(isAdmin || post.userId === user?.id) && (
+                                      <div className="relative">
+                                        <button 
+                                          onClick={() => setOpenMenuId(openMenuId === `post-${post.id}` ? null : `post-${post.id}`)}
+                                          className="p-2 text-gray-400 hover:text-gray-600 transition-colors rounded-full hover:bg-gray-50"
+                                        >
+                                          <MoreVertical className="w-5 h-5" />
+                                        </button>
+                                        {openMenuId === `post-${post.id}` && (
+                                          <>
+                                          <div className="fixed inset-0 z-40" onClick={() => setOpenMenuId(null)} />
+                                          <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 z-50">
+                                            <button
+                                              onClick={async () => {
+                                                setOpenMenuId(null);
+                                                const newCaption = window.prompt('Editar legenda:', post.content);
+                                                if (newCaption !== null && newCaption.trim() !== '' && newCaption !== post.content) {
+                                                  await supabase.from('posts').update({ content: newCaption }).eq('id', post.id);
+                                                  setPosts(prev => prev.map(p => p.id === post.id ? { ...p, content: newCaption } : p));
+                                                }
+                                              }}
+                                              className="w-full px-4 py-2 text-left text-sm font-bold text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                                            >
+                                              <Edit2 className="w-4 h-4" /> Editar Legenda
+                                            </button>
+                                            <button
+                                              onClick={async () => {
+                                                setOpenMenuId(null);
+                                                if (window.confirm('Deseja excluir esta postagem?')) {
+                                                  await supabase.from('posts').delete().eq('id', post.id);
+                                                  setPosts(prev => prev.filter(p => p.id !== post.id));
+                                                }
+                                              }}
+                                              className="w-full px-4 py-2 text-left text-sm font-bold text-red-600 hover:bg-red-50 flex items-center gap-2"
+                                            >
+                                              <Trash2 className="w-4 h-4" /> Excluir
+                                            </button>
+                                          </div>
+                                          </>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {/* Photo */}
+                                  <div className="w-full aspect-square bg-gray-100 relative">
+                                    <img src={post.imageUrl || 'https://picsum.photos/seed/passeio/800/800'} alt="Passeio" className="w-full h-full object-cover" />
+                                    <div className="absolute top-3 right-3 bg-white/90 backdrop-blur text-orange-500 rounded-full w-8 h-8 flex items-center justify-center shadow-lg">
+                                      {post.type === 'walk' ? '🚶‍♂️' : '📸'}
+                                    </div>
+                                  </div>
+
+                                  {/* Actions */}
+                                  <div className="flex items-center gap-4 px-4 pt-3 pb-1">
+                                     <button className="flex items-center gap-1.5 text-gray-400 font-bold text-sm hover:text-orange-500 transition-colors">
+                                       <Heart className="w-6 h-6" />
+                                       {post.likes?.length || 0}
+                                     </button>
+                                  </div>
+
+                                  {/* Caption */}
+                                  <div className="px-4 pb-4 pt-1 space-y-1">
+                                    <p className="text-sm text-gray-800 font-medium leading-snug">
+                                      <span className="font-black text-gray-900">{(post.userName || 'Tutor').split('@')[0] || 'Tutor'}</span>{' '}
+                                      {post.content}
+                                    </p>
+                                    <p className="text-[11px] text-gray-400 font-medium pt-1">
+                                      {post.createdAt ? new Date(post.createdAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : 'Recentemente'}
+                                    </p>
+                                  </div>
+                               </div>
+                            );
                           }
+                          return null;
                         });
                       })()}
                     </div>
@@ -4499,8 +4593,6 @@ export default function App() {
                             <p className="text-xl md:text-3xl font-black text-gray-800">{walkSummary.altitudeGain?.toFixed(0) || '0'} m</p>
                           </div>
                         </div>
-
-
                         <div className="flex justify-center gap-8">
                           <div className="flex items-center gap-2">
                             <span className="text-2xl">💧</span>
@@ -4516,20 +4608,92 @@ export default function App() {
 
                     <div className="space-y-3">
                       <Button
-                        onClick={handleDownloadWalkImage}
+                        onClick={async () => {
+                          if (!user) {
+                            window.alert('Você precisa estar logado para postar.');
+                            return;
+                          }
+                          try {
+                            setIsGeneratingImage(true);
+                            let imgToUpload = generatedWalkImage;
+                            if (!imgToUpload) {
+                              imgToUpload = await generateSummaryImage();
+                            }
+                            if (!imgToUpload) throw new Error('Falha ao gerar a imagem');
+
+                            // Buscar o blob
+                            const response = await fetch(imgToUpload);
+                            const blob = await response.blob();
+                            const fileName = `passeio-${user.id}-${Date.now()}.png`;
+
+                            // Fazer upload no storage
+                            const { data: uploadData, error: uploadError } = await supabase.storage
+                              .from('media')
+                              .upload(fileName, blob, { contentType: 'image/png', upsert: true });
+
+                            if (uploadError) throw uploadError;
+
+                            // Pegar a URL pública
+                            const { data: publicData } = supabase.storage.from('media').getPublicUrl(uploadData.path);
+                            const publicUrl = publicData.publicUrl;
+
+                            // Inserir o post na tabela 'posts'
+                            const postId = generateId() + '-walk';
+                            const pet = userPets.find(p => p.id === selectedWalkPets[0]);
+                            const postData = {
+                              id: postId,
+                              userId: user.id,
+                              userName: ownerProfile?.username || ownerProfile?.name || user.user_metadata?.full_name || user.email?.split('@')[0] || 'Usuário',
+                              userPhoto: typeof ownerProfile?.photoUrl === 'string' ? ownerProfile.photoUrl : user.user_metadata?.avatar_url || '',
+                              type: 'walk' as const,
+                              content: `Completamos um passeio de ${walkSummary.distance} km em ${Math.floor(walkSummary.duration / 60)}m! 🐾✨`,
+                              imageUrl: publicUrl,
+                              likes: [],
+                              createdAt: new Date().toISOString(),
+                              petId: pet?.id || '',
+                              petName: pet?.name || ''
+                            };
+
+                            const { error: insertError } = await supabase.from('posts').insert(postData);
+                            if (insertError) throw insertError;
+
+                            const { data: updatedPosts } = await supabase.from('posts').select('*').order('createdAt', { ascending: false }).limit(50);
+                            if (updatedPosts) setPosts(updatedPosts as Post[]);
+
+                            window.alert('Passeio compartilhado na Timeline com sucesso! 🎉');
+                            resetWalkState();
+                            setView('dashboard');
+                          } catch (e) {
+                            console.error('Erro ao postar na timeline:', e);
+                            window.alert('Ocorreu um erro ao compartilhar. Tente novamente.');
+                          } finally {
+                            setIsGeneratingImage(false);
+                          }
+                        }}
                         loading={isGeneratingImage}
-                        className="w-full bg-orange-500 hover:bg-orange-600 shadow-orange-200 py-4 flex items-center justify-center gap-2"
+                        className="w-full bg-gradient-to-r from-orange-400 to-amber-500 hover:from-orange-500 hover:to-amber-600 shadow-orange-200 text-white shadow-xl py-4 flex items-center justify-center gap-2 font-bold mb-2"
                       >
-                        <Download className="w-5 h-5" />
-                        Salvar na Galeria
+                        <span className="text-xl">🚀</span>
+                        Postar na Timeline do App
                       </Button>
-                      <Button
-                        onClick={resetWalkState}
-                        variant="outline"
-                        className="w-full py-4"
-                      >
-                        Novo Passeio
-                      </Button>
+                      
+                      <div className="flex gap-3">
+                        <Button
+                          onClick={handleDownloadWalkImage}
+                          loading={isGeneratingImage}
+                          className="flex-1 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 focus:ring-gray-200 shadow-sm py-4 flex items-center justify-center gap-2"
+                        >
+                          <Download className="w-5 h-5 text-gray-400" />
+                          Salvar Imagem
+                        </Button>
+                        <Button
+                          onClick={resetWalkState}
+                          variant="outline"
+                          className="flex-1 py-4"
+                        >
+                          Fechar
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -5705,15 +5869,13 @@ export default function App() {
                       <button onClick={() => setAccountSubView('menu')} className="flex items-center gap-2 text-orange-500 font-bold text-sm">
                         <ChevronLeft className="w-4 h-4" /> Voltar ao menu
                       </button>
-                      {isAdmin && (
-                        <Button
-                          onClick={() => setIsAddingAdoptionPet(true)}
-                          variant="secondary"
-                          className="!px-4 !py-2 text-xs"
-                        >
-                          <Plus className="w-4 h-4" /> Divulgar Pet
-                        </Button>
-                      )}
+                      <Button
+                        onClick={() => setIsAddingAdoptionPet(true)}
+                        variant="secondary"
+                        className="!px-4 !py-2 text-xs"
+                      >
+                        <Plus className="w-4 h-4" /> Divulgar Pet
+                      </Button>
                     </div>
                     <div className="space-y-5">
                       <div className="flex items-center gap-3">
@@ -5785,39 +5947,52 @@ export default function App() {
                                   </div>
                                   {/* 3 dots menu for admin */}
                                   {isAdmin && (
-                                    <div className="relative group">
-                                      <button className="p-2 text-gray-400 hover:text-gray-600 transition-colors rounded-full hover:bg-gray-50">
+                                    <div className="relative">
+                                      <button 
+                                        onClick={() => setOpenMenuId(openMenuId === `adoption-${pet.id}` ? null : `adoption-${pet.id}`)}
+                                        className="p-2 text-gray-400 hover:text-gray-600 transition-colors rounded-full hover:bg-gray-50"
+                                      >
                                         <MoreVertical className="w-5 h-5" />
                                       </button>
-                                      <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 hidden group-hover:block z-50">
-                                        <button
-                                          onClick={() => {
-                                            setEditingAdoptionPetId(pet.id);
-                                            setNewAdoptionPet({ ...pet });
-                                            setIsAddingAdoptionPet(true);
-                                          }}
-                                          className="w-full px-4 py-2 text-left text-sm font-bold text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                                        >
-                                          <Edit2 className="w-4 h-4" /> Editar
-                                        </button>
-                                        <button
-                                          onClick={() => handleUpdateAdoptionStatus(pet.id, adoptionTab === 'available' ? 'adopted' : 'available')}
-                                          className="w-full px-4 py-2 text-left text-sm font-bold text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                                        >
-                                          <CheckCircle2 className={`w-4 h-4 ${adoptionTab === 'available' ? 'text-green-500' : 'text-gray-400'}`} /> {adoptionTab === 'available' ? 'Marcar Adotado' : 'Voltar p/ Disponível'}
-                                        </button>
-                                        <button
-                                          onClick={async () => {
-                                            if (window.confirm('Excluir ' + pet.name + ' para adoção?')) {
-                                              await supabase.from('adoption_pets').delete().eq('id', pet.id);
-                                              setAdoptionPets(prev => prev.filter(p => p.id !== pet.id));
-                                            }
-                                          }}
-                                          className="w-full px-4 py-2 text-left text-sm font-bold text-red-600 hover:bg-red-50 flex items-center gap-2"
-                                        >
-                                          <Trash2 className="w-4 h-4" /> Excluir
-                                        </button>
-                                      </div>
+                                      {openMenuId === `adoption-${pet.id}` && (
+                                        <>
+                                        <div className="fixed inset-0 z-40" onClick={() => setOpenMenuId(null)} />
+                                        <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 z-50">
+                                          <button
+                                            onClick={() => {
+                                              setOpenMenuId(null);
+                                              setEditingAdoptionPetId(pet.id);
+                                              setNewAdoptionPet({ ...pet });
+                                              setIsAddingAdoptionPet(true);
+                                            }}
+                                            className="w-full px-4 py-2 text-left text-sm font-bold text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                                          >
+                                            <Edit2 className="w-4 h-4" /> Editar
+                                          </button>
+                                          <button
+                                            onClick={() => {
+                                              setOpenMenuId(null);
+                                              handleUpdateAdoptionStatus(pet.id, adoptionTab === 'available' ? 'adopted' : 'available');
+                                            }}
+                                            className="w-full px-4 py-2 text-left text-sm font-bold text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                                          >
+                                            <CheckCircle2 className={`w-4 h-4 ${adoptionTab === 'available' ? 'text-green-500' : 'text-gray-400'}`} /> {adoptionTab === 'available' ? 'Marcar Adotado' : 'Voltar p/ Disponível'}
+                                          </button>
+                                          <button
+                                            onClick={async () => {
+                                              setOpenMenuId(null);
+                                              if (window.confirm('Excluir ' + pet.name + ' para adoção?')) {
+                                                await supabase.from('adoption_pets').delete().eq('id', pet.id);
+                                                setAdoptionPets(prev => prev.filter(p => p.id !== pet.id));
+                                              }
+                                            }}
+                                            className="w-full px-4 py-2 text-left text-sm font-bold text-red-600 hover:bg-red-50 flex items-center gap-2"
+                                          >
+                                            <Trash2 className="w-4 h-4" /> Excluir
+                                          </button>
+                                        </div>
+                                        </>
+                                      )}
                                     </div>
                                   )}
                                 </div>
@@ -8340,3 +8515,7 @@ export default function App() {
     </ErrorBoundary>
   );
 }
+
+
+
+
