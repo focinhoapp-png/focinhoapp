@@ -8100,7 +8100,15 @@ export default function App() {
         {user && view !== 'finder' && view !== 'install_pwa' && (
           <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 px-2 py-3 flex justify-around items-center z-50 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
             <button
-              onClick={() => setView('dashboard')}
+              onClick={() => {
+                if (view === 'dashboard') {
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                } else {
+                  setView('dashboard');
+                  window.scrollTo(0, 0);
+                }
+              }}
+              onDoubleClick={() => window.location.reload()}
               className={`flex flex-col items-center gap-1 transition-colors flex-1 min-h-[44px] justify-center ${view === 'dashboard' ? 'text-orange-500' : 'text-gray-300'}`}
             >
               <Home className="w-6 h-6" />
