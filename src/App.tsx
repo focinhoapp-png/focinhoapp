@@ -4370,8 +4370,8 @@ export default function App() {
                     </div>
                   </div>
                 ) : !walkSummary ? (
-                  <div className="flex-1 flex flex-col gap-4 relative">
-                    <div className="flex-1 bg-white rounded-[2.5rem] overflow-hidden border border-gray-100 shadow-sm relative z-0 min-h-[300px]">
+                  <div className="flex-1 flex flex-col bg-white">
+                    <div className="flex-1 bg-white rounded-b-[2.5rem] overflow-hidden border-b border-gray-100 shadow-sm relative z-0 min-h-[300px]">
                       {currentLocation ? (
                         <div className="absolute inset-0">
                           <MapContainer
@@ -4449,7 +4449,7 @@ export default function App() {
                       </div>
                     )}
 
-                    <div className="space-y-4 relative z-10 pb-8">
+                    <div className="space-y-4 px-6 relative z-10 pt-4 pb-8">
                       {isWalking ? (
                         <div className="flex flex-col gap-4">
                           <div className="flex gap-4">
@@ -4474,7 +4474,7 @@ export default function App() {
                         </div>
                       ) : (
                         <div className="space-y-4">
-                          <div className="bg-white p-6 rounded-[2.5rem] shadow-xl mb-6">
+                          <div className="mb-6">
                             <h3 className="font-bold text-gray-800 mb-4 ml-1">Quem vai passear hoje?</h3>
                             <div className="flex flex-col gap-3">
                               {userPets.map(pet => (
