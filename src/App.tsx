@@ -5035,19 +5035,7 @@ export default function App() {
                       <ChevronRight className="text-gray-300" />
                     </button>
 
-                    <button
-                      onClick={() => setAccountSubView('report')}
-                      className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 flex items-center gap-4 hover:border-orange-200 transition-all text-left mb-4"
-                    >
-                      <div className="w-12 h-12 bg-red-50 rounded-2xl flex items-center justify-center">
-                        <Megaphone className="w-6 h-6 text-red-500" />
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="font-bold text-gray-800">Denunciar</h4>
-                        <p className="text-xs text-gray-400">Denuncie maus-tratos</p>
-                      </div>
-                      <ChevronRight className="text-gray-300" />
-                    </button>
+
 
                     <button
                       onClick={() => setAccountSubView('config')}
@@ -6101,43 +6089,7 @@ export default function App() {
                   </div>
                 )}
 
-                {accountSubView === 'report' && (
-                  <div className="space-y-6">
-                    <button onClick={() => setAccountSubView('menu')} className="flex items-center gap-2 text-orange-500 font-bold text-sm">
-                      <ChevronLeft className="w-4 h-4" /> Voltar ao menu
-                    </button>
-                    <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 space-y-6 mb-10">
-                      <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 bg-red-50 rounded-2xl flex items-center justify-center">
-                          <Megaphone className="w-6 h-6 text-red-500" />
-                        </div>
-                        <h3 className="font-bold text-xl">Denunciar Maus-tratos</h3>
-                      </div>
 
-                      <div className="space-y-4 text-sm text-gray-600 leading-relaxed">
-                        <p>Se você presenciou algum caso de maus-tratos a animais, não se cale. A denúncia é anônima e o <strong>sigilo é 100% garantido</strong>.</p>
-                        <div className="bg-red-50 p-4 rounded-2xl border border-red-100">
-                          <p className="text-red-800 font-bold text-xs mb-1">O que é considerado maus-tratos?</p>
-                          <ul className="text-[10px] text-red-600 list-disc ml-4 space-y-1">
-                            <li>Abandono em vias públicas</li>
-                            <li>Agressão física ou envenenamento</li>
-                            <li>Manter preso em correntes curtas</li>
-                            <li>Falta de higiene, água ou comida</li>
-                          </ul>
-                        </div>
-                      </div>
-
-                      <Button
-                        onClick={() => window.open('https://wa.me/5511999999999?text=Gostaria%20de%20fazer%20uma%20denúncia%20de%20maus-tratos%20animal.', '_blank')}
-                        className="w-full bg-red-500 hover:bg-red-600 shadow-red-100"
-                      >
-                        <MessageCircle className="w-5 h-5" /> Denunciar via WhatsApp
-                      </Button>
-                      <p className="text-[10px] text-gray-400 text-center">Em caso de emergência, ligue para 190.</p>
-                    </div>
-                    <div className="h-20" /> {/* Spacer to avoid bottom nav overlap */}
-                  </div>
-                )}
 
                 {accountSubView === 'admin' && isAdmin && (
                   <div className="space-y-6">
