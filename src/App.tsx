@@ -713,13 +713,14 @@ function CityStatePicker({ state, city, onStateChange, onCityChange, label = 'Lo
 
 // --- SOS Alert Card (Instagram-style) ---
 
-function SOSAlertCard({ alert, user, onEdit, onFound, onShare }: {
+function SOSAlertCard({ alert, user, onEdit, onFound, onShare, onOpenFinder }: {
   key?: string;
   alert: LostAlert;
   user: any;
   onEdit: () => void;
   onFound: () => void | Promise<void>;
   onShare: () => void | Promise<void>;
+  onOpenFinder?: () => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const mainImage = alert.petPhoto || null;
@@ -743,7 +744,14 @@ function SOSAlertCard({ alert, user, onEdit, onFound, onShare }: {
           </div>
           <div>
             <p className="text-[14px] text-gray-900 leading-tight">
-              <span className="font-bold">{alert.ownerUsername || alert.ownerName || 'Tutor do Pet'}</span> procurando por <span className="font-bold">{alert.petName}</span>
+              <span className="font-bold">{alert.ownerUsername || alert.ownerName || 'Tutor do Pet'}</span> procurando por{' '}
+              {onOpenFinder ? (
+                <button onClick={onOpenFinder} className="font-bold text-orange-600 hover:underline">
+                  {alert.petName}
+                </button>
+              ) : (
+                <span className="font-bold">{alert.petName}</span>
+              )}
             </p>
             <p className="text-[12px] text-gray-500 font-medium leading-tight mt-0.5">
                {alert.city || 'Localização não informada'}
@@ -783,6 +791,16 @@ function SOSAlertCard({ alert, user, onEdit, onFound, onShare }: {
         )}
       </div>
 
+      {/* ── Caption ── */}
+      <div className="px-4 pb-3 space-y-1">
+        <p className="text-sm text-gray-800 font-medium leading-relaxed">
+          Visto por último em: <span className="text-gray-600">{alert.lastSeen}</span>
+        </p>
+        {alert.reward && (
+          <p className="text-xs text-orange-500 font-bold">🏆 Recompensa: {alert.reward}</p>
+        )}
+      </div>
+
       {/* ── Full-width photo ── */}
       <div className="w-full aspect-square bg-gray-100 relative">
         {mainImage ? (
@@ -800,7 +818,7 @@ function SOSAlertCard({ alert, user, onEdit, onFound, onShare }: {
       </div>
 
       {/* ── Action buttons ── */}
-      <div className="flex items-center gap-4 px-4 pt-3 pb-1">
+      <div className="flex flex-wrap items-center gap-4 px-4 pt-3 pb-3">
         <button
           onClick={onFound}
           className="flex items-center gap-1.5 text-green-600 font-bold text-sm hover:text-green-700 transition-colors"
@@ -827,17 +845,8 @@ function SOSAlertCard({ alert, user, onEdit, onFound, onShare }: {
           Contato
         </button>
       </div>
-
-      {/* ── Caption ── */}
-      <div className="px-4 pb-4 pt-1 space-y-1">
-        <p className="text-sm text-gray-800 font-medium leading-snug">
-          <span className="font-black text-gray-900">{alert.petName}</span>{' '}
-          Visto por último em: <span className="text-gray-600">{alert.lastSeen}</span>
-        </p>
-        {alert.reward && (
-          <p className="text-xs text-orange-500 font-bold">🏆 Recompensa: {alert.reward}</p>
-        )}
-        <p className="text-[11px] text-gray-400 font-medium pt-1">
+      <div className="px-4 pb-4">
+        <p className="text-[11px] text-gray-400 font-medium">
           {new Date(alert.createdAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
         </p>
       </div>
@@ -895,6 +904,7 @@ export default function App() {
 
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const [adoptionTab, setAdoptionTab] = useState<'available'|'adopted'>('available');
+  const [adoptionFocusPet, setAdoptionFocusPet] = useState<string | null>(null);
   const [ownerProfile, setOwnerProfile] = useState<OwnerProfile | null>(null);
   const [isFetchingOwnerProfile, setIsFetchingOwnerProfile] = useState(true);
   const [currentPetIndex, setCurrentPetIndex] = useState(0);
@@ -1106,6 +1116,31 @@ export default function App() {
     } catch (err) {
       console.error('Error processing scanned tag:', err);
       alert('Erro ao processar o QR Code. Tente novamente.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const openPetFinderById = async (petId: string) => {
+    setLoading(true);
+    try {
+      const { data: petSnap } = await supabase.from('pets').select('*').eq('id', petId).limit(1).maybeSingle();
+      if (petSnap) {
+        const { data: ownerData } = await supabase.from('owners').select('*').eq('uid', petSnap.ownerId).maybeSingle();
+        const mergedPet: PetProfile = {
+          ...petSnap,
+          ownerPhone: ownerData?.phone || petSnap.ownerPhone || '',
+          ownerAddress: ownerData?.address || petSnap.ownerAddress || '',
+          ownerName: ownerData?.name || '',
+          privacySettings: ownerData?.privacySettings
+            ? { ...(petSnap.privacySettings || {}), ...ownerData.privacySettings }
+            : petSnap.privacySettings,
+        };
+        setFinderPet(mergedPet);
+        setView('finder');
+      }
+    } catch (err) {
+      console.error('Error opening pet finder:', err);
     } finally {
       setLoading(false);
     }
@@ -1814,6 +1849,13 @@ export default function App() {
     try {
       const pet = userPets.find(p => p.id === newSOS.petId);
       if (!pet) return;
+
+      // Só permite alerta se o pet tiver um Pingente ativado
+      if (!pet.tagId) {
+        setError('Para gerar um alerta SOS, o pet precisa ter um Pingente Inteligente ativado. Adquira já o seu FocinhoPingente!');
+        setLoading(false);
+        return;
+      }
 
       const alertId = editingSOSId || generateId();
       const payload = {
@@ -3543,6 +3585,7 @@ export default function App() {
                                   <SOSAlertCard
                                     alert={alert}
                                     user={user}
+                                    onOpenFinder={() => openPetFinderById(alert.petId)}
                                     onEdit={() => {}} /* feed uses read-only */
                                     onFound={async () => {
                                        if (window.confirm(`Você encontrou ${alert.petName}?`)) {
@@ -3585,7 +3628,11 @@ export default function App() {
                                       </div>
                                       <div>
                                         <p className="text-[14px] text-gray-900 leading-tight">
-                                          <span className="font-bold">{pet.ownerUsername || pet.ownerName || 'Tutor do Pet'}</span> busca um lar pra <span className="font-bold">{pet.name}</span>
+                                          <span className="font-bold">{pet.ownerUsername || pet.ownerName || 'Tutor do Pet'}</span> busca um lar pra{' '}
+                                          <button
+                                            className="font-bold text-gray-900"
+                                            onClick={() => { setAdoptionFocusPet(pet.id); setView('account'); setAccountSubView('adoption'); }}
+                                          >{pet.name}</button>
                                         </p>
                                         <p className="text-[12px] text-gray-500 font-medium leading-tight mt-0.5">
                                            {pet.city || 'Localização não informada'}
@@ -3603,7 +3650,7 @@ export default function App() {
                                   </div>
 
                                   {/* Buttons */}
-                                  <div className="flex items-center gap-4 px-4 pt-3 pb-1">
+                                  <div className="flex flex-wrap items-center gap-4 px-4 pt-3 pb-3">
                                      <div className="flex items-center gap-1.5 font-bold text-sm text-green-600">
                                        <CheckCircle2 className="w-6 h-6" />
                                        Disponível
@@ -3637,17 +3684,10 @@ export default function App() {
                                        Quero Adotar
                                      </button>
                                   </div>
-
-                                  {/* Caption */}
-                                  <div className="px-4 pb-4 pt-1 space-y-1">
-                                    <p className="text-sm text-gray-800 font-medium leading-snug">
-                                      <span className="font-black text-gray-900">{pet.name}</span>{' '}
-                                      <span className="text-gray-600 font-bold">({pet.breed} • {pet.gender})</span>{' '}
-                                      {pet.description}
-                                    </p>
-                                    <p className="text-[11px] text-gray-400 font-medium pt-1">
-                                      {pet.createdAt ? new Date(pet.createdAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : 'Recentemente'}
-                                    </p>
+                                  <div className="px-4 pb-4">
+                                     <p className="text-[11px] text-gray-400 font-medium">
+                                       {pet.createdAt ? new Date(pet.createdAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : 'Recentemente'}
+                                     </p>
                                   </div>
                                </div>
                             )
@@ -3667,7 +3707,18 @@ export default function App() {
                                         <p className="text-[14px] text-gray-900 leading-tight">
                                           <span className="font-bold">{post.userName || 'Tutor'}</span>{' '}
                                           {post.type === 'alert' ? 'procurando por ' : post.type === 'adoption' ? 'busca um lar pra ' : 'passeando com '}
-                                          <span className="font-bold">{post.petName || 'Pet'}</span>
+                                          <button
+                                            className="font-bold text-gray-900"
+                                            onClick={async () => {
+                                              if (!post.petId) { window.alert('Para ter um perfil público, o pet precisa de um Pingente Inteligente ativado.'); return; }
+                                              const { data: petRow } = await supabase.from('pets').select('tagId').eq('id', post.petId).maybeSingle();
+                                              if (petRow?.tagId) {
+                                                handleViewFinder(petRow.tagId);
+                                              } else {
+                                                window.alert('Para ter um perfil público, o pet precisa de um Pingente Inteligente ativado.');
+                                              }
+                                            }}
+                                          >{post.petName || 'Pet'}</button>
                                         </p>
                                         <p className="text-[12px] text-gray-500 font-medium leading-tight mt-0.5">
                                            {selectedCity || userCity || 'Perto de você'}
@@ -3718,31 +3769,27 @@ export default function App() {
                                     )}
                                   </div>
 
+                                  {/* Caption */}
+                                  <div className="px-4 pb-3 space-y-1">
+                                    <p className="text-sm text-gray-800 font-medium leading-relaxed">
+                                      {post.content}
+                                    </p>
+                                  </div>
+
                                   {/* Photo */}
                                   <div className="w-full aspect-square bg-gray-100 relative">
                                     <img src={post.imageUrl || 'https://picsum.photos/seed/passeio/800/800'} alt="Passeio" className="w-full h-full object-cover" />
-                                    <div className="absolute top-3 right-3 bg-white/90 backdrop-blur text-orange-500 rounded-full w-8 h-8 flex items-center justify-center shadow-lg">
-                                      {post.type === 'walk' ? '🚶‍♂️' : '📸'}
-                                    </div>
                                   </div>
 
-                                  {/* Actions */}
-                                  <div className="flex items-center gap-4 px-4 pt-3 pb-1">
+                                  {/* Actions & Date */}
+                                  <div className="flex items-center gap-4 px-4 pt-3 pb-4">
                                      <button className="flex items-center gap-1.5 text-gray-400 font-bold text-sm hover:text-orange-500 transition-colors">
                                        <Heart className="w-6 h-6" />
                                        {post.likes?.length || 0}
                                      </button>
-                                  </div>
-
-                                  {/* Caption */}
-                                  <div className="px-4 pb-4 pt-1 space-y-1">
-                                    <p className="text-sm text-gray-800 font-medium leading-snug">
-                                      <span className="font-black text-gray-900">{(post.userName || 'Tutor').split('@')[0] || 'Tutor'}</span>{' '}
-                                      {post.content}
-                                    </p>
-                                    <p className="text-[11px] text-gray-400 font-medium pt-1">
-                                      {post.createdAt ? new Date(post.createdAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : 'Recentemente'}
-                                    </p>
+                                     <p className="text-[11px] text-gray-400 font-medium ml-auto mt-1">
+                                       {post.createdAt ? new Date(post.createdAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : 'Recentemente'}
+                                     </p>
                                   </div>
                                </div>
                             );
@@ -4730,6 +4777,7 @@ export default function App() {
                             key={alert.id}
                             alert={alert}
                             user={user}
+                            onOpenFinder={() => openPetFinderById(alert.petId)}
                             onEdit={() => {
                               setEditingSOSId(alert.id);
                               setNewSOS({
@@ -4811,48 +4859,70 @@ export default function App() {
                         </div>
 
                         <div className="space-y-4">
-                          <Select
-                            label="Qual Pet fugiu?"
-                            value={newSOS.petId}
-                            onChange={(v: string) => setNewSOS(prev => ({ ...prev, petId: v }))}
-                            options={userPets.map(p => ({ label: p.name, value: p.id }))}
-                            icon={Dog}
-                          />
-                          <div className="relative">
-                            <CityStatePicker
-                              label="Cidade do alerta"
-                              state={newSOS.city ? (newSOS.city.includes(' - ') ? newSOS.city.split(' - ')[1] : '') : ''}
-                              city={newSOS.city ? (newSOS.city.includes(' - ') ? newSOS.city.split(' - ')[0] : newSOS.city) : ''}
-                              onStateChange={(s) => {
-                                const currentCity = newSOS.city?.includes(' - ') ? newSOS.city.split(' - ')[0] : newSOS.city || '';
-                                setNewSOS(prev => ({ ...prev, city: currentCity ? `${currentCity} - ${s}` : s }));
-                              }}
-                              onCityChange={(c) => {
-                                const currentState = newSOS.city?.includes(' - ') ? newSOS.city.split(' - ')[1] : '';
-                                setNewSOS(prev => ({ ...prev, city: currentState ? `${c} - ${currentState}` : c }));
-                              }}
-                            />
-                            <button
-                              type="button"
-                              onClick={handleGetCurrentLocation}
-                              className="absolute right-3 bottom-3 p-2 bg-orange-100 text-orange-600 rounded-lg hover:bg-orange-200 transition-colors"
-                              title="Pegar localização atual"
-                            >
-                              <Compass className="w-4 h-4" />
-                            </button>
-                          </div>
-                          <Input
-                            label="Visto por último em..."
-                            placeholder="Ex: Próximo ao metrô, Rua X..."
-                            value={newSOS.lastSeen}
-                            onChange={(v: string) => setNewSOS(prev => ({ ...prev, lastSeen: v }))}
-                            icon={AlertCircle}
-                          />
+                          {(() => {
+                            const taggedPets = userPets.filter(p => !!p.tagId);
+                            if (taggedPets.length === 0) {
+                              return (
+                                <div className="space-y-6">
+                                  <div className="bg-red-50 border border-red-100 rounded-2xl p-4 text-center space-y-2">
+                                    <AlertCircle className="w-8 h-8 text-red-400 mx-auto" />
+                                    <p className="text-sm font-bold text-red-600">Nenhum pet com Pingente ativado</p>
+                                    <p className="text-xs text-red-400 leading-relaxed">Para gerar um alerta SOS, seu pet precisa ter um Pingente Inteligente FocinhoApp ativado. Adquira já!</p>
+                                  </div>
+                                  <Button onClick={() => setIsAddingSOS(false)} variant="primary" className="w-full bg-red-600 hover:bg-red-700 text-white">
+                                    Fechar
+                                  </Button>
+                                </div>
+                              );
+                            }
+                            return (
+                              <>
+                                <Select
+                                  label="Qual Pet fugiu?"
+                                  value={newSOS.petId}
+                                  onChange={(v: string) => setNewSOS(prev => ({ ...prev, petId: v }))}
+                                  options={taggedPets.map(p => ({ label: p.name, value: p.id }))}
+                                  icon={Dog}
+                                />
+                                <div className="relative">
+                                  <CityStatePicker
+                                    label="Cidade do alerta"
+                                    state={newSOS.city ? (newSOS.city.includes(' - ') ? newSOS.city.split(' - ')[1] : '') : ''}
+                                    city={newSOS.city ? (newSOS.city.includes(' - ') ? newSOS.city.split(' - ')[0] : newSOS.city) : ''}
+                                    onStateChange={(s) => {
+                                      const currentCity = newSOS.city?.includes(' - ') ? newSOS.city.split(' - ')[0] : newSOS.city || '';
+                                      setNewSOS(prev => ({ ...prev, city: currentCity ? `${currentCity} - ${s}` : s }));
+                                    }}
+                                    onCityChange={(c) => {
+                                      const currentState = newSOS.city?.includes(' - ') ? newSOS.city.split(' - ')[1] : '';
+                                      setNewSOS(prev => ({ ...prev, city: currentState ? `${c} - ${currentState}` : c }));
+                                    }}
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={handleGetCurrentLocation}
+                                    className="absolute right-3 bottom-3 p-2 bg-orange-100 text-orange-600 rounded-lg hover:bg-orange-200 transition-colors"
+                                    title="Pegar localização atual"
+                                  >
+                                    <Compass className="w-4 h-4" />
+                                  </button>
+                                </div>
+                                <Input
+                                  label="Visto por último em..."
+                                  placeholder="Ex: Próximo ao metrô, Rua X..."
+                                  value={newSOS.lastSeen}
+                                  onChange={(v: string) => setNewSOS(prev => ({ ...prev, lastSeen: v }))}
+                                  icon={AlertCircle}
+                                />
+                                <div className="pt-2">
+                                  <Button onClick={handleSaveSOS} loading={loading} variant="danger" className="w-full">
+                                    {editingSOSId ? 'Atualizar Alerta' : 'Publicar Alerta SOS'}
+                                  </Button>
+                                </div>
+                              </>
+                            );
+                          })()}
                         </div>
-
-                        <Button onClick={handleSaveSOS} loading={loading} variant="danger" className="w-full">
-                          {editingSOSId ? 'Atualizar Alerta' : 'Publicar Alerta SOS'}
-                        </Button>
                       </motion.div>
                     </div>
                   )}
@@ -5857,6 +5927,56 @@ export default function App() {
                         <Plus className="w-4 h-4" /> Divulgar Pet
                       </Button>
                     </div>
+
+                    {/* ── Focused Pet Profile (when coming from feed) ── */}
+                    {adoptionFocusPet && (() => {
+                      const fp = adoptionPets.find(p => p.id === adoptionFocusPet);
+                      if (!fp) return null;
+                      return (
+                        <div className="bg-white rounded-[2rem] overflow-hidden shadow-sm border border-pink-100">
+                          {/* Back button */}
+                          <div className="flex items-center gap-2 px-4 pt-4 pb-2">
+                            <button onClick={() => setAdoptionFocusPet(null)} className="flex items-center gap-1.5 text-pink-500 font-bold text-sm">
+                              <ChevronLeft className="w-4 h-4" /> Voltar para lista
+                            </button>
+                          </div>
+                          {/* Photo */}
+                          <div className="w-full aspect-square bg-gray-100 relative">
+                            <img src={fp.photoUrl || 'https://picsum.photos/seed/pet/800/600'} alt={fp.name} className="w-full h-full object-cover" />
+                            <div className="absolute top-3 left-3 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-[10px] font-black px-3 py-1.5 rounded-full uppercase shadow-lg">
+                              Para Adoção
+                            </div>
+                          </div>
+                          {/* Info */}
+                          <div className="px-5 py-4 space-y-3">
+                            <div>
+                              <h2 className="text-2xl font-black text-gray-900">{fp.name}</h2>
+                              <p className="text-sm text-gray-500 font-bold mt-0.5">{fp.breed} • {fp.gender} • {fp.city}</p>
+                            </div>
+                            {fp.description && (
+                              <p className="text-sm text-gray-700 leading-relaxed">{fp.description}</p>
+                            )}
+                            <div className="grid grid-cols-2 gap-3">
+                              {fp.size && <div className="bg-gray-50 rounded-2xl p-3"><p className="text-[10px] text-gray-400 font-bold uppercase">Porte</p><p className="font-bold text-gray-800 text-sm mt-0.5">{fp.size}</p></div>}
+                              {fp.age && <div className="bg-gray-50 rounded-2xl p-3"><p className="text-[10px] text-gray-400 font-bold uppercase">Idade</p><p className="font-bold text-gray-800 text-sm mt-0.5">{fp.age}</p></div>}
+                              {fp.color && <div className="bg-gray-50 rounded-2xl p-3"><p className="text-[10px] text-gray-400 font-bold uppercase">Cor</p><p className="font-bold text-gray-800 text-sm mt-0.5">{fp.color}</p></div>}
+                              {fp.location && <div className="bg-gray-50 rounded-2xl p-3"><p className="text-[10px] text-gray-400 font-bold uppercase">Localização</p><p className="font-bold text-gray-800 text-sm mt-0.5">{fp.location}</p></div>}
+                            </div>
+                            <button
+                              onClick={() => {
+                                const phone = (fp.contactPhone || '').replace(/\D/g, '');
+                                if (!phone) { window.alert('Este pet não possui telefone de contato.'); return; }
+                                window.open(`https://wa.me/55${phone}?text=${encodeURIComponent(`Olá! Queria falar sobre a adoção do ${fp.name}.`)}`, '_blank');
+                              }}
+                              className="w-full py-3 bg-gradient-to-r from-pink-500 to-rose-500 text-white font-black rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-pink-100"
+                            >
+                              <MessageCircle className="w-5 h-5" /> Quero Adotar {fp.name}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
                     <div className="space-y-5">
                       <div className="flex items-center gap-3">
                         <div className="w-12 h-12 bg-pink-50 rounded-2xl flex items-center justify-center">
@@ -7756,7 +7876,7 @@ export default function App() {
 
                       {finderPet.privacySettings?.showAddress !== false ? (
                         <div className="flex items-start gap-3">
-                          <MapPin className="w-5 h-5 text-orange-500 mt-1 shrink-0" />
+                          <MapPin className="w-5 h-5 text-black mt-1 shrink-0" />
                           <div>
                             <h4 className="font-bold text-sm">Endereço de Devolução</h4>
                             <p className="text-gray-600 text-sm leading-relaxed">
@@ -7778,7 +7898,7 @@ export default function App() {
 
                       {finderPet.privacySettings?.showObservations !== false && finderPet.observations && (
                         <div className="flex items-start gap-3">
-                          <AlertCircle className="w-5 h-5 text-orange-500 mt-1 shrink-0" />
+                          <AlertCircle className="w-5 h-5 text-black mt-1 shrink-0" />
                           <div>
                             <h4 className="font-bold text-sm">Observações</h4>
                             <p className="text-gray-600 text-sm leading-relaxed">
@@ -7795,21 +7915,21 @@ export default function App() {
                           <>
                             <button
                               onClick={() => window.open(`https://wa.me/55${finderPet.ownerPhone!.replace(/\D/g, '')}?text=${encodeURIComponent(`Olá! Encontrei seu pet ${finderPet.name}.`)}`, '_blank')}
-                              className="w-full py-4 text-lg bg-green-500 hover:bg-green-600 active:bg-green-700 shadow-lg shadow-green-200 text-white font-bold rounded-[20px] flex items-center justify-center transition-colors"
+                              className="w-full py-2 bg-gray-100 hover:bg-gray-200 text-black font-bold text-[14px] rounded-lg flex items-center justify-center transition-colors"
                             >
-                              <MessageCircle className="w-6 h-6 mr-2" /> Falar com tutor no WhatsApp
+                              <MessageCircle className="w-5 h-5 mr-2" /> Falar no WhatsApp
                             </button>
                             <button
                               onClick={() => window.open(`tel:${finderPet.ownerPhone?.replace(/\D/g, '')}`, '_blank')}
-                              className="w-full py-4 text-lg bg-red-500 hover:bg-red-600 active:bg-red-700 shadow-lg shadow-red-200 text-white font-bold rounded-[20px] flex items-center justify-center transition-colors"
+                              className="w-full py-2 bg-gray-100 hover:bg-gray-200 text-black font-bold text-[14px] rounded-lg flex items-center justify-center transition-colors"
                             >
-                              <Phone className="w-6 h-6 mr-2" /> Ligar para o Tutor
+                              <Phone className="w-5 h-5 mr-2" /> Ligar para o Tutor
                             </button>
                             <button
                               onClick={sendLocation}
-                              className="w-full py-4 text-lg bg-orange-500 hover:bg-orange-600 active:bg-orange-700 shadow-lg shadow-orange-200 text-white font-bold rounded-[20px] flex items-center justify-center transition-colors"
+                              className="w-full py-2 bg-gray-100 hover:bg-gray-200 text-black font-bold text-[14px] rounded-lg flex items-center justify-center transition-colors"
                             >
-                              <MapPin className="w-6 h-6 mr-2" /> Enviar Localização do Pet
+                              <MapPin className="w-5 h-5 mr-2" /> Enviar Localização
                             </button>
                           </>
                         ) : (
