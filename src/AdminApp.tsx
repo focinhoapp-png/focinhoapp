@@ -5,7 +5,7 @@ import {
   Mail, Lock, LogOut, Loader2, ShieldCheck, 
   LayoutDashboard, QrCode, Image as ImageIcon, Star, 
   Heart, Briefcase, Calendar, ChevronRight, Menu, X, Plus, Trash2, Edit2, Download, CheckCircle2, MapPin, Camera, ExternalLink,
-  Store, Dog, Edit3, User as UserIcon
+  Store, Dog, Edit3, User as UserIcon, ShoppingBag
 } from 'lucide-react';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
@@ -19,6 +19,7 @@ interface Banner { id: string; image_url: string; link_url: string; title?: stri
 interface Tag { id: string; petId?: string; ownerId?: string; activated: boolean; }
 interface AppPet { id: string; ownerId?: string; tagId?: string | null; name: string; animalType?: string; gender?: string; breed?: string; photoUrl?: string; deleted?: boolean; createdAt?: string; }
 interface AppOwner { uid: string; name: string; phone?: string; }
+interface Product { id: string; name: string; description: string; price: number; category: string; image_url: string; }
 
 export default function AdminApp() {
   const [sessionUser, setSessionUser] = useState<User | null>(null);
@@ -67,6 +68,9 @@ export default function AdminApp() {
   const [eventForm, setEventForm] = useState<Partial<PetEvent>>({ id: '', title: '', description: '', imageUrl: '', event_date: '', location: '' });
   const [eventMessage, setEventMessage] = useState<string | null>(null);
 
+  const [products, setProducts] = useState<Product[]>([]);
+  const [productForm, setProductForm] = useState<Partial<Product>>({ id: '', name: '', description: '', price: 0, category: 'Acessórios', image_url: '' });
+
   /** Retorna a URL da foto apenas se for uma URL real (não base64 enorme) */
   const petPhoto = (url?: string) => url && (url.startsWith('http') || url.startsWith('https')) ? url : null;
 
@@ -101,6 +105,11 @@ export default function AdminApp() {
       const partnersRes = await supabase.from('partners').select('*').order('created_at', { ascending: false });
       if (partnersRes.data) setPartners(partnersRes.data);
     } catch(e) { console.error('Partners exception:', e); }
+
+    try {
+      const productsRes = await supabase.from('products').select('*').order('created_at', { ascending: false });
+      if (productsRes.data) setProducts(productsRes.data);
+    } catch(e) { console.error('Products exception:', e); }
 
     try {
       const eventsRes = await supabase.from('events').select('*').order('created_at', { ascending: false });
@@ -198,6 +207,23 @@ export default function AdminApp() {
     if (partnerForm.id) await supabase.from('partners').update(payload).eq('id', partnerForm.id);
     else await supabase.from('partners').insert(payload);
     setPartnerForm({ id: '', name: '', category: 'Pet Shops', description: '', location: '', logo: '', url: '' });
+    fetchAllAdminData();
+    setLoadingAction(false);
+  };
+
+  const handleSaveProduct = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoadingAction(true);
+    const payload = { 
+      name: productForm.name, 
+      category: productForm.category, 
+      description: productForm.description, 
+      price: productForm.price, 
+      image_url: productForm.image_url 
+    };
+    if (productForm.id) await supabase.from('products').update(payload).eq('id', productForm.id);
+    else await supabase.from('products').insert(payload);
+    setProductForm({ id: '', name: '', category: 'Acessórios', description: '', price: 0, image_url: '' });
     fetchAllAdminData();
     setLoadingAction(false);
   };
@@ -314,6 +340,7 @@ export default function AdminApp() {
     { id: 'banners', label: 'Primeiro Carrossel', icon: ImageIcon },
     { id: 'promo', label: 'Megabanners Promo', icon: Star },
     { id: 'partners', label: 'Loja Parceira', icon: Store },
+    { id: 'products', label: 'Produtos', icon: ShoppingBag },
     { id: 'adoption', label: 'Adoção', icon: Heart },
     { id: 'pets_app', label: 'Pets do App', icon: Dog },
     { id: 'events', label: 'Eventos', icon: Calendar }
@@ -644,10 +671,91 @@ export default function AdminApp() {
                     </div>
                  </div>
               </div>
-            )}
+             )}
+
+             {/* 5B. PRODUTOS */}
+             {activeTab === 'products' && (
+               <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-100">
+                  <h3 className="font-black text-xl mb-4 text-indigo-900 flex items-center gap-2"><ShoppingBag className="w-6 h-6"/> Central de Produtos</h3>
+                  <p className="text-gray-500 text-sm font-medium mb-8 max-w-2xl">Cadastre os produtos que aparecerão na Lojinha VIP do app. As compras serão enviadas via WhatsApp.</p>
+                  
+                  <div className="flex flex-col md:flex-row gap-8">
+                     <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {products.map(p => (
+                          <div key={p.id} className="bg-white border border-gray-200 rounded-3xl p-5 shadow-sm relative group overflow-hidden">
+                            <div className="absolute top-2 right-2 flex gap-1 z-10 translate-x-12 opacity-0 group-hover:translate-x-0 group-hover:opacity-100 transition-all bg-white p-1 rounded-xl shadow-lg border border-gray-100">
+                               <button onClick={() => setProductForm(p)} className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg"><Edit2 className="w-4 h-4"/></button>
+                               <button onClick={async () => { if(window.confirm('Excluir produto?')){ await supabase.from('products').delete().eq('id', p.id); setProducts(r=>r.filter(x=>x.id!==p.id)); } }} className="p-2 text-red-500 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4"/></button>
+                            </div>
+                            <div className="flex items-center gap-4 mb-3">
+                               <img src={p.image_url} alt="produto" className="w-16 h-16 rounded-2xl bg-gray-50 border border-gray-100 object-cover" />
+                               <div className="min-w-0">
+                                  <h4 className="font-black text-gray-900 border-b border-gray-100 pb-1 mb-1 truncate text-lg pr-4">{p.name}</h4>
+                                  <div className="flex gap-2">
+                                     <span className="text-[10px] font-bold tracking-wider uppercase text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">{p.category}</span>
+                                     <span className="text-[10px] font-bold tracking-wider text-green-700 bg-green-100 px-2 py-0.5 rounded-md">R$ {Number(p.price).toFixed(2).replace('.', ',')}</span>
+                                  </div>
+                               </div>
+                            </div>
+                            <p className="text-xs text-gray-500 font-medium mb-3 line-clamp-3 leading-relaxed">{p.description}</p>
+                          </div>
+                        ))}
+                        {products.length === 0 && <div className="col-span-full py-10 text-center"><p className="text-sm font-medium text-gray-400">Nenhum produto cadastrado.</p></div>}
+                     </div>
+
+                     <div className="md:w-96 bg-indigo-50 border border-indigo-100 p-6 rounded-[1.5rem] h-fit">
+                        <h4 className="font-black text-indigo-900 mb-4">{productForm.id ? 'Editar Produto' : 'Novo Produto'}</h4>
+                        <form onSubmit={handleSaveProduct} className="space-y-4">
+                          <div>
+                             <label className="text-xs font-bold text-indigo-800 mb-1 block">Nome do Produto</label>
+                             <input type="text" required className="w-full bg-white border border-indigo-200 rounded-xl py-3 px-4 text-sm outline-none focus:border-indigo-500" value={productForm.name||''} onChange={e=>setProductForm(p=>({...p, name: e.target.value}))}/>
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                               <label className="text-xs font-bold text-indigo-800 mb-1 block">Categoria</label>
+                               <select className="w-full bg-white border border-indigo-200 rounded-xl py-3 px-4 text-sm outline-none" value={productForm.category||''} onChange={e=>setProductForm(p=>({...p, category: e.target.value}))}>
+                                 <option value="Acessórios">Acessórios</option>
+                                 <option value="Roupas">Roupas</option>
+                                 <option value="Alimentação">Alimentação</option>
+                                 <option value="Higiene">Higiene</option>
+                                 <option value="Outros">Outros</option>
+                               </select>
+                            </div>
+                            <div>
+                               <label className="text-xs font-bold text-indigo-800 mb-1 block">Preço (R$)</label>
+                               <input type="number" step="0.01" required className="w-full bg-white border border-indigo-200 rounded-xl py-3 px-4 text-sm outline-none" placeholder="Ex: 49.90" value={productForm.price||''} onChange={e=>setProductForm(p=>({...p, price: parseFloat(e.target.value)}))}/>
+                            </div>
+                          </div>
+                          <div>
+                             <label className="text-xs font-bold text-indigo-800 mb-1 block">Foto do Produto</label>
+                             {productForm.image_url ? (
+                               <div className="w-32 h-32 relative group bg-white border border-indigo-200 rounded-xl overflow-hidden mx-auto shadow-sm">
+                                 <img src={productForm.image_url} className="w-full h-full object-cover" />
+                                 <button type="button" onClick={()=>setProductForm(p=>({...p, image_url:''}))} className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"><X className="text-white w-6 h-6"/></button>
+                               </div>
+                             ) : (
+                               <label className="w-32 h-32 mx-auto bg-white border-2 border-dashed border-indigo-300 rounded-xl flex flex-col items-center justify-center text-indigo-600 font-bold text-xs cursor-pointer hover:border-indigo-500 hover:bg-indigo-50 transition-colors">
+                                 <input type="file" accept="image/*" className="hidden" onChange={e => { const f=e.target.files?.[0]; if(f){ const r=new FileReader(); r.onload=ev=>setProductForm(p=>({...p, image_url: ev.target?.result as string})); r.readAsDataURL(f); } }}/>
+                                 <Camera className="w-6 h-6 mb-2 text-indigo-400" />
+                                 <span>Upload Foto</span>
+                               </label>
+                             )}
+                          </div>
+                          <div>
+                             <label className="text-xs font-bold text-indigo-800 mb-1 block">Descrição do Produto</label>
+                             <textarea rows={3} required className="w-full bg-white border border-indigo-200 rounded-xl py-3 px-4 text-sm outline-none flex-1 resize-none leading-relaxed" value={productForm.description||''} onChange={e=>setProductForm(p=>({...p, description: e.target.value}))}></textarea>
+                          </div>
+                          <button disabled={loadingAction || !productForm.image_url} type="submit" className="w-full py-4 text-white bg-indigo-600 hover:bg-indigo-700 font-black rounded-xl shadow-md disabled:opacity-50 transition-colors flex items-center justify-center gap-2">
+                            {loadingAction ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Salvar Produto'}
+                          </button>
+                        </form>
+                     </div>
+                  </div>
+               </div>
+             )}
 
 
-            {/* 6. ADOÇÃO */}
+             {/* 6. ADOÇÃO */}
             {activeTab === 'adoption' && (
                <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-100">
                   {/* Header */}

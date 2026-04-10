@@ -189,6 +189,15 @@ interface AdoptionPet {
   ownerPhotoUrl?: string;
 }
 
+interface Product {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  category: string;
+  image_url: string;
+}
+
 interface LostAlert {
   id: string;
   petId: string;
@@ -876,9 +885,7 @@ export default function App() {
   const [finderPet, setFinderPet] = useState<PetProfile | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [storeItems, setStoreItems] = useState<any[]>([]); // Admin only
-  const [storeForm, setStoreForm] = useState<{ id: string, name: string, price: string, url: string, gallery: string[] }>({ id: '', name: '', price: '', url: '', gallery: [] }); // Admin only
-  const [storeMessage, setStoreMessage] = useState<string | null>(null); // Admin only
+  const [products, setProducts] = useState<Product[]>([]);
   
   // Admin Banners
   const [adminBanners, setAdminBanners] = useState<any[]>([]);
@@ -1505,6 +1512,19 @@ export default function App() {
     return () => { supabase.removeChannel(channel); };
   }, []);
 
+  // Fetch Products for Loja
+  useEffect(() => {
+    const fetchProducts = async () => {
+      const { data } = await supabase.from('products').select('*').order('created_at', { ascending: false });
+      setProducts((data || []) as Product[]);
+    };
+    fetchProducts();
+    const channel = supabase.channel('products')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, fetchProducts)
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, []);
+
   // Fetch Promo Events
   useEffect(() => {
     const fetchPromoEvents = async () => {
@@ -1525,15 +1545,13 @@ export default function App() {
       setIsFetchingAllPets(true);
       setIsFetchingAllTags(true);
       try {
-        const [petsRes, tagsRes, storeRes, bannersRes] = await Promise.all([
+        const [petsRes, tagsRes, bannersRes] = await Promise.all([
           supabase.from('pets').select('*').or('deleted.is.null,deleted.eq.false'),
           supabase.from('tags').select('*').order('id', { ascending: true }),
-          supabase.from('store_items').select('*').order('created_at', { ascending: false }),
           supabase.from('banners').select('*').order('created_at', { ascending: false })
         ]);
         setAllPets((petsRes.data || []) as PetProfile[]);
         setAllTags(tagsRes.data || []);
-        setStoreItems(storeRes.data || []);
         setAdminBanners(bannersRes.data || []);
       } catch (err) {
         console.error('Error fetching admin data:', err);
@@ -2592,80 +2610,6 @@ export default function App() {
     } catch (err) {
       console.error('Error saving pet:', err);
       setError('Erro ao salvar perfil.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-
-  const handleStorePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-
-    setLoading(true);
-    try {
-      const newImages: string[] = [];
-      for (let i = 0; i < files.length; i++) {
-        if ((storeForm.gallery?.length || 0) + newImages.length >= 10) break;
-        const reader = new FileReader();
-        await new Promise((resolve) => {
-          reader.onloadend = () => {
-            newImages.push(reader.result as string);
-            resolve(true);
-          };
-          reader.readAsDataURL(files[i]);
-        });
-      }
-      setStoreForm(prev => ({ ...prev, gallery: [...(prev.gallery || []), ...newImages].slice(0, 10) }));
-    } catch (err) {
-      setError('Erro ao carregar fotos da loja.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSaveStoreItem = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!storeForm.name || !storeForm.price || !storeForm.url) return;
-    setLoading(true);
-    setStoreMessage(null);
-    try {
-      const priceVal = parseFloat(storeForm.price.replace(',', '.'));
-      const payload = { 
-          name: storeForm.name, 
-          price: priceVal, 
-          url: storeForm.url, 
-          gallery: storeForm.gallery || [] 
-      };
-      
-      if (storeForm.id) {
-        const { error } = await supabase.from('store_items').update(payload).eq('id', storeForm.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from('store_items').insert(payload);
-        if (error) throw error;
-      }
-      const { data } = await supabase.from('store_items').select('*').order('created_at', { ascending: false });
-      setStoreItems(data || []);
-      setStoreForm({ id: '', name: '', price: '', url: '', gallery: [] });
-      setStoreMessage(storeForm.id ? 'Produto atualizado de maneira rápida!' : 'Item adicionado na loja perfeitamente!');
-      setTimeout(() => setStoreMessage(null), 3000);
-    } catch (err) {
-      setStoreMessage('Falha ao processar o item. Tente novamente.');
-      setTimeout(() => setStoreMessage(null), 3000);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDeleteStoreItem = async (id: string) => {
-    if(!window.confirm('Excluir este item da loja?')) return;
-    setLoading(true);
-    try {
-      await supabase.from('store_items').delete().eq('id', id);
-      setStoreItems(prev => prev.filter(item => item.id !== id));
-    } catch (err) {
-      alert('Erro ao deletar item.');
     } finally {
       setLoading(false);
     }
@@ -5802,31 +5746,39 @@ export default function App() {
                         <h3 className="font-bold text-xl">Loja FocinhoApp</h3>
                       </div>
 
-                      {storeItems.length > 0 ? (
+                      {products.length > 0 ? (
                         <div className="grid grid-cols-2 gap-4">
-                          {storeItems.map(item => (
-                            <a 
-                              key={item.id}
-                              href={item.url}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="bg-gray-50 p-4 rounded-3xl border border-gray-100 space-y-3 hover:border-purple-200 transition-colors group block"
-                            >
-                              <div className="aspect-square bg-white rounded-2xl flex items-center justify-center group-hover:scale-105 transition-transform overflow-hidden">
-                                {item.gallery && item.gallery.length > 0 ? (
-                                  <img src={item.gallery[0]} alt={item.name} className="w-full h-full object-cover" />
-                                ) : (
-                                  <ShoppingBag className="w-8 h-8 text-purple-300" />
-                                )}
-                              </div>
-                              <div>
-                                <h4 className="font-bold text-xs truncate" title={item.name}>{item.name}</h4>
-                                <p className="text-[10px] text-purple-600 font-black mt-1">
-                                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(item.price))}
-                                </p>
-                              </div>
-                            </a>
-                          ))}
+                          {products.map(item => {
+                            const message = encodeURIComponent(`Olá! Gostaria de saber mais sobre o produto: *${item.name}* (Ref: Lojinha Focinho)`);
+                            const waLink = `https://wa.me/5521988853407?text=${message}`;
+                            return (
+                              <a 
+                                key={item.id}
+                                href={waLink}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="bg-gray-50 p-4 rounded-3xl border border-gray-100 space-y-3 hover:border-purple-200 transition-colors group block relative"
+                              >
+                                <div className="absolute top-2 right-2 bg-purple-100 text-purple-700 text-[9px] font-black uppercase px-2 py-0.5 rounded-lg z-10">
+                                  {item.category}
+                                </div>
+                                <div className="relative w-full aspect-square bg-white rounded-2xl flex items-center justify-center group-hover:scale-105 transition-transform overflow-hidden">
+                                  {item.image_url ? (
+                                    <img src={item.image_url} alt={item.name} className="absolute inset-0 w-full h-full object-cover" />
+                                  ) : (
+                                    <ShoppingBag className="w-8 h-8 text-purple-300 relative z-10" />
+                                  )}
+                                </div>
+                                <div>
+                                  <h4 className="font-bold text-xs truncate" title={item.name}>{item.name}</h4>
+                                  <p className="text-[10px] text-gray-400 mt-0.5 line-clamp-2 leading-snug">{item.description}</p>
+                                  <p className="text-xs text-purple-600 font-black mt-2">
+                                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(item.price))}
+                                  </p>
+                                </div>
+                              </a>
+                            );
+                          })}
                         </div>
                       ) : (
                         <div className="bg-purple-50 p-6 rounded-3xl text-center">
@@ -6604,101 +6556,6 @@ export default function App() {
                         </div>
                       </div>
 
-                      {/* Store Management */}
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between mb-4">
-                          <h4 className="font-bold text-gray-800 flex items-center gap-2">
-                            <ShoppingBag className="w-5 h-5 text-gray-400" /> Loja Parceira ({storeItems.length})
-                          </h4>
-                        </div>
-                        <div className="bg-gray-50/50 border border-gray-100 rounded-[2rem] p-4">
-                          <form onSubmit={handleSaveStoreItem} className="flex flex-col gap-3 mb-6">
-                            <Input 
-                              placeholder="Nome do Produto" 
-                              icon={ShoppingBag} 
-                              value={storeForm.name}
-                              onChange={(v: string) => setStoreForm(prev => ({ ...prev, name: v }))}
-                            />
-                            <div className="flex gap-3">
-                              <Input 
-                                placeholder="Preço (19.90)" 
-                                value={storeForm.price}
-                                onChange={(v: string) => setStoreForm(prev => ({ ...prev, price: v }))}
-                              />
-                            </div>
-                            <Input 
-                              placeholder="Link de Venda (https://...)" 
-                              value={storeForm.url}
-                              onChange={(v: string) => setStoreForm(prev => ({ ...prev, url: v }))}
-                            />
-                            
-                            <div className="flex flex-col gap-1.5">
-                              <label className="text-sm font-medium text-gray-600 ml-1">Fotos do Produto (até 10)</label>
-                              <div className="grid grid-cols-5 gap-2">
-                                {storeForm.gallery?.map((url, idx) => (
-                                  <div key={idx} className="aspect-square rounded-xl overflow-hidden relative group">
-                                    <img src={url} className="w-full h-full object-cover" />
-                                    <button
-                                      type="button"
-                                      onClick={() => setStoreForm(prev => ({ ...prev, gallery: prev.gallery?.filter((_, i) => i !== idx) }))}
-                                      className="absolute top-1 right-1 p-1 bg-black/50 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                                    >
-                                      <X className="w-3 h-3" />
-                                    </button>
-                                  </div>
-                                ))}
-                                {(storeForm.gallery?.length || 0) < 10 && (
-                                  <label className="aspect-square bg-gray-50 rounded-xl flex flex-col items-center justify-center border-2 border-dashed border-gray-200 hover:border-orange-300 transition-all cursor-pointer">
-                                    <input type="file" accept="image/*" multiple className="hidden" onChange={handleStorePhotoUpload} />
-                                    <Camera className="w-5 h-5 text-gray-300" />
-                                    <span className="text-[8px] text-gray-400 font-bold uppercase mt-1">Fotos</span>
-                                  </label>
-                                )}
-                              </div>
-                            </div>
-
-                            {storeMessage && (
-                              <div className="bg-green-50 text-green-600 p-3 rounded-xl text-center text-sm font-bold border border-green-200 mt-1">
-                                {storeMessage}
-                              </div>
-                            )}
-
-                            <div className="flex gap-2">
-                              <Button type="submit" className="w-full bg-orange-500 hover:bg-orange-600">
-                                {storeForm.id ? 'Salvar Alterações' : 'Adicionar Produto'}
-                              </Button>
-                              {storeForm.id && (
-                                <button type="button" onClick={() => setStoreForm({ id: '', name: '', price: '', url: '', gallery: [] })} className="px-6 rounded-2xl border-2 border-gray-100 text-gray-500 font-bold hover:bg-gray-50">
-                                  Cancelar
-                                </button>
-                              )}
-                            </div>
-                          </form>
-                          
-                          <div className="flex flex-col gap-3">
-                            {storeItems.map(item => (
-                              <div key={item.id} className="bg-white p-4 rounded-3xl border border-gray-200 flex justify-between items-center shadow-sm">
-                                <div className="min-w-0 pr-2">
-                                  <h5 className="font-bold text-gray-900 truncate">{item.name}</h5>
-                                  <p className="text-orange-500 font-black text-sm">
-                                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(item.price))}
-                                  </p>
-                                  <a href={item.url} target="_blank" rel="noreferrer" className="text-[10px] text-blue-500 hover:underline mt-1 block max-w-full truncate">{item.url}</a>
-                                </div>
-                                <div className="flex gap-2 shrink-0">
-                                  <button onClick={() => setStoreForm({ id: item.id, name: item.name, price: item.price.toString(), url: item.url, gallery: item.gallery || [] })} className="p-2.5 bg-orange-50 text-orange-600 rounded-xl hover:bg-orange-100 transition-colors">
-                                    <Edit2 className="w-4 h-4" />
-                                  </button>
-                                  <button onClick={() => handleDeleteStoreItem(item.id)} className="p-2.5 bg-red-50 text-red-500 rounded-xl hover:bg-red-100 transition-colors">
-                                    <Trash2 className="w-4 h-4" />
-                                  </button>
-                                </div>
-                              </div>
-                            ))}
-                            {storeItems.length === 0 && <p className="text-center text-xs text-gray-400 font-medium py-4">Nenhum item cadastrado.</p>}
-                          </div>
-                        </div>
-                      </div>
 
                       {/* Partners Management */}
                       <div className="space-y-4">
