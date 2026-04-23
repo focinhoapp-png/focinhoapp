@@ -874,6 +874,8 @@ export default function App() {
   const [pickerStateSearch, setPickerStateSearch] = useState('');
   const [isLoadingCities, setIsLoadingCities] = useState(false);
   const [accountSubView, setAccountSubView] = useState('menu'); // menu, profile, pets, support, store, admin, partners
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const [eventInfoEvent, setEventInfoEvent] = useState<PetEvent | null>(null);
   const [activePartnerFilter, setActivePartnerFilter] = useState('Todos');
   const [selectedPet, setSelectedPet] = useState<PetProfile | null>(() => {
     const pendingTag = localStorage.getItem('focinho_pending_tag');
@@ -989,6 +991,9 @@ export default function App() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [isAddingPost, setIsAddingPost] = useState(false);
   const [newPost, setNewPost] = useState<{ content: string, type: 'photo' | 'walk', imageUrl?: string, petId?: string, petName?: string }>({ content: '', type: 'photo' });
+  const [showPostPicker, setShowPostPicker] = useState<{ hashtag: string } | null>(null);
+  const [pickerPhotos, setPickerPhotos] = useState<string[]>([]);
+  const [postHashtag, setPostHashtag] = useState<string>('');
 
   // Verification State
   const [verificationCode, setVerificationCode] = useState<string | null>(null);
@@ -1668,21 +1673,13 @@ export default function App() {
           }
         }
 
-        // City-level filter: compare only the city portion from both sides
-        const cityName = selectedCity ? selectedCity.split(' - ')[0].trim().toLowerCase() : '';
-        const filteredAlerts = cityName && !isAdmin
-          ? allAlerts.filter(a => {
-              const alertCity = (a.city || '').split(' - ')[0].trim().toLowerCase();
-              return alertCity.includes(cityName) || cityName.includes(alertCity);
-            })
-          : allAlerts;
-
+        // Sem filtro por cidade — todos os alertas são visíveis para toda a comunidade
         setHasNewUnreadSOS(prev => {
-          if (lastLostAlertsCount.current !== 0 && filteredAlerts.length > lastLostAlertsCount.current) return true;
+          if (lastLostAlertsCount.current !== 0 && allAlerts.length > lastLostAlertsCount.current) return true;
           return prev;
         });
-        lastLostAlertsCount.current = filteredAlerts.length;
-        setLostAlerts(filteredAlerts);
+        lastLostAlertsCount.current = allAlerts.length;
+        setLostAlerts(allAlerts);
 
 
       } catch (e: any) {
@@ -1698,7 +1695,7 @@ export default function App() {
 
     return () => { supabase.removeChannel(channel); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedCity, isAdmin]);
+  }, [isAdmin]);
 
   // Fetch Walk History
   useEffect(() => {
@@ -2216,18 +2213,55 @@ export default function App() {
   };
 
 
-  // Fetch Feed Posts
+  // Fetch Feed Posts — Instagram-style: posts do usuário + seguidos primeiro, depois todos os outros
   useEffect(() => {
     const fetchPosts = async () => {
-      const { data } = await supabase.from('posts').select('*').order('createdAt', { ascending: false }).limit(50);
-      setPosts((data || []) as Post[]);
+      const { data } = await supabase.from('posts').select('*').order('createdAt', { ascending: false }).limit(100);
+      const allPosts = (data || []) as Post[];
+
+      if (!user) {
+        setPosts(allPosts.slice(0, 50));
+        return;
+      }
+
+      // Buscar quem o usuário segue
+      let followingIds: string[] = [];
+      try {
+        const { data: followsData } = await supabase
+          .from('follows')
+          .select('following_id')
+          .eq('follower_id', user.id);
+        followingIds = (followsData || []).map((f: any) => f.following_id);
+      } catch {
+        // tabela follows pode não existir ainda — sem problema
+      }
+
+      const priorityIds = new Set([user.id, ...followingIds]);
+
+      // Separar: posts prioritários (próprios + seguidos) vs. resto
+      const priorityPosts = allPosts.filter(p => priorityIds.has(p.userId));
+      const otherPosts = allPosts.filter(p => !priorityIds.has(p.userId));
+
+      // Intercalar: blocos de 3 prioritários + 1 do resto (estilo Instagram)
+      const merged: Post[] = [];
+      let pi = 0, oi = 0;
+      while (pi < priorityPosts.length || oi < otherPosts.length) {
+        for (let i = 0; i < 3 && pi < priorityPosts.length; i++, pi++) {
+          merged.push(priorityPosts[pi]);
+        }
+        if (oi < otherPosts.length) {
+          merged.push(otherPosts[oi++]);
+        }
+      }
+
+      setPosts(merged.slice(0, 50));
     };
     fetchPosts();
     const channel = supabase.channel('posts')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, fetchPosts)
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, []);
+  }, [user]);
 
   const handleCreatePost = async () => {
     if (!user || !newPost.content) return;
@@ -3035,31 +3069,220 @@ export default function App() {
   return (
     <ErrorBoundary>
       <div className={`min-h-screen ${!user && view === 'home' ? 'bg-white' : 'bg-gray-50'} font-sans text-gray-900 pb-32 md:pb-0`}>
+
+        {/* ══════════════════════════════════════════
+            EVENT INFO PAGE — Full-screen overlay
+            Opens when user taps a banner in EventCarousel
+        ══════════════════════════════════════════ */}
+        {eventInfoEvent && (() => {
+          const ev = eventInfoEvent;
+          const start = ev.event_date ? new Date(ev.event_date + 'T12:00:00') : null;
+          const end = start ? new Date(start.getTime() + 15 * 24 * 60 * 60 * 1000) : null;
+          const fmtDate = (d: Date) => d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+          const dateRange = start && end ? `${fmtDate(start)} — ${fmtDate(end)}` : '';
+          const daysLeft = end ? Math.max(0, Math.ceil((end.getTime() - Date.now()) / 86400000)) : null;
+          const hashId = ev.id ? ev.id.split('').reduce((a: number, c: string) => a + c.charCodeAt(0), 0) : 42;
+          const interested = 80 + (hashId % 400);
+          const hashtag = `#Evento_${ev.title.replace(/\s+/g, '')}`;
+
+          return (
+            <div
+              className="fixed inset-0 z-[200] bg-white overflow-y-auto"
+              style={{ fontFamily: "'Inter', 'Outfit', sans-serif" }}
+            >
+              {/* ── Hero Banner ── */}
+              <div className="relative w-full" style={{ minHeight: 280 }}>
+                {ev.imageUrl ? (
+                  <img src={ev.imageUrl} alt={ev.title} className="w-full object-cover" style={{ height: 280 }} />
+                ) : (
+                  <div className="w-full flex items-center justify-center" style={{ height: 280, background: 'linear-gradient(135deg, #ff8c00 0%, #ff5f00 50%, #e63900 100%)' }}>
+                    <span style={{ fontSize: 80 }}>🐾</span>
+                  </div>
+                )}
+                {/* Dark scrim at top for back button */}
+                <div className="absolute inset-x-0 top-0 h-24" style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.45), transparent)' }} />
+                {/* Back button */}
+                <button
+                  onClick={() => setEventInfoEvent(null)}
+                  className="absolute top-4 left-4 flex items-center gap-1.5 text-white font-bold text-sm"
+                  style={{ textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                  <span>{ev.title.length > 24 ? ev.title.slice(0, 22) + '…' : ev.title}</span>
+                </button>
+                {/* Bottom scrim */}
+                <div className="absolute inset-x-0 bottom-0 h-20" style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.55), transparent)' }} />
+                {/* Title over hero */}
+                <div className="absolute bottom-0 left-0 right-0 px-5 pb-5">
+                  <h1 className="text-white font-black text-2xl leading-tight drop-shadow-lg">{ev.title}</h1>
+                  {dateRange && (
+                    <p className="text-white/80 text-sm font-semibold mt-0.5">📅 {dateRange}</p>
+                  )}
+                </div>
+              </div>
+
+              {/* ── Body ── */}
+              <div style={{ background: 'linear-gradient(180deg, #f5f0ff 0%, #fff8f0 60%, #fff 100%)', minHeight: 'calc(100vh - 280px)' }}>
+
+                {/* ── Interested row ── */}
+                <div className="px-5 pt-5 pb-4 flex items-center gap-3">
+                  <div className="flex -space-x-2">
+                    {[
+                      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=50&h=50&fit=crop',
+                      'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=50&h=50&fit=crop',
+                      'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=50&h=50&fit=crop',
+                    ].map((url, i) => (
+                      <div key={i} className="w-8 h-8 rounded-full border-2 border-white overflow-hidden bg-gray-100 shrink-0">
+                        <img src={url} alt="" className="w-full h-full object-cover" />
+                      </div>
+                    ))}
+                  </div>
+                  <p style={{ color: '#6c3fc5', fontWeight: 700, fontSize: 13 }}>
+                    {interested} pessoas estão participando! 🐾
+                  </p>
+                </div>
+
+                {/* ── Description card ── */}
+                {ev.description && (
+                  <div className="mx-4 mb-4 bg-white rounded-3xl p-5 shadow-sm border border-purple-100">
+                    <p className="text-gray-600 text-sm leading-relaxed">{ev.description}</p>
+                  </div>
+                )}
+
+                {/* ── How to Join ── */}
+                <div className="mx-4 mb-4">
+                  <div
+                    className="flex items-center justify-center py-3 px-6 rounded-2xl mb-4"
+                    style={{ background: 'linear-gradient(90deg, #7c3aed, #9b5de5)', boxShadow: '0 4px 16px rgba(124,58,237,0.25)' }}
+                  >
+                    <span className="text-white font-black text-base tracking-wide">— Como Participar —</span>
+                  </div>
+                  <div className="bg-white rounded-3xl p-5 shadow-sm border border-purple-100 space-y-5">
+                    {[
+                      { num: '1', text: 'Abra o FocinhoApp e acesse a seção de Passeio' },
+                      { num: '2', text: `Publique uma foto do seu pet com o tema do evento usando a hashtag ${hashtag}` },
+                      { num: '3', text: 'Compartilhe com a comunidade e colete curtidas! ❤️' },
+                    ].map((step) => (
+                      <div key={step.num} className="flex items-start gap-4">
+                        <div
+                          className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 font-black text-lg"
+                          style={{ background: 'linear-gradient(135deg, #f59e0b, #f97316)', color: '#fff', boxShadow: '0 2px 8px rgba(245,158,11,0.35)' }}
+                        >
+                          {step.num}
+                        </div>
+                        <p className="text-gray-700 text-sm leading-relaxed pt-1">{step.text}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* ── Event Details ── */}
+                <div className="mx-4 mb-4">
+                  <div
+                    className="flex items-center justify-center py-3 px-6 rounded-2xl mb-4"
+                    style={{ background: 'linear-gradient(90deg, #7c3aed, #9b5de5)', boxShadow: '0 4px 16px rgba(124,58,237,0.25)' }}
+                  >
+                    <span className="text-white font-black text-base tracking-wide">— Detalhes do Evento —</span>
+                  </div>
+                  <div className="bg-white rounded-3xl p-5 shadow-sm border border-purple-100 space-y-3">
+                    {dateRange && (
+                      <div className="flex items-start gap-3">
+                        <span className="text-xl">📅</span>
+                        <div>
+                          <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Período</p>
+                          <p className="text-gray-800 font-bold text-sm mt-0.5">{dateRange}</p>
+                        </div>
+                      </div>
+                    )}
+                    {daysLeft !== null && daysLeft > 0 && (
+                      <div className="flex items-start gap-3">
+                        <span className="text-xl">⏳</span>
+                        <div>
+                          <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Tempo restante</p>
+                          <p className="text-gray-800 font-bold text-sm mt-0.5">{daysLeft} {daysLeft === 1 ? 'dia' : 'dias'} restantes</p>
+                        </div>
+                      </div>
+                    )}
+                    {ev.location && (
+                      <div className="flex items-start gap-3">
+                        <span className="text-xl">📍</span>
+                        <div>
+                          <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Local</p>
+                          <p className="text-gray-800 font-bold text-sm mt-0.5">{ev.location}</p>
+                        </div>
+                      </div>
+                    )}
+                    <div className="flex items-start gap-3">
+                      <span className="text-xl">🏆</span>
+                      <div>
+                        <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Seleção de vencedores</p>
+                        <p className="text-gray-800 font-bold text-sm mt-0.5">Baseada no engajamento dos posts da comunidade</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <span className="text-xl">🏅</span>
+                      <div>
+                        <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Hashtag do evento</p>
+                        <p className="font-black text-sm mt-0.5" style={{ color: '#7c3aed' }}>{hashtag}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ── CTA Button ── */}
+                <div className="px-4 pb-6 pt-2">
+                  <button
+                    onClick={() => {
+                      setEventInfoEvent(null);
+                      // Navigate to event detail view
+                      const found = petEvents.find(p => p.id === ev.id);
+                      if (found) {
+                        setSelectedEventId(found.id);
+                        setView('account');
+                        setAccountSubView('eventDetail');
+                      }
+                    }}
+                    className="w-full py-4 rounded-3xl font-black text-white text-lg shadow-lg active:scale-95 transition-transform"
+                    style={{ background: 'linear-gradient(135deg, #7c3aed, #9b5de5)', boxShadow: '0 8px 24px rgba(124,58,237,0.35)' }}
+                  >
+                    🐾 Participar Agora!
+                  </button>
+                  <p className="text-center text-xs text-gray-400 mt-3">
+                    Publique uma foto do seu pet com a hashtag do evento para participar
+                  </p>
+                </div>
+
+                <div className="h-8" />
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Main App Header */}
         {user && view === 'dashboard' && (
           <header className="bg-white border-b border-gray-100 px-4 py-4 sticky top-0 z-50 flex items-center justify-between relative">
             {/* Left: QR Scanner */}
             <button
               onClick={() => setShowScanner(true)}
-              className="w-10 h-10 bg-gray-50 border border-gray-200 rounded-xl flex items-center justify-center text-gray-600 hover:bg-gray-100 transition-colors shrink-0"
+              className="p-2 text-black hover:bg-gray-100 rounded-xl flex items-center justify-center transition-colors shrink-0"
               title="Escanear QR Code ou Tag"
             >
-              <QrCode className="w-5 h-5" />
+              <QrCode className="w-6 h-6" />
             </button>
 
             {/* Center: name */}
             <span translate="no" className="absolute left-1/2 -translate-x-1/2 text-xl font-bold tracking-tight text-orange-500">FocinhoApp</span>
 
             {/* Right: Location + Logout */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1">
               <button
                 onClick={() => setShowCityPicker(true)}
-                className="w-10 h-10 bg-orange-50 border border-orange-100 rounded-xl flex items-center justify-center text-orange-600 hover:bg-orange-100 transition-colors shrink-0"
+                className="p-2 text-black hover:bg-gray-100 rounded-xl flex items-center justify-center transition-colors shrink-0"
                 title="Mudar localização global"
               >
-                <MapPin className="w-5 h-5" />
+                <MapPin className="w-6 h-6" />
               </button>
-              <button onClick={handleLogout} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors shrink-0" title="Sair da conta">
+              <button onClick={handleLogout} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl flex items-center justify-center transition-colors shrink-0" title="Sair da conta">
                 <LogOut className="w-6 h-6" />
               </button>
             </div>
@@ -3553,7 +3776,7 @@ export default function App() {
                     <BannerCarousel />
 
                     {/* Novo Slider de Eventos com Auto-scroll */}
-                    <EventCarousel />
+                    <EventCarousel onEventClick={(evt) => setEventInfoEvent(evt)} />
                     
                     {/* Eventos Destacados pelo Admin */}
                     <MyEventsCarousel />
@@ -4763,66 +4986,46 @@ export default function App() {
                   <div className="flex items-center justify-between ml-1">
                     <h3 className="font-bold text-gray-800">Alertas na Região</h3>
                   </div>
-                  {(() => {
-                    const filteredAlerts = lostAlerts.filter(alert => {
-                      if (isAdmin || !selectedCity || !alert.city) return true;
-                      const cityName = selectedCity.split(' - ')[0].trim().toLowerCase();
-                      return alert.city.toLowerCase().includes(cityName);
-                    });
-
-                    return filteredAlerts.length > 0 ? (
-                      <div className="grid grid-cols-1 gap-4">
-                        {filteredAlerts.map((alert) => (
-                          <SOSAlertCard
-                            key={alert.id}
-                            alert={alert}
-                            user={user}
-                            onOpenFinder={() => openPetFinderById(alert.petId)}
-                            onEdit={() => {
-                              setEditingSOSId(alert.id);
-                              setNewSOS({
-                                petId: alert.petId,
-                                city: alert.city,
-                                lastSeen: alert.lastSeen,
-                                reward: alert.reward
-                              });
-                              setIsAddingSOS(true);
-                            }}
-                            onFound={() => handleDeleteSOS(alert.id)}
-                            onShare={async () => {
-                              if (navigator.share) {
-                                try {
-                                  await navigator.share({
-                                    title: `Alerta SOS: ${alert.petName}`,
-                                    text: `Alerta SOS: ${alert.petName} desapareceu${alert.city ? ` em ${alert.city}` : ''}. Ajude a encontrar!`,
-                                    url: window.location.href,
-                                  });
-                                } catch (err) { console.log('Error sharing:', err); }
-                              } else {
-                                window.alert('O compartilhamento não é suportado neste dispositivo.');
-                              }
-                            }}
-                          />
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="bg-gray-50 p-8 rounded-[2rem] text-center border border-dashed border-gray-200">
-                        <p className="text-gray-400 text-sm">
-                          {selectedCity && !isAdmin
-                            ? `Nenhum alerta ativo em ${selectedCity.split(' - ')[0]}.`
-                            : 'Nenhum alerta ativo no momento.'}
-                        </p>
-                        {selectedCity && !isAdmin && (
-                          <button
-                            onClick={() => { setSelectedCity(''); localStorage.removeItem('focinho_selected_city'); }}
-                            className="mt-3 text-xs font-bold text-orange-500 underline"
-                          >
-                            Ver todos os alertas
-                          </button>
-                        )}
-                      </div>
-                    );
-                  })()}
+                  {lostAlerts.length > 0 ? (
+                    <div className="grid grid-cols-1 gap-4">
+                      {lostAlerts.map((alert) => (
+                        <SOSAlertCard
+                          key={alert.id}
+                          alert={alert}
+                          user={user}
+                          onOpenFinder={() => openPetFinderById(alert.petId)}
+                          onEdit={() => {
+                            setEditingSOSId(alert.id);
+                            setNewSOS({
+                              petId: alert.petId,
+                              city: alert.city,
+                              lastSeen: alert.lastSeen,
+                              reward: alert.reward
+                            });
+                            setIsAddingSOS(true);
+                          }}
+                          onFound={() => handleDeleteSOS(alert.id)}
+                          onShare={async () => {
+                            if (navigator.share) {
+                              try {
+                                await navigator.share({
+                                  title: `Alerta SOS: ${alert.petName}`,
+                                  text: `Alerta SOS: ${alert.petName} desapareceu${alert.city ? ` em ${alert.city}` : ''}. Ajude a encontrar!`,
+                                  url: window.location.href,
+                                });
+                              } catch (err) { console.log('Error sharing:', err); }
+                            } else {
+                              window.alert('O compartilhamento não é suportado neste dispositivo.');
+                            }
+                          }}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="bg-gray-50 p-8 rounded-[2rem] text-center border border-dashed border-gray-200">
+                      <p className="text-gray-400 text-sm">Nenhum alerta ativo no momento.</p>
+                    </div>
+                  )}
                   <div className="h-20" /> {/* Spacer to avoid bottom nav overlap */}
                 </div>
 
@@ -5874,44 +6077,254 @@ export default function App() {
                         <h3 className="font-bold text-xl">Eventos da Comunidade</h3>
                       </div>
 
-                      {petEvents.length === 0 ? (
+                      {petEvents.filter(ev => {
+                        if (!ev.event_date) return false;
+                        const s = new Date(ev.event_date + 'T12:00:00');
+                        const n = new Date();
+                        return n >= s;
+                      }).length === 0 ? (
                         <div className="bg-blue-50 p-6 rounded-[2rem] text-center border-2 border-dashed border-blue-200">
                           <p className="text-blue-800 font-bold text-sm">Nenhum evento próximo</p>
                           <p className="text-blue-600 text-xs mt-1">Fique de olho! Em breve teremos encontros de pets na sua região.</p>
                         </div>
                       ) : (
                         <div className="flex flex-col gap-4">
-                          {petEvents.map(ev => (
-                            <div key={ev.id} className="bg-white rounded-[2rem] border border-gray-100 overflow-hidden shadow-sm">
-                              {ev.imageUrl && (
-                                <div className="w-full aspect-video overflow-hidden">
-                                  <img src={ev.imageUrl} alt={ev.title} className="w-full h-full object-cover" />
-                                </div>
-                              )}
-                              <div className="p-5">
-                                <h4 className="font-black text-gray-900 text-lg mb-1">{ev.title}</h4>
-                                {ev.description && <p className="text-sm text-gray-500 mb-3">{ev.description}</p>}
-                                <div className="flex flex-wrap gap-2">
-                                  {ev.event_date && (
-                                    <span className="bg-blue-50 text-blue-600 text-xs font-bold px-3 py-1.5 rounded-full">
-                                      📅 {new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }).format(new Date(ev.event_date + 'T12:00:00'))}
-                                    </span>
+                          {petEvents
+                            .filter(ev => {
+                              if (!ev.event_date) return false;
+                              const s = new Date(ev.event_date + 'T12:00:00');
+                              const n = new Date();
+                              return n >= s; // Keep Acontecendo and Concluído
+                            })
+                            .sort((a, b) => {
+                              const now = new Date().getTime();
+                              const getStatusWeight = (ev: typeof a) => {
+                                if (!ev.event_date) return 2;
+                                const end = new Date(ev.event_date + 'T12:00:00').getTime() + 15 * 24 * 60 * 60 * 1000;
+                                return now > end ? 2 : 1; // 1 = Acontecendo (first), 2 = Concluído (second)
+                              };
+                              const weightDiff = getStatusWeight(a) - getStatusWeight(b);
+                              if (weightDiff !== 0) return weightDiff;
+                              const timeA = a.event_date ? new Date(a.event_date).getTime() : 0;
+                              const timeB = b.event_date ? new Date(b.event_date).getTime() : 0;
+                              return timeB - timeA; // Descending date
+                            })
+                            .map(ev => {
+                              // Derive status from event_date (+15 days = end date)
+                            const now = new Date();
+                            const start = ev.event_date ? new Date(ev.event_date + 'T12:00:00') : null;
+                            const end = start ? new Date(start.getTime() + 15 * 24 * 60 * 60 * 1000) : null;
+                            let evStatus: 'Acontecendo' | 'Concluído' | 'Em breve' = 'Em breve';
+                            if (start && end) {
+                              if (now > end) evStatus = 'Concluído';
+                              else if (now >= start) evStatus = 'Acontecendo';
+                            }
+                            const isClickable = evStatus === 'Acontecendo';
+                            // Deterministic fake interested count from id
+                            const hashId = ev.id ? ev.id.split('').reduce((a: number, c: string) => a + c.charCodeAt(0), 0) : 42;
+                            const interested = 80 + (hashId % 400);
+                            // Format date range
+                            const fmtDate = (d: Date) => d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                            const dateRange = start && end ? `${fmtDate(start)} — ${fmtDate(end)}` : '';
+                            return (
+                              <div key={ev.id} 
+                                onClick={() => {
+                                  if (isClickable) {
+                                    setSelectedEventId(ev.id);
+                                    setAccountSubView('eventDetail');
+                                  }
+                                }}
+                                className={`bg-white rounded-[2rem] border border-gray-100 overflow-hidden shadow-sm ${isClickable ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}`}
+                              >
+                                {/* Banner image */}
+                                {ev.imageUrl ? (
+                                  <div className="w-full h-44 overflow-hidden">
+                                    <img src={ev.imageUrl} alt={ev.title} className="w-full h-full object-cover" />
+                                  </div>
+                                ) : (
+                                  <div className="w-full h-44 bg-gradient-to-br from-orange-400 to-amber-500 flex items-center justify-center">
+                                    <Calendar className="w-12 h-12 text-white/60" />
+                                  </div>
+                                )}
+                                {/* Card body */}
+                                <div className="p-4">
+                                  <h4 className="font-black text-gray-900 text-[17px] leading-snug mb-0.5">{ev.title}</h4>
+                                  {dateRange && (
+                                    <p className="text-sm text-gray-500 font-medium mb-3">{dateRange}</p>
                                   )}
-                                  {ev.location && (
-                                    <span className="bg-orange-50 text-orange-600 text-xs font-bold px-3 py-1.5 rounded-full">
-                                      📍 {ev.location}
-                                    </span>
+                                  {/* Bottom row: interested + status badge */}
+                                  <div className={`flex flex-wrap items-center ${evStatus === 'Concluído' ? 'justify-end' : 'justify-between'} gap-2`}>
+                                    {evStatus !== 'Concluído' && (
+                                      <div className="flex items-center gap-2 min-w-0">
+                                        <div className="flex -space-x-2 shrink-0">
+                                          {[
+                                            'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=50&h=50&fit=crop',
+                                            'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=50&h=50&fit=crop',
+                                            'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=50&h=50&fit=crop',
+                                          ].map((picUrl, i) => (
+                                            <div key={i} className="w-6 h-6 rounded-full bg-gray-100 border-2 border-white overflow-hidden shrink-0">
+                                              <img src={picUrl} alt="Interessado" className="w-full h-full object-cover" />
+                                            </div>
+                                          ))}
+                                        </div>
+                                        <span className="text-[11px] text-orange-500 font-semibold truncate leading-tight">
+                                          {interested} pessoas participando.
+                                        </span>
+                                      </div>
+                                    )}
+                                    {evStatus !== 'Em breve' && (
+                                      <span className={`shrink-0 px-4 py-1.5 rounded-xl text-xs font-black ${
+                                        evStatus === 'Acontecendo'
+                                          ? 'bg-orange-500 text-white'
+                                          : 'bg-gray-100 text-gray-500'
+                                      }`}>
+                                        {evStatus}
+                                      </span>
+                                    )}
+                                  </div>
+                                  {/* Contextual footer per status */}
+                                  {evStatus === 'Acontecendo' && end && (
+                                    <p className="text-[11px] text-orange-500 font-semibold mt-2 flex items-center gap-1">
+                                      ⏳ {Math.max(0, Math.ceil((end.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)))} {Math.max(0, Math.ceil((end.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))) === 1 ? 'dia restante' : 'dias restantes'}
+                                    </p>
+                                  )}
+                                  {evStatus === 'Concluído' && (
+                                    <p className="text-[11px] text-gray-400 font-medium mt-2">O evento terminou.</p>
+                                  )}
+                                  {evStatus === 'Em breve' && ev.location && (
+                                    <p className="text-[11px] text-gray-400 font-medium mt-2 flex items-center gap-1">
+                                      <MapPin className="w-3 h-3 shrink-0" /> {ev.location}
+                                    </p>
                                   )}
                                 </div>
                               </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       )}
                     </div>
                     <div className="h-20" />
                   </div>
                 )}
+
+                {accountSubView === 'eventDetail' && selectedEventId && (() => {
+                  const ev = petEvents.find(p => p.id === selectedEventId);
+                  if (!ev) return null;
+                  
+                  const start = ev.event_date ? new Date(ev.event_date + 'T12:00:00') : null;
+                  const end = start ? new Date(start.getTime() + 15 * 24 * 60 * 60 * 1000) : null;
+                  const fmtDate = (d: Date) => d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                  const dateRange = start && end ? `${fmtDate(start)} — ${fmtDate(end)}` : '';
+                  const hashId = ev.id ? ev.id.split('').reduce((a: number, c: string) => a + c.charCodeAt(0), 0) : 42;
+                  const interested = 80 + (hashId % 400);
+                  const hashtag = `#Evento_${ev.title.replace(/\s+/g, '')}`;
+                  
+                  // Filter associated posts
+                  const eventPosts = posts.filter(p => p.content?.includes(hashtag));
+
+                  return (
+                    <div className="space-y-6">
+                      <div className="flex items-center justify-between pb-2">
+                        <button onClick={() => { setSelectedEventId(null); setAccountSubView('events'); }} className="flex items-center gap-1 text-gray-800 font-bold text-lg">
+                          <ChevronLeft className="w-5 h-5" />
+                        </button>
+                      </div>
+                      
+                      {/* Detailed info */}
+                      <div className="bg-[#FAF9F6] -mx-4 px-4 pb-4 border-b border-gray-100">
+                        <h2 className="text-[17px] font-medium text-gray-900 leading-snug mb-1">{ev.title}</h2>
+                        <div className="flex justify-between items-center mb-3">
+                          <p className="text-sm text-gray-400 font-medium">{dateRange}</p>
+                          <span className="bg-[#0B3B8B] text-white text-xs font-bold px-3 py-1 rounded-[4px] tracking-wide">Acontecendo</span>
+                        </div>
+                        <div className="flex items-center gap-2 mb-4">
+                          <div className="flex -space-x-2 shrink-0">
+                            {[
+                              'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=50&h=50&fit=crop',
+                              'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=50&h=50&fit=crop',
+                              'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=50&h=50&fit=crop',
+                            ].map((picUrl, i) => (
+                              <div key={i} className="w-6 h-6 rounded-full bg-gray-100 border border-white overflow-hidden shrink-0">
+                                <img src={picUrl} alt="Interessado" className="w-full h-full object-cover" />
+                              </div>
+                            ))}
+                          </div>
+                          <span className="text-xs text-[#0B3B8B] font-semibold">{interested} pessoas estão interessadas.</span>
+                        </div>
+                        {ev.imageUrl && (
+                          <button
+                            onClick={() => setEventInfoEvent(ev)}
+                            className="w-full rounded-[14px] overflow-hidden shadow-sm h-36 block relative group"
+                          >
+                            <img src={ev.imageUrl} alt={ev.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                            <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                              <span className="bg-white/90 text-gray-800 font-bold text-xs px-3 py-1.5 rounded-full shadow">Ver detalhes do evento</span>
+                            </div>
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Header Posts */}
+                      <div className="flex justify-between items-center pt-2">
+                         <h3 className="text-xl font-medium text-gray-900">Posts</h3>
+                         <button onClick={() => setShowPostPicker({ hashtag })} className="text-[#0B3B8B] flex items-center justify-center p-1 bg-blue-50 border border-blue-100 rounded-full w-8 h-8 shadow-sm">
+                            <Plus className="w-5 h-5 stroke-[2.5]" />
+                         </button>
+                      </div>
+
+                      {/* Timeline */}
+                      <div className="flex flex-col gap-6">
+                        {eventPosts.length === 0 ? (
+                           <div className="text-center py-6 text-gray-400 text-sm border-2 border-dashed border-gray-100 rounded-xl">Seja o primeiro a postar neste evento!</div>
+                        ) : (
+                           eventPosts.map((post, idx) => (
+                              <div key={`${post.id}-${idx}`} className="bg-white rounded-xl overflow-hidden border-b border-gray-100 pb-4">
+                                {/* Header */}
+                                <div className="pb-3 flex items-center justify-between">
+                                  <div className="flex items-center gap-3">
+                                     <img src={post.userPhoto || 'https://picsum.photos/seed/user/100/100'} className="w-10 h-10 rounded-full border border-gray-100" />
+                                     <div>
+                                        <p className="text-base font-semibold m-0 text-gray-900">{post.userName}</p>
+                                        <p className="text-[11px] text-gray-400 m-0">{new Date(post.createdAt).toLocaleDateString()}</p>
+                                     </div>
+                                  </div>
+                                  <button className="flex items-center gap-1 text-[#0B3B8B] text-sm font-semibold border border-[#0B3B8B] px-3 py-1 rounded-full">
+                                    <Plus className="w-3.5 h-3.5" /> Seguir
+                                  </button>
+                                </div>
+                                {/* Post Content */}
+                                <div className="pb-3 text-sm text-[#0B3B8B] font-medium break-words">
+                                   {post.content}
+                                </div>
+                                {/* Image Grid mockup depending on content or single image */}
+                                {post.imageUrl && (
+                                   <div className="w-full bg-gray-50 h-[300px] rounded-xl overflow-hidden mb-3">
+                                     <img src={post.imageUrl} className="w-full h-full object-cover" />
+                                   </div>
+                                )}
+                                {/* Footer actions */}
+                                <div className="flex flex-col gap-3">
+                                   <p className="text-[13px] text-gray-500">{post.likes?.length || 0} curtida(s)</p>
+                                   <div className="flex items-center justify-between border-t border-gray-100 pt-3">
+                                      <div className="flex items-center gap-4">
+                                         <button className="flex items-center gap-1 text-gray-600 font-medium text-sm">
+                                            <Heart className="w-5 h-5 text-gray-400" /> Curtir
+                                         </button>
+                                         <button className="flex items-center gap-1 text-gray-600 font-medium text-sm">
+                                            <MessageCircle className="w-5 h-5 text-gray-400" /> Comentar
+                                         </button>
+                                      </div>
+                                      <button className="text-gray-400"><Share2 className="w-5 h-5" /></button>
+                                   </div>
+                                </div>
+                              </div>
+                           ))
+                        )}
+                      </div>
+                      <div className="h-20" />
+                    </div>
+                  );
+                })()}
 
                 {accountSubView === 'adoption' && (
                   <div className="space-y-6">
@@ -7954,120 +8367,383 @@ export default function App() {
             )}
           </AnimatePresence>
 
-          {/* Add Post Modal */}
+          {/* ───── Gallery Photo Picker ───── */}
           <AnimatePresence>
-            {isAddingPost && (
+            {showPostPicker && (
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-end sm:items-center justify-center p-4"
-                onClick={() => setIsAddingPost(false)}
+                className="fixed inset-0 bg-black/80 z-[110] flex items-end"
+                onClick={() => { setShowPostPicker(null); setPickerPhotos([]); }}
               >
                 <motion.div
-                  initial={{ y: 100, opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  exit={{ y: 100, opacity: 0 }}
-                  className="bg-white w-full max-w-lg rounded-[2.5rem] overflow-hidden shadow-2xl"
+                  initial={{ y: '100%' }}
+                  animate={{ y: 0 }}
+                  exit={{ y: '100%' }}
+                  transition={{ type: 'spring', damping: 32, stiffness: 320 }}
+                  className="w-full bg-white rounded-t-[2rem] flex flex-col"
+                  style={{ maxHeight: '88vh' }}
                   onClick={e => e.stopPropagation()}
                 >
-                  <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-orange-50/50">
-                    <h3 className="font-black text-gray-900 uppercase tracking-tight">Nova Postagem</h3>
+                  {/* Handle */}
+                  <div className="flex justify-center pt-3 pb-0.5 shrink-0">
+                    <div className="w-10 h-1 bg-gray-300 rounded-full" />
+                  </div>
+
+                  {/* Header */}
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 shrink-0">
+                    <span className="font-bold text-gray-900 text-base">Recentes</span>
                     <button
-                      onClick={() => setIsAddingPost(false)}
-                      className="p-2 hover:bg-white rounded-full transition-colors"
+                      onClick={() => { setShowPostPicker(null); setPickerPhotos([]); }}
+                      className="p-1.5 rounded-full hover:bg-gray-100 transition-colors"
                     >
-                      <X className="w-5 h-5 text-gray-400" />
+                      <X className="w-5 h-5 text-gray-500" />
                     </button>
                   </div>
 
-                  <div className="p-6 space-y-6">
-                    {/* Image Upload */}
-                    <div className="space-y-2">
-                      <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Foto do Pet</label>
-                      <div
-                        onClick={() => document.getElementById('post-photo')?.click()}
-                        className="aspect-video bg-gray-50 rounded-3xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center gap-3 cursor-pointer hover:border-orange-300 hover:bg-orange-50 transition-all overflow-hidden group"
+                  {/* Selected strip (shown only when photos are selected) */}
+                  {pickerPhotos.length > 0 && (
+                    <div className="flex items-center gap-2 px-4 pt-3 pb-2 overflow-x-auto no-scrollbar shrink-0">
+                      {pickerPhotos.map((photo, idx) => (
+                        <div key={idx} className="relative w-20 h-20 shrink-0 rounded-xl overflow-hidden border border-gray-200">
+                          <img src={photo} className="w-full h-full object-cover" />
+                          <button
+                            onClick={() => setPickerPhotos(prev => prev.filter((_, i) => i !== idx))}
+                            className="absolute top-1 right-1 bg-black/60 backdrop-blur-sm rounded-full p-0.5"
+                          >
+                            <X className="w-3 h-3 text-white" />
+                          </button>
+                        </div>
+                      ))}
+                      {/* + add more */}
+                      <label
+                        htmlFor="picker-gallery-input"
+                        className="w-20 h-20 shrink-0 rounded-xl bg-gray-100 border-2 border-dashed border-gray-300 flex items-center justify-center cursor-pointer hover:bg-gray-200 transition-colors"
                       >
-                        {newPost.imageUrl ? (
-                          <img src={newPost.imageUrl} className="w-full h-full object-cover" />
-                        ) : (
-                          <>
-                            <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
-                              <Plus className="w-6 h-6 text-orange-500" />
-                            </div>
-                            <span className="text-xs font-bold text-gray-400">Clique para adicionar foto</span>
-                          </>
-                        )}
+                        <Plus className="w-6 h-6 text-gray-400" />
+                      </label>
+                    </div>
+                  )}
+
+                  {/* Grid: Camera (always first) + Clickable slots */}
+                  <div className="flex-1 overflow-y-auto">
+                    <div className="grid grid-cols-3 gap-0.5">
+                      {/* Camera slot — always the first */}
+                      <label
+                        htmlFor="picker-camera-input"
+                        className="aspect-square bg-gray-900 flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-gray-800 transition-colors"
+                      >
+                        <div className="w-12 h-12 rounded-full border-2 border-white/40 flex items-center justify-center">
+                          <Camera className="w-6 h-6 text-white" />
+                        </div>
+                        <span className="text-white text-[11px] font-semibold">Câmera</span>
+                      </label>
+
+                      {/* Gallery slots (11 slots, click any to open gallery) */}
+                      {Array(11).fill(null).map((_, i) => (
+                        <label
+                          key={i}
+                          htmlFor="picker-gallery-input"
+                          className="aspect-square bg-gray-100 flex items-center justify-center cursor-pointer hover:bg-gray-200 transition-colors relative overflow-hidden"
+                        >
+                          <ImageIcon className="w-7 h-7 text-gray-300" />
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Hidden inputs */}
+                  <input
+                    id="picker-camera-input"
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        try {
+                          const croppedBlob = await requestCrop(file, 1, false);
+                          const reader = new FileReader();
+                          reader.onloadend = () => {
+                            const url = reader.result as string;
+                            setPickerPhotos([url]);
+                            setPostHashtag(showPostPicker!.hashtag);
+                            setNewPost({ type: 'photo', content: '', imageUrl: url });
+                            setShowPostPicker(null);
+                            setIsAddingPost(true);
+                          };
+                          reader.readAsDataURL(croppedBlob);
+                        } catch (err) { console.error(err); }
+                      }
+                      e.target.value = '';
+                    }}
+                  />
+                  <input
+                    id="picker-gallery-input"
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        try {
+                          const croppedBlob = await requestCrop(file, 1, false);
+                          const reader = new FileReader();
+                          reader.onloadend = () => {
+                            const url = reader.result as string;
+                            if (pickerPhotos.length === 0) {
+                              // First photo → go directly to sharing
+                              setPickerPhotos([url]);
+                              setPostHashtag(showPostPicker!.hashtag);
+                              setNewPost({ type: 'photo', content: '', imageUrl: url });
+                              setShowPostPicker(null);
+                              setIsAddingPost(true);
+                            } else {
+                              // Adding more photos
+                              setPickerPhotos(prev => [...prev, url]);
+                            }
+                          };
+                          reader.readAsDataURL(croppedBlob);
+                        } catch (err) { console.error(err); }
+                      }
+                      e.target.value = '';
+                    }}
+                  />
+
+                  {/* Continue button (when photos selected) */}
+                  {pickerPhotos.length > 0 && (
+                    <div className="px-4 py-4 border-t border-gray-100 shrink-0">
+                      <button
+                        onClick={() => {
+                          setPostHashtag(showPostPicker!.hashtag);
+                          setNewPost({ type: 'photo', content: '', imageUrl: pickerPhotos[0] });
+                          setShowPostPicker(null);
+                          setIsAddingPost(true);
+                        }}
+                        className="w-full bg-[#0B3B8B] text-white font-bold py-4 rounded-full text-base"
+                      >
+                        Continuar
+                      </button>
+                    </div>
+                  )}
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* ───── Sharing Screen (Compartilhar Foto) ───── */}
+          <AnimatePresence>
+            {isAddingPost && (
+              <motion.div
+                initial={{ x: '100%' }}
+                animate={{ x: 0 }}
+                exit={{ x: '100%' }}
+                transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+                className="fixed inset-0 bg-white z-[105] flex flex-col"
+              >
+                {/* Header */}
+                <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 shrink-0">
+                  <button
+                    onClick={() => { setIsAddingPost(false); setNewPost({ content: '', type: 'photo', imageUrl: '' }); setPostHashtag(''); setPickerPhotos([]); }}
+                    className="p-1"
+                  >
+                    <ChevronLeft className="w-6 h-6 text-gray-800" />
+                  </button>
+                  <h2 className="flex-1 font-bold text-gray-900 text-lg">Compartilhar Foto</h2>
+                </div>
+
+                {/* Scrollable body */}
+                <div className="flex-1 overflow-y-auto">
+                  {/* Photo + caption row */}
+                  <div className="flex gap-3 p-4">
+                    {/* Selected photo thumbnail */}
+                    {newPost.imageUrl ? (
+                      <div className="relative w-24 h-24 shrink-0 rounded-xl overflow-hidden border border-gray-200">
+                        <img src={newPost.imageUrl} className="w-full h-full object-cover" />
+                        <button
+                          onClick={() => setNewPost(p => ({ ...p, imageUrl: '' }))}
+                          className="absolute top-1 right-1 bg-black/60 backdrop-blur-sm rounded-full p-0.5"
+                        >
+                          <X className="w-3 h-3 text-white" />
+                        </button>
+                      </div>
+                    ) : (
+                      <label htmlFor="share-photo-input" className="w-24 h-24 shrink-0 rounded-xl bg-gray-100 border-2 border-dashed border-gray-300 flex items-center justify-center cursor-pointer">
+                        <Plus className="w-7 h-7 text-gray-400" />
                         <input
-                          id="post-photo"
+                          id="share-photo-input"
                           type="file"
                           accept="image/*"
                           className="hidden"
                           onChange={async (e) => {
                             const file = e.target.files?.[0];
                             if (file) {
-                              try {
-                                const croppedBlob = await requestCrop(file, 1, false);
-                                const reader = new FileReader();
-                                reader.onloadend = () => {
-                                  setNewPost(prev => ({ ...prev, imageUrl: reader.result as string }));
-                                };
-                                reader.readAsDataURL(croppedBlob);
-                              } catch (err) {
-                                console.error(err);
-                              }
+                              const croppedBlob = await requestCrop(file, 1, false);
+                              const reader = new FileReader();
+                              reader.onloadend = () => setNewPost(p => ({ ...p, imageUrl: reader.result as string }));
+                              reader.readAsDataURL(croppedBlob);
                             }
                             e.target.value = '';
                           }}
                         />
-                      </div>
-                    </div>
+                      </label>
+                    )}
 
-                    {/* Content */}
-                    <div className="space-y-2">
-                      <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Legenda</label>
-                      <textarea
-                        value={newPost.content}
-                        onChange={(e) => setNewPost(prev => ({ ...prev, content: e.target.value }))}
-                        placeholder="O que seu pet está aprontando hoje?"
-                        className="w-full bg-gray-50 border border-gray-200 rounded-2xl py-4 px-5 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all min-h-[120px] text-sm"
+                    {/* + add more */}
+                    <label htmlFor="share-add-more-input" className="w-24 h-24 shrink-0 rounded-xl bg-gray-100 border border-gray-200 flex items-center justify-center cursor-pointer hover:bg-gray-200 transition-colors">
+                      <Plus className="w-7 h-7 text-gray-400" />
+                      <input id="share-add-more-input" type="file" accept="image/*" className="hidden"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            const croppedBlob = await requestCrop(file, 1, false);
+                            const reader = new FileReader();
+                            reader.onloadend = () => setNewPost(p => ({ ...p, imageUrl: reader.result as string }));
+                            reader.readAsDataURL(croppedBlob);
+                          }
+                          e.target.value = '';
+                        }}
                       />
-                    </div>
+                    </label>
 
-                    {/* Pet Selection */}
-                    <div className="space-y-2">
-                      <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Com qual Pet?</label>
-                      <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
-                        {userPets.map(pet => (
-                          <button
-                            key={pet.id}
-                            onClick={() => setNewPost(prev => ({ ...prev, petId: pet.id, petName: pet.name }))}
-                            className={`flex items-center gap-2 px-4 py-2 rounded-xl border transition-all shrink-0 ${newPost.petId === pet.id ? 'bg-orange-500 border-orange-500 text-white shadow-md shadow-orange-100' : 'bg-white border-gray-100 text-gray-600 hover:border-orange-200'}`}
-                          >
-                            <div className="w-6 h-6 rounded-full bg-gray-100 overflow-hidden border border-white/20">
-                              {pet.photoUrl ? (
-                                <img src={pet.photoUrl} className="w-full h-full object-cover" />
-                              ) : (
-                                <Dog className="w-4 h-4 m-1" />
-                              )}
-                            </div>
-                            <span className="text-xs font-bold">{pet.name}</span>
-                          </button>
-                        ))}
+                    {/* Caption textarea */}
+                    <textarea
+                      value={newPost.content}
+                      onChange={(e) => setNewPost(prev => ({ ...prev, content: e.target.value }))}
+                      placeholder="Compartilhe sua emoção atual..."
+                      className="flex-1 resize-none outline-none text-sm text-gray-700 placeholder-gray-400 leading-relaxed min-h-[96px]"
+                    />
+                  </div>
+
+                  <div className="border-t border-gray-100" />
+
+                  {/* Hashtag chip */}
+                  {postHashtag ? (
+                    <div className="px-4 py-3">
+                      <div className="inline-flex items-center border border-[#0B3B8B] rounded-md px-3 py-1.5">
+                        <span className="text-[#0B3B8B] text-sm font-medium">{postHashtag}</span>
                       </div>
                     </div>
+                  ) : null}
 
-                    <Button
-                      onClick={handleCreatePost}
-                      className="w-full py-4 shadow-xl shadow-orange-100"
-                      loading={loading}
-                      disabled={!newPost.content && !newPost.imageUrl}
-                    >
-                      Publicar na Timeline
-                    </Button>
+                  <div className="border-t border-gray-100" />
+
+                  {/* Tag do Pet */}
+                  {userPets.length > 0 && (
+                    <>
+                      <div className="px-4 py-3 space-y-2">
+                        <p className="font-bold text-gray-800 text-sm">Tag do Pet</p>
+                        <div className="flex gap-2 flex-wrap">
+                          {userPets.map(pet => (
+                            <button
+                              key={pet.id}
+                              onClick={() => setNewPost(prev => ({ ...prev, petId: newPost.petId === pet.id ? undefined : pet.id, petName: newPost.petId === pet.id ? undefined : pet.name }))}
+                              className={`flex items-center gap-1.5 pl-1.5 pr-3 py-1.5 rounded-full border-2 transition-all ${newPost.petId === pet.id ? 'border-[#0B3B8B] bg-blue-50' : 'border-gray-200 bg-white'}`}
+                            >
+                              <div className="w-6 h-6 rounded-full bg-gray-100 overflow-hidden shrink-0">
+                                {pet.photoUrl ? (
+                                  <img src={pet.photoUrl} className="w-full h-full object-cover" />
+                                ) : (
+                                  <Dog className="w-4 h-4 m-1 text-gray-400" />
+                                )}
+                              </div>
+                              <span className="text-sm font-semibold text-gray-800">{pet.name}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="border-t border-gray-100" />
+                    </>
+                  )}
+
+                  {/* Location */}
+                  <button className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-gray-50 transition-colors text-left">
+                    <MapPin className="w-5 h-5 text-gray-400 shrink-0" />
+                    <span className="text-sm text-gray-400">Adicionar Localização</span>
+                  </button>
+
+                  <div className="border-t border-gray-100" />
+                </div>
+
+                {/* Bottom fixed area */}
+                <div className="px-4 pt-4 pb-6 space-y-5 border-t border-gray-100 shrink-0 bg-white">
+                  {/* Post button */}
+                  <button
+                    onClick={async () => {
+                      const combinedContent = postHashtag
+                        ? `${postHashtag}\n\n${newPost.content}`.trim()
+                        : newPost.content.trim();
+                      if (!combinedContent && !newPost.imageUrl) return;
+                      setNewPost(p => ({ ...p, content: combinedContent }));
+                      await handleCreatePost();
+                      setPostHashtag('');
+                      setPickerPhotos([]);
+                    }}
+                    disabled={loading || (!newPost.content && !newPost.imageUrl && !postHashtag)}
+                    className="w-full bg-[#0B3B8B] text-white font-bold py-4 rounded-full text-base disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Post'}
+                  </button>
+
+                  {/* Outros */}
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1 h-px bg-gray-200" />
+                    <span className="text-sm font-medium text-gray-400">Outros</span>
+                    <div className="flex-1 h-px bg-gray-200" />
                   </div>
-                </motion.div>
+
+                  <div className="flex justify-center gap-10">
+                    {/* Instagram */}
+                    <button
+                      onClick={() => {
+                        if (navigator.share) navigator.share({ title: 'FocinhoApp', url: window.location.href });
+                        else window.open('https://instagram.com', '_blank');
+                      }}
+                      className="flex flex-col items-center gap-1.5"
+                    >
+                      <div className="w-14 h-14 rounded-full flex items-center justify-center" style={{ background: 'radial-gradient(circle at 30% 107%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285AEB 90%)' }}>
+                        <svg viewBox="0 0 24 24" className="w-7 h-7 fill-white">
+                          <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z" />
+                        </svg>
+                      </div>
+                      <span className="text-xs text-gray-600 font-medium">Instagram</span>
+                    </button>
+
+                    {/* Facebook */}
+                    <button
+                      onClick={() => {
+                        const url = encodeURIComponent(window.location.href);
+                        window.open(`https://www.facebook.com/sharer/sharer.php?u=${url}`, '_blank');
+                      }}
+                      className="flex flex-col items-center gap-1.5"
+                    >
+                      <div className="w-14 h-14 rounded-full bg-[#1877F2] flex items-center justify-center">
+                        <svg viewBox="0 0 24 24" className="w-7 h-7 fill-white">
+                          <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+                        </svg>
+                      </div>
+                      <span className="text-xs text-gray-600 font-medium">Facebook</span>
+                    </button>
+
+                    {/* WhatsApp */}
+                    <button
+                      onClick={() => {
+                        const text = encodeURIComponent(`${postHashtag ? postHashtag + ' - ' : ''}${newPost.content || 'Veja minha postagem no FocinhoApp!'}`);
+                        window.open(`https://wa.me/?text=${text}`, '_blank');
+                      }}
+                      className="flex flex-col items-center gap-1.5"
+                    >
+                      <div className="w-14 h-14 rounded-full bg-[#25D366] flex items-center justify-center">
+                        <svg viewBox="0 0 24 24" className="w-7 h-7 fill-white">
+                          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+                        </svg>
+                      </div>
+                      <span className="text-xs text-gray-600 font-medium">WhatsApp</span>
+                    </button>
+                  </div>
+                </div>
               </motion.div>
             )}
           </AnimatePresence>

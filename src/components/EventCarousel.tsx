@@ -12,10 +12,13 @@ interface PetEvent {
   created_at?: string;
 }
 
+interface EventCarouselProps {
+  onEventClick?: (event: PetEvent) => void;
+}
+
 const formatEventDate = (dateStr?: string): string => {
   if (!dateStr) return '';
   try {
-    // Handle both "YYYY-MM-DD" and ISO timestamps
     const d = new Date(dateStr.includes('T') ? dateStr : dateStr + 'T12:00:00');
     return d.toLocaleDateString('pt-BR', { weekday: 'short', day: 'numeric', month: 'short' });
   } catch {
@@ -23,7 +26,7 @@ const formatEventDate = (dateStr?: string): string => {
   }
 };
 
-export function EventCarousel() {
+export function EventCarousel({ onEventClick }: EventCarouselProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [events, setEvents] = useState<PetEvent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -47,7 +50,6 @@ export function EventCarousel() {
 
     fetchEvents();
 
-    // Realtime subscription — reflects admin changes immediately
     const subscription = supabase
       .channel('events_carousel_changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, () => {
@@ -75,7 +77,7 @@ export function EventCarousel() {
           scrollRef.current.scrollTo({ left: currentScroll + width, behavior: 'smooth' });
         }
       }
-    }, 4500); // 4.5s — intentionally offset from BannerCarousel's 4s
+    }, 4500);
     return () => clearInterval(interval);
   }, [events]);
 
@@ -94,7 +96,8 @@ export function EventCarousel() {
         {events.map(evt => (
           <div
             key={evt.id}
-            className="w-[358px] h-[190px] shrink-0 bg-white rounded-[22px] relative overflow-hidden snap-center border border-gray-100 group cursor-pointer shadow-md"
+            onClick={() => onEventClick && onEventClick(evt)}
+            className={`w-[358px] h-[190px] shrink-0 bg-white rounded-[22px] relative overflow-hidden snap-center border border-gray-100 group shadow-md ${onEventClick ? 'cursor-pointer' : ''}`}
           >
             {/* Background image or placeholder gradient */}
             {evt.imageUrl ? (
@@ -109,6 +112,13 @@ export function EventCarousel() {
 
             {/* Gradient overlay for text legibility */}
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+
+            {/* Tap indicator */}
+            {onEventClick && (
+              <div className="absolute top-3 right-3 bg-white/20 backdrop-blur-sm rounded-full px-2 py-1 flex items-center gap-1">
+                <span className="text-white text-[10px] font-bold">Ver evento</span>
+              </div>
+            )}
 
             {/* Content */}
             <div className="absolute bottom-4 left-4 right-4">
