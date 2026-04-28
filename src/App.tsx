@@ -3135,169 +3135,29 @@ export default function App() {
               className="fixed inset-0 z-[200] bg-white overflow-y-auto"
               style={{ fontFamily: "'Inter', 'Outfit', sans-serif" }}
             >
-              {/* ── Hero Banner ── */}
-              <div className="relative w-full" style={{ minHeight: 280 }}>
-                {ev.imageUrl ? (
-                  <img src={ev.imageUrl} alt={ev.title} className="w-full object-cover" style={{ height: 280 }} />
-                ) : (
-                  <div className="w-full flex items-center justify-center" style={{ height: 280, background: 'linear-gradient(135deg, #ff8c00 0%, #ff5f00 50%, #e63900 100%)' }}>
-                    <span style={{ fontSize: 80 }}>🐾</span>
-                  </div>
-                )}
-                {/* Dark scrim at top for back button */}
-                <div className="absolute inset-x-0 top-0 h-24" style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.45), transparent)' }} />
-                {/* Back button */}
-                <button
-                  onClick={() => setEventInfoEvent(null)}
-                  className="absolute top-4 left-4 flex items-center gap-1.5 text-white font-bold text-sm"
-                  style={{ textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}
-                >
-                  <ChevronLeft className="w-5 h-5" />
-                  <span>{ev.title.length > 24 ? ev.title.slice(0, 22) + '…' : ev.title}</span>
-                </button>
-                {/* Bottom scrim */}
-                <div className="absolute inset-x-0 bottom-0 h-20" style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.55), transparent)' }} />
-                {/* Title over hero */}
-                <div className="absolute bottom-0 left-0 right-0 px-5 pb-5">
-                  <h1 className="text-white font-black text-2xl leading-tight drop-shadow-lg">{ev.title}</h1>
-                  {dateRange && (
-                    <p className="text-white/80 text-sm font-semibold mt-0.5">📅 {dateRange}</p>
-                  )}
-                </div>
-              </div>
+              {/* Dark scrim at top for back button to be visible over yellow */}
+              <div className="fixed inset-x-0 top-0 h-24 z-[210] pointer-events-none" style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.5), transparent)' }} />
+              
+              {/* Back button */}
+              <button
+                onClick={() => setEventInfoEvent(null)}
+                className="fixed top-4 left-4 z-[220] flex items-center gap-1.5 text-white font-bold text-sm"
+                style={{ textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}
+              >
+                <ChevronLeft className="w-5 h-5" />
+                <span>{ev.title.length > 24 ? ev.title.slice(0, 22) + '…' : ev.title}</span>
+              </button>
 
-              {/* ── Body ── */}
-              <div style={{ background: 'linear-gradient(180deg, #f5f0ff 0%, #fff8f0 60%, #fff 100%)', minHeight: 'calc(100vh - 280px)' }}>
-
-                {/* ── Interested row ── */}
-                <div className="px-5 pt-5 pb-4 flex items-center gap-3">
-                  <div className="flex -space-x-2">
-                    {[
-                      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=50&h=50&fit=crop',
-                      'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=50&h=50&fit=crop',
-                      'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=50&h=50&fit=crop',
-                    ].map((url, i) => (
-                      <div key={i} className="w-8 h-8 rounded-full border-2 border-white overflow-hidden bg-gray-100 shrink-0">
-                        <img src={url} alt="" className="w-full h-full object-cover" />
-                      </div>
-                    ))}
-                  </div>
-                  <p style={{ color: '#6c3fc5', fontWeight: 700, fontSize: 13 }}>
-                    {interested} pessoas estão participando! 🐾
-                  </p>
-                </div>
-
-                {/* ── Description card ── */}
-                {ev.description && (
-                  <div className="mx-4 mb-4 bg-white rounded-3xl p-5 shadow-sm border border-purple-100">
-                    <p className="text-gray-600 text-sm leading-relaxed">{ev.description}</p>
-                  </div>
-                )}
-
-                {/* ── How to Join ── */}
-                <div className="mx-4 mb-4">
-                  <div
-                    className="flex items-center justify-center py-3 px-6 rounded-2xl mb-4"
-                    style={{ background: 'linear-gradient(90deg, #7c3aed, #9b5de5)', boxShadow: '0 4px 16px rgba(124,58,237,0.25)' }}
-                  >
-                    <span className="text-white font-black text-base tracking-wide">— Como Participar —</span>
-                  </div>
-                  <div className="bg-white rounded-3xl p-5 shadow-sm border border-purple-100 space-y-5">
-                    {[
-                      { num: '1', text: 'Abra o FocinhoApp e acesse a seção de Passeio' },
-                      { num: '2', text: `Publique uma foto do seu pet com o tema do evento usando a hashtag ${hashtag}` },
-                      { num: '3', text: 'Compartilhe com a comunidade e colete curtidas! ❤️' },
-                    ].map((step) => (
-                      <div key={step.num} className="flex items-start gap-4">
-                        <div
-                          className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 font-black text-lg"
-                          style={{ background: 'linear-gradient(135deg, #f59e0b, #f97316)', color: '#fff', boxShadow: '0 2px 8px rgba(245,158,11,0.35)' }}
-                        >
-                          {step.num}
-                        </div>
-                        <p className="text-gray-700 text-sm leading-relaxed pt-1">{step.text}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* ── Event Details ── */}
-                <div className="mx-4 mb-4">
-                  <div
-                    className="flex items-center justify-center py-3 px-6 rounded-2xl mb-4"
-                    style={{ background: 'linear-gradient(90deg, #7c3aed, #9b5de5)', boxShadow: '0 4px 16px rgba(124,58,237,0.25)' }}
-                  >
-                    <span className="text-white font-black text-base tracking-wide">— Detalhes do Evento —</span>
-                  </div>
-                  <div className="bg-white rounded-3xl p-5 shadow-sm border border-purple-100 space-y-3">
-                    {dateRange && (
-                      <div className="flex items-start gap-3">
-                        <span className="text-xl">📅</span>
-                        <div>
-                          <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Período</p>
-                          <p className="text-gray-800 font-bold text-sm mt-0.5">{dateRange}</p>
-                        </div>
-                      </div>
-                    )}
-                    {daysLeft !== null && daysLeft > 0 && (
-                      <div className="flex items-start gap-3">
-                        <span className="text-xl">⏳</span>
-                        <div>
-                          <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Tempo restante</p>
-                          <p className="text-gray-800 font-bold text-sm mt-0.5">{daysLeft} {daysLeft === 1 ? 'dia' : 'dias'} restantes</p>
-                        </div>
-                      </div>
-                    )}
-                    {ev.location && (
-                      <div className="flex items-start gap-3">
-                        <span className="text-xl">📍</span>
-                        <div>
-                          <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Local</p>
-                          <p className="text-gray-800 font-bold text-sm mt-0.5">{ev.location}</p>
-                        </div>
-                      </div>
-                    )}
-                    <div className="flex items-start gap-3">
-                      <span className="text-xl">🏆</span>
-                      <div>
-                        <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Seleção de vencedores</p>
-                        <p className="text-gray-800 font-bold text-sm mt-0.5">Baseada no engajamento dos posts da comunidade</p>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-3">
-                      <span className="text-xl">🏅</span>
-                      <div>
-                        <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Hashtag do evento</p>
-                        <p className="font-black text-sm mt-0.5" style={{ color: '#7c3aed' }}>{hashtag}</p>
-                      </div>
+              {/* ── Results Vertical Feed (Carousel) ── */}
+              <div className="flex flex-col w-full relative z-[205]">
+                {[...Array(7)].map((_, idx) => (
+                  <div key={idx} className="w-full aspect-square bg-yellow-400 flex items-center justify-center border-b border-yellow-500">
+                    <div className="text-center">
+                      <p className="text-yellow-700 font-black text-2xl">IMAGEM {idx + 1}</p>
+                      <p className="text-yellow-600 font-bold text-sm mt-1">1200 x 1200</p>
                     </div>
                   </div>
-                </div>
-
-                {/* ── CTA Button ── */}
-                <div className="px-4 pb-6 pt-2">
-                  <button
-                    onClick={() => {
-                      setEventInfoEvent(null);
-                      // Navigate to event detail view
-                      const found = petEvents.find(p => p.id === ev.id);
-                      if (found) {
-                        setSelectedEventId(found.id);
-                        setView('account');
-                        setAccountSubView('eventDetail');
-                      }
-                    }}
-                    className="w-full py-4 rounded-3xl font-black text-white text-lg shadow-lg active:scale-95 transition-transform"
-                    style={{ background: 'linear-gradient(135deg, #7c3aed, #9b5de5)', boxShadow: '0 8px 24px rgba(124,58,237,0.35)' }}
-                  >
-                    🐾 Participar Agora!
-                  </button>
-                  <p className="text-center text-xs text-gray-400 mt-3">
-                    Publique uma foto do seu pet com a hashtag do evento para participar
-                  </p>
-                </div>
-
-                <div className="h-8" />
+                ))}
               </div>
             </div>
           );
