@@ -53,7 +53,15 @@ import {
   Clock,
   DollarSign,
   Star,
-  AtSign
+  AtSign,
+  BellDot,
+  BellOff,
+  UserPlus,
+  Package,
+  Store,
+  Siren,
+  ToggleLeft,
+  ToggleRight
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap } from 'react-leaflet';
@@ -877,6 +885,43 @@ export default function App() {
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [eventInfoEvent, setEventInfoEvent] = useState<PetEvent | null>(null);
   const [activePartnerFilter, setActivePartnerFilter] = useState('Todos');
+
+  // ── Notification Preferences (stored in localStorage) ──
+  const [notifPrefs, setNotifPrefs] = useState<Record<string, boolean>>(() => {
+    try {
+      const saved = localStorage.getItem('focinho_notif_prefs');
+      return saved ? JSON.parse(saved) : {
+        sos: true,
+        adoption: true,
+        friends: true,
+        reminders: true,
+        events: true,
+        products: true,
+        partners: true,
+      };
+    } catch { return { sos: true, adoption: true, friends: true, reminders: true, events: true, products: true, partners: true }; }
+  });
+  const toggleNotifPref = (key: string) => {
+    setNotifPrefs(prev => {
+      const next = { ...prev, [key]: !prev[key] };
+      localStorage.setItem('focinho_notif_prefs', JSON.stringify(next));
+      return next;
+    });
+  };
+  // Track which notifications have been seen
+  const [seenNotifIds, setSeenNotifIds] = useState<Set<string>>(() => {
+    try {
+      const saved = localStorage.getItem('focinho_seen_notifs');
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    } catch { return new Set(); }
+  });
+  const markAllSeen = (ids: string[]) => {
+    setSeenNotifIds(prev => {
+      const next = new Set([...Array.from(prev), ...ids]);
+      localStorage.setItem('focinho_seen_notifs', JSON.stringify(Array.from(next)));
+      return next;
+    });
+  };
   const [selectedPet, setSelectedPet] = useState<PetProfile | null>(() => {
     const pendingTag = localStorage.getItem('focinho_pending_tag');
     return pendingTag ? ({ tagId: pendingTag } as any) : null;
@@ -3276,11 +3321,35 @@ export default function App() {
             {/* Right: Location + Logout */}
             <div className="flex items-center gap-1">
               <button
-                onClick={() => setShowCityPicker(true)}
-                className="p-2 text-black hover:bg-gray-100 rounded-xl flex items-center justify-center transition-colors shrink-0"
-                title="Mudar localização global"
+                onClick={() => {
+                  const allIds = [
+                    ...lostAlerts.map(a => `sos-${a.id}`),
+                    ...adoptionPets.filter(p => p.status === 'available' || !p.status).map(p => `adop-${p.id}`),
+                    ...petEvents.map(e => `evt-${e.id}`),
+                    ...products.map(p => `prod-${p.id}`),
+                    ...partners.map(p => `part-${p.id}`),
+                  ];
+                  setView('account');
+                  setAccountSubView('notifications');
+                  markAllSeen(allIds);
+                }}
+                className="p-2 text-black hover:bg-gray-100 rounded-xl flex items-center justify-center transition-colors shrink-0 relative"
+                title="Notificações"
               >
-                <MapPin className="w-6 h-6" />
+                <Bell className="w-6 h-6" />
+                {(() => {
+                  const allIds = [
+                    ...lostAlerts.map(a => `sos-${a.id}`),
+                    ...adoptionPets.filter(p => p.status === 'available' || !p.status).map(p => `adop-${p.id}`),
+                    ...petEvents.map(e => `evt-${e.id}`),
+                    ...products.map(p => `prod-${p.id}`),
+                    ...partners.map(p => `part-${p.id}`),
+                  ];
+                  const unseenCount = allIds.filter(id => !seenNotifIds.has(id)).length;
+                  return unseenCount > 0 ? (
+                    <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white" />
+                  ) : null;
+                })()}
               </button>
               <button onClick={handleLogout} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl flex items-center justify-center transition-colors shrink-0" title="Sair da conta">
                 <LogOut className="w-6 h-6" />
@@ -5145,40 +5214,15 @@ export default function App() {
                     <div className="relative">
                       {/* Cover Photo */}
                       <div className="h-32 bg-gradient-to-r from-orange-400 to-pink-500 w-full relative">
-                        {/* Settings Dropdown */}
+                        {/* Settings Button → opens full-page settings */}
                         <div className="absolute top-4 right-4 z-20">
                           <button
-                            onClick={() => setOpenMenuId(openMenuId === 'account-settings' ? null : 'account-settings')}
+                            onClick={() => setAccountSubView('settingsPage')}
                             className="w-10 h-10 bg-black/20 backdrop-blur-md rounded-full flex items-center justify-center text-white hover:bg-black/30 transition-colors"
                             title="Configurações"
                           >
                             <Settings className="w-5 h-5" />
                           </button>
-                          {openMenuId === 'account-settings' && (
-                            <>
-                              <div className="fixed inset-0 z-40" onClick={() => setOpenMenuId(null)} />
-                              <div className="absolute right-0 mt-2 w-52 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 z-50">
-                                <button
-                                  onClick={() => { setOpenMenuId(null); setAccountSubView('support'); }}
-                                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 text-sm font-bold text-gray-700 transition-colors"
-                                >
-                                  <HelpCircle className="w-4 h-4 text-green-500" /> Suporte
-                                </button>
-                                <button
-                                  onClick={() => { setOpenMenuId(null); setAccountSubView('config'); }}
-                                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 text-sm font-bold text-gray-700 transition-colors border-t border-gray-50"
-                                >
-                                  <Settings className="w-4 h-4 text-gray-500" /> Configurações
-                                </button>
-                                <button
-                                  onClick={() => { setOpenMenuId(null); setAccountSubView('sobre'); }}
-                                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 text-sm font-bold text-gray-700 transition-colors border-t border-gray-50"
-                                >
-                                  <Info className="w-4 h-4 text-orange-400" /> Sobre
-                                </button>
-                              </div>
-                            </>
-                          )}
                         </div>
                       </div>
                       
@@ -5226,13 +5270,11 @@ export default function App() {
                             <Plus className="w-5 h-5" /> Adicionar amigo
                           </button>
                           <button 
-                            onClick={() => setAccountSubView('profile')} 
+                            onClick={() => setAccountSubView('pets')} 
                             className="flex-1 bg-[#E4E6EB] hover:bg-[#D8DADF] text-gray-900 font-semibold py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors active:scale-[0.98]"
                           >
-                            <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
-                              <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
-                            </svg>
-                            Editar perfil
+                            <Dog className="w-5 h-5" />
+                            Meus Pets
                           </button>
                         </div>
                       </div>
@@ -5240,18 +5282,6 @@ export default function App() {
 
                     {/* Menu List */}
                     <div className="flex flex-col">
-
-                    <button
-                      onClick={() => setAccountSubView('pets')}
-                      className="p-5 md:p-6 flex items-center gap-4 hover:bg-gray-50 transition-all text-left border-b border-gray-50 last:border-b-0 relative group"
-                    >
-                      <Dog className="w-6 h-6 text-gray-900 shrink-0 group-hover:scale-110 transition-transform" />
-                      <div className="flex-1">
-                        <h4 className="font-bold text-gray-800">Meus Pets</h4>
-                        <p className="text-xs text-gray-400">Gerenciar todos os seus pets</p>
-                      </div>
-                      <ChevronRight className="text-gray-300" />
-                    </button>
 
                     <button
                       onClick={() => setAccountSubView('store')}
@@ -5312,6 +5342,42 @@ export default function App() {
                       </div>
                       <ChevronRight className="text-gray-300" />
                     </button>
+
+                    {/* ── Notificações ── */}
+                    {(() => {
+                      // Count unseen notifications
+                      const allIds = [
+                        ...lostAlerts.map(a => `sos-${a.id}`),
+                        ...adoptionPets.filter(p => p.status === 'available' || !p.status).map(p => `adop-${p.id}`),
+                        ...petEvents.map(e => `evt-${e.id}`),
+                        ...products.map(p => `prod-${p.id}`),
+                        ...partners.map(p => `part-${p.id}`),
+                      ];
+                      const unseenCount = allIds.filter(id => !seenNotifIds.has(id)).length;
+                      return (
+                        <button
+                          onClick={() => { setAccountSubView('notifications'); markAllSeen(allIds); }}
+                          className="p-5 md:p-6 flex items-center gap-4 hover:bg-gray-50 transition-all text-left border-b border-gray-50 last:border-b-0 relative group"
+                        >
+                          <div className="relative">
+                            <Bell className="w-6 h-6 text-gray-900 shrink-0 group-hover:scale-110 transition-transform" />
+                            {unseenCount > 0 && (
+                              <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center shadow">
+                                {unseenCount > 9 ? '9+' : unseenCount}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex-1">
+                            <h4 className="font-bold text-gray-800">Notificações</h4>
+                            <p className="text-xs text-gray-400">
+                              {unseenCount > 0 ? `${unseenCount} nova${unseenCount > 1 ? 's' : ''}` : 'Tudo em dia'}
+                            </p>
+                          </div>
+                          <ChevronRight className="text-gray-300" />
+                        </button>
+                      );
+                    })()}
+
                     </div>
                   </div>
                 )}
@@ -5770,6 +5836,279 @@ export default function App() {
                         </a>
                       </div>
 
+                    </div>
+                  </div>
+                )}
+
+                {/* ═══════════════════════════════════════
+                    SETTINGS PAGE — Instagram-style layout
+                ═══════════════════════════════════════ */}
+                {accountSubView === 'settingsPage' && (
+                  <div className="min-h-screen bg-white pb-28">
+                    {/* Header */}
+                    <div className="flex items-center gap-3 px-4 pt-4 pb-3 border-b border-gray-100 sticky top-0 bg-white z-10">
+                      <button
+                        onClick={() => setAccountSubView('menu')}
+                        className="p-1.5 hover:bg-gray-100 rounded-full transition-colors"
+                      >
+                        <ChevronLeft className="w-6 h-6 text-gray-800" />
+                      </button>
+                      <h1 className="text-[17px] font-bold text-gray-900">Configurações e atividade</h1>
+                    </div>
+
+                    {/* ── Seção: Mais informações e suporte ── */}
+                    <div className="mt-4">
+                      <p className="px-4 text-[13px] font-semibold text-gray-500 mb-1">Mais informações e suporte</p>
+                      <div className="divide-y divide-gray-100">
+
+                        {/* Suporte */}
+                        <button
+                          onClick={() => setAccountSubView('support')}
+                          className="w-full flex items-center gap-4 px-4 py-3.5 hover:bg-gray-50 transition-colors text-left"
+                        >
+                          <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
+                            <HelpCircle className="w-5 h-5 text-gray-600" />
+                          </div>
+                          <span className="flex-1 text-[15px] text-gray-900 font-normal">Ajuda e suporte</span>
+                          <ChevronRight className="w-4 h-4 text-gray-400" />
+                        </button>
+
+                        {/* Privacidade (Config) */}
+                        <button
+                          onClick={() => setAccountSubView('config')}
+                          className="w-full flex items-center gap-4 px-4 py-3.5 hover:bg-gray-50 transition-colors text-left"
+                        >
+                          <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
+                            <ShieldCheck className="w-5 h-5 text-gray-600" />
+                          </div>
+                          <span className="flex-1 text-[15px] text-gray-900 font-normal">Central de Privacidade</span>
+                          <ChevronRight className="w-4 h-4 text-gray-400" />
+                        </button>
+
+                        {/* Notificações */}
+                        <button
+                          onClick={() => setAccountSubView('settings_notifications')}
+                          className="w-full flex items-center gap-4 px-4 py-3.5 hover:bg-gray-50 transition-colors text-left"
+                        >
+                          <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
+                            <Bell className="w-5 h-5 text-gray-600" />
+                          </div>
+                          <span className="flex-1 text-[15px] text-gray-900 font-normal">Notificações</span>
+                          <ChevronRight className="w-4 h-4 text-gray-400" />
+                        </button>
+
+                        {/* Status da conta */}
+                        <button
+                          onClick={() => setAccountSubView('sobre')}
+                          className="w-full flex items-center gap-4 px-4 py-3.5 hover:bg-gray-50 transition-colors text-left"
+                        >
+                          <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
+                            <UserIcon className="w-5 h-5 text-gray-600" />
+                          </div>
+                          <span className="flex-1 text-[15px] text-gray-900 font-normal">Status da conta</span>
+                          <ChevronRight className="w-4 h-4 text-gray-400" />
+                        </button>
+
+                        {/* Sobre */}
+                        <button
+                          onClick={() => setAccountSubView('sobre')}
+                          className="w-full flex items-center gap-4 px-4 py-3.5 hover:bg-gray-50 transition-colors text-left"
+                        >
+                          <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
+                            <Info className="w-5 h-5 text-gray-600" />
+                          </div>
+                          <span className="flex-1 text-[15px] text-gray-900 font-normal">Sobre o FocinhoApp</span>
+                          <ChevronRight className="w-4 h-4 text-gray-400" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* ── Seção: Funcionalidades ── */}
+                    <div className="mt-6">
+                      <p className="px-4 text-[13px] font-semibold text-gray-500 mb-1">Funcionalidades</p>
+                      <div className="divide-y divide-gray-100">
+
+                        <button
+                          onClick={() => setAccountSubView('pets')}
+                          className="w-full flex items-center gap-4 px-4 py-3.5 hover:bg-gray-50 transition-colors text-left"
+                        >
+                          <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
+                            <Dog className="w-5 h-5 text-gray-600" />
+                          </div>
+                          <span className="flex-1 text-[15px] text-gray-900 font-normal">Meus Pets</span>
+                          <ChevronRight className="w-4 h-4 text-gray-400" />
+                        </button>
+
+                        <button
+                          onClick={() => setAccountSubView('events')}
+                          className="w-full flex items-center gap-4 px-4 py-3.5 hover:bg-gray-50 transition-colors text-left"
+                        >
+                          <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
+                            <Calendar className="w-5 h-5 text-gray-600" />
+                          </div>
+                          <span className="flex-1 text-[15px] text-gray-900 font-normal">Eventos da Comunidade</span>
+                          <ChevronRight className="w-4 h-4 text-gray-400" />
+                        </button>
+
+                        <button
+                          onClick={() => setAccountSubView('adoption')}
+                          className="w-full flex items-center gap-4 px-4 py-3.5 hover:bg-gray-50 transition-colors text-left"
+                        >
+                          <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
+                            <Heart className="w-5 h-5 text-gray-600" />
+                          </div>
+                          <span className="flex-1 text-[15px] text-gray-900 font-normal">Adoção Responsável</span>
+                          <ChevronRight className="w-4 h-4 text-gray-400" />
+                        </button>
+
+                        <button
+                          onClick={() => setAccountSubView('store')}
+                          className="w-full flex items-center gap-4 px-4 py-3.5 hover:bg-gray-50 transition-colors text-left"
+                        >
+                          <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
+                            <ShoppingBag className="w-5 h-5 text-gray-600" />
+                          </div>
+                          <span className="flex-1 text-[15px] text-gray-900 font-normal">Loja FocinhoApp</span>
+                          <ChevronRight className="w-4 h-4 text-gray-400" />
+                        </button>
+
+                        <button
+                          onClick={() => setAccountSubView('partners')}
+                          className="w-full flex items-center gap-4 px-4 py-3.5 hover:bg-gray-50 transition-colors text-left"
+                        >
+                          <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
+                            <Briefcase className="w-5 h-5 text-gray-600" />
+                          </div>
+                          <span className="flex-1 text-[15px] text-gray-900 font-normal">Parceiros</span>
+                          <ChevronRight className="w-4 h-4 text-gray-400" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* ── Seção: Conta ── */}
+                    <div className="mt-6">
+                      <p className="px-4 text-[13px] font-semibold text-gray-500 mb-1">Conta</p>
+                      <div className="divide-y divide-gray-100">
+
+                        <button
+                          onClick={() => setAccountSubView('profile')}
+                          className="w-full flex items-center gap-4 px-4 py-3.5 hover:bg-gray-50 transition-colors text-left"
+                        >
+                          <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
+                            <UserIcon className="w-5 h-5 text-gray-600" />
+                          </div>
+                          <span className="flex-1 text-[15px] text-gray-900 font-normal">Editar perfil</span>
+                          <ChevronRight className="w-4 h-4 text-gray-400" />
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            localStorage.removeItem('focinho_notif_prefs');
+                            localStorage.removeItem('focinho_seen_notifs');
+                            alert('Cache limpo com sucesso!');
+                          }}
+                          className="w-full flex items-center gap-4 px-4 py-3.5 hover:bg-gray-50 transition-colors text-left"
+                        >
+                          <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
+                            <Trash2 className="w-5 h-5 text-gray-600" />
+                          </div>
+                          <span className="flex-1 text-[15px] text-gray-900 font-normal">Limpar cache</span>
+                          <ChevronRight className="w-4 h-4 text-gray-400" />
+                        </button>
+
+                        <button
+                          onClick={() => window.open('https://focinhoapp.com/privacidade', '_blank')}
+                          className="w-full flex items-center gap-4 px-4 py-3.5 hover:bg-gray-50 transition-colors text-left"
+                        >
+                          <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
+                            <FileText className="w-5 h-5 text-gray-600" />
+                          </div>
+                          <span className="flex-1 text-[15px] text-gray-900 font-normal">Política de Privacidade</span>
+                          <ChevronRight className="w-4 h-4 text-gray-400" />
+                        </button>
+
+                        <button
+                          onClick={() => window.open('https://focinhoapp.com/termos', '_blank')}
+                          className="w-full flex items-center gap-4 px-4 py-3.5 hover:bg-gray-50 transition-colors text-left"
+                        >
+                          <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
+                            <FileText className="w-5 h-5 text-gray-600" />
+                          </div>
+                          <span className="flex-1 text-[15px] text-gray-900 font-normal">Termos de Serviço</span>
+                          <ChevronRight className="w-4 h-4 text-gray-400" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* ── Sair ── */}
+                    <div className="mt-8 px-4">
+                      <button
+                        onClick={handleLogout}
+                        className="text-red-500 text-[15px] font-normal hover:text-red-600 transition-colors active:opacity-70"
+                      >
+                        Sair
+                      </button>
+                    </div>
+
+                    {/* Version */}
+                    <div className="mt-6 px-4 pb-4">
+                      <p className="text-[12px] text-gray-400">FocinhoApp • Versão 1.0.0</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Configurações de Notificações (Settings) ── */}
+                {accountSubView === 'settings_notifications' && (
+                  <div className="bg-white min-h-screen">
+                    {/* Header */}
+                    <div className="sticky top-0 bg-white/80 backdrop-blur-xl z-10 flex items-center gap-4 px-4 py-4 border-b border-gray-100">
+                      <button onClick={() => setAccountSubView('settingsPage')} className="p-1 -ml-1 active:scale-95 transition-transform">
+                        <ChevronLeft className="w-6 h-6 text-gray-800" />
+                      </button>
+                      <h1 className="text-[17px] font-bold text-gray-900">Notificações</h1>
+                    </div>
+                    
+                    <div className="p-4 space-y-6">
+                      <div className="bg-white rounded-[2rem] shadow-sm border border-gray-100 overflow-hidden">
+                        <div className="px-5 pt-5 pb-3 border-b border-gray-50">
+                          <h3 className="font-black text-gray-800 text-base">Configurar alertas</h3>
+                          <p className="text-xs text-gray-400 mt-0.5">Escolha o que deseja receber</p>
+                        </div>
+                        <div className="divide-y divide-gray-50">
+                          {[
+                            { key: 'sos', label: 'Alertas SOS', desc: 'Pets perdidos na sua cidade', icon: <Siren className="w-5 h-5" />, color: 'text-red-500', bg: 'bg-red-50' },
+                            { key: 'adoption', label: 'Adoção', desc: 'Pets disponíveis para adoção', icon: <Heart className="w-5 h-5" />, color: 'text-pink-500', bg: 'bg-pink-50' },
+                            { key: 'friends', label: 'Pedidos de amizade', desc: 'Novos seguidores e pedidos', icon: <UserPlus className="w-5 h-5" />, color: 'text-blue-500', bg: 'bg-blue-50' },
+                            { key: 'reminders', label: 'Lembretes', desc: 'Vacinas, consultas e cuidados', icon: <Bell className="w-5 h-5" />, color: 'text-orange-500', bg: 'bg-orange-50' },
+                            { key: 'events', label: 'Eventos', desc: 'Novos eventos na comunidade', icon: <Calendar className="w-5 h-5" />, color: 'text-violet-500', bg: 'bg-violet-50' },
+                            { key: 'products', label: 'Produtos da Loja', desc: 'Novos produtos e promoções', icon: <Package className="w-5 h-5" />, color: 'text-indigo-500', bg: 'bg-indigo-50' },
+                            { key: 'partners', label: 'Lojas Parceiras', desc: 'Novos parceiros na sua cidade', icon: <Store className="w-5 h-5" />, color: 'text-emerald-500', bg: 'bg-emerald-50' },
+                          ].map(cat => (
+                            <div key={cat.key} className="flex items-center gap-4 px-5 py-4">
+                              <div className={`w-10 h-10 rounded-2xl ${cat.bg} flex items-center justify-center shrink-0`}>
+                                <span className={cat.color}>{cat.icon}</span>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-bold text-gray-800 text-sm">{cat.label}</p>
+                                <p className="text-xs text-gray-400">{cat.desc}</p>
+                              </div>
+                              <button
+                                onClick={() => toggleNotifPref(cat.key)}
+                                className={`relative w-12 h-6 rounded-full transition-colors shrink-0 ${notifPrefs[cat.key] ? 'bg-orange-500' : 'bg-gray-200'}`}
+                              >
+                                <span className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform ${notifPrefs[cat.key] ? 'left-7' : 'left-1'}`} />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="bg-orange-50 border border-orange-100 rounded-2xl px-4 py-3 flex items-start gap-3">
+                        <Info className="w-4 h-4 text-orange-400 shrink-0 mt-0.5" />
+                        <p className="text-xs text-orange-700 leading-relaxed">
+                          As notificações são baseadas na sua cidade selecionada. Para alterar, use o seletor de localização no topo do app.
+                        </p>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -6322,6 +6661,191 @@ export default function App() {
                         )}
                       </div>
                       <div className="h-20" />
+                    </div>
+                  );
+                })()}
+
+                {/* ═══════════════════════════════════════
+                    NOTIFICATIONS SCREEN
+                ═══════════════════════════════════════ */}
+                {accountSubView === 'notifications' && (() => {
+                  // Build notification feed from existing data
+                  type NotifItem = {
+                    id: string;
+                    avatarUrl?: string; // If undefined, use FocinhoApp logo
+                    titleNode: React.ReactNode; 
+                    time: Date;
+                    action?: () => void;
+                    rightImage?: string; // Pet photo, event photo, product photo
+                  };
+
+                  const userCity = (selectedCity || ownerProfile?.city || '').split(' - ')[0].trim().toLowerCase();
+
+                  const feed: NotifItem[] = [
+                    // SOS Alerts
+                    ...lostAlerts.filter(a => {
+                      if (!notifPrefs.sos) return false;
+                      if (!userCity) return true;
+                      return (a.city || '').toLowerCase().includes(userCity);
+                    }).map(a => ({
+                      id: `sos-${a.id}`,
+                      avatarUrl: a.ownerPhotoUrl || 'https://picsum.photos/seed/user/100/100',
+                      titleNode: (
+                        <>
+                          <span className="font-bold cursor-pointer hover:underline" onClick={(e) => { e.stopPropagation(); window.alert('Perfil do usuário em desenvolvimento'); }}>{a.ownerName || a.ownerUsername || 'Tutor'}</span>
+                          {' reportou o pet '}
+                          <span className="font-bold cursor-pointer hover:underline" onClick={async (e) => {
+                            e.stopPropagation();
+                            const { data: petRow } = await supabase.from('pets').select('tagId').eq('id', a.petId).maybeSingle();
+                            if (petRow?.tagId) { handleViewFinder(petRow.tagId); } else { window.alert('Para ter um perfil público, o pet precisa de um Pingente Inteligente ativado.'); }
+                          }}>{a.petName || 'Um pet'}</span>
+                          {` perdido${a.city ? ` em ${a.city}` : ''}. Você pode ajudar!`}
+                        </>
+                      ),
+                      time: new Date(a.createdAt),
+                      action: () => { setView('dashboard'); },
+                      rightImage: a.petPhoto,
+                    })),
+                    // Adoption
+                    ...adoptionPets.filter(p => notifPrefs.adoption && (p.status === 'available' || !p.status)).map(p => ({
+                      id: `adop-${p.id}`,
+                      avatarUrl: p.ownerPhotoUrl || 'https://picsum.photos/seed/user/100/100',
+                      titleNode: (
+                        <>
+                          <span className="font-bold cursor-pointer hover:underline" onClick={(e) => { e.stopPropagation(); window.alert('Perfil do usuário em desenvolvimento'); }}>{p.ownerName || p.ownerUsername || 'Tutor'}</span>
+                          {' cadastrou '}
+                          <span className="font-bold">{p.name || 'um pet'}</span>
+                          {' para adoção.'}
+                        </>
+                      ),
+                      time: new Date(p.createdAt || Date.now()),
+                      action: () => { setAccountSubView('adoption'); },
+                      rightImage: p.photoUrl,
+                    })),
+                    // Events
+                    ...petEvents.filter(e => notifPrefs.events).map(e => ({
+                      id: `evt-${e.id}`,
+                      avatarUrl: undefined, // Uses FocinhoApp logo
+                      titleNode: (
+                        <>
+                          <span className="font-bold">FocinhoApp</span>
+                          {' adicionou um novo evento: '}
+                          <span className="font-bold">{e.title}</span>
+                          {'. Participe e mostre seu pet!'}
+                        </>
+                      ),
+                      time: new Date(e.created_at || Date.now()),
+                      action: () => { setAccountSubView('events'); },
+                      rightImage: e.imageUrl,
+                    })),
+                    // Products
+                    ...products.filter(() => notifPrefs.products).map(p => ({
+                      id: `prod-${p.id}`,
+                      avatarUrl: undefined,
+                      titleNode: (
+                        <>
+                          <span className="font-bold">FocinhoApp</span>
+                          {' adicionou um novo produto na loja: '}
+                          <span className="font-bold">{p.name}</span>
+                          {'.'}
+                        </>
+                      ),
+                      time: new Date(p.created_at || Date.now()),
+                      action: () => { setAccountSubView('store'); },
+                      rightImage: p.image_url,
+                    })),
+                    // Partners
+                    ...partners.filter(() => notifPrefs.partners).map(p => ({
+                      id: `part-${p.id}`,
+                      avatarUrl: undefined,
+                      titleNode: (
+                        <>
+                          <span className="font-bold">FocinhoApp</span>
+                          {' tem uma nova loja parceira: '}
+                          <span className="font-bold">{p.name}</span>
+                          {'. Confira os benefícios!'}
+                        </>
+                      ),
+                      time: new Date(p.created_at || Date.now()),
+                      action: () => { setAccountSubView('partners'); },
+                      rightImage: p.logo,
+                    })),
+                  ].sort((a, b) => b.time.getTime() - a.time.getTime());
+
+                  const fmtTime = (d: Date) => {
+                    const now = Date.now();
+                    const diff = now - d.getTime();
+                    if (diff < 60000) return 'Agora';
+                    if (diff < 3600000) return `${Math.floor(diff / 60000)} m`;
+                    if (diff < 86400000) return `${Math.floor(diff / 3600000)} h`;
+                    if (diff < 604800000) return `${Math.floor(diff / 86400000)} d`;
+                    return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+                  };
+
+                  return (
+                    <div className="space-y-5 pb-24 bg-white min-h-screen">
+                      {/* Header */}
+                      <div className="flex items-center gap-3 px-4 pt-4 pb-2 border-b border-gray-100 sticky top-0 bg-white/80 backdrop-blur-xl z-10">
+                        <button onClick={() => setView('dashboard')} className="p-1 -ml-1 active:scale-95 transition-transform">
+                          <ChevronLeft className="w-6 h-6 text-gray-800" />
+                        </button>
+                        <h2 className="text-[17px] font-bold text-gray-900 leading-tight">Notificações</h2>
+                      </div>
+
+                      {/* Feed de Notificações */}
+                      <div className="px-2">
+                        {feed.length === 0 ? (
+                          <div className="flex flex-col items-center justify-center py-12 px-6 gap-3">
+                            <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center">
+                              <BellOff className="w-8 h-8 text-gray-300" />
+                            </div>
+                            <p className="text-gray-500 font-medium text-[15px] text-center">Nenhuma notificação</p>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col">
+                            {feed.slice(0, 30).map(n => {
+                              const isNew = !seenNotifIds.has(n.id);
+                              return (
+                                <div
+                                  key={n.id}
+                                  onClick={n.action}
+                                  className={`flex items-center gap-3 px-3 py-3 cursor-pointer transition-colors w-full text-left rounded-xl ${isNew ? 'bg-orange-50/40' : 'hover:bg-gray-50'}`}
+                                >
+                                  {/* Avatar */}
+                                  <div className="relative shrink-0 self-start mt-0.5">
+                                    <div className="w-11 h-11 rounded-full overflow-hidden bg-gray-100 border border-gray-100">
+                                      {n.avatarUrl ? (
+                                        <img src={n.avatarUrl} className="w-full h-full object-cover" alt="Avatar" />
+                                      ) : (
+                                        <div className="w-full h-full bg-orange-500 flex items-center justify-center text-white">
+                                          <PawPrint className="w-6 h-6" />
+                                        </div>
+                                      )}
+                                    </div>
+                                    {isNew && <span className="absolute bottom-0 right-0 w-3 h-3 bg-red-500 border-2 border-white rounded-full" />}
+                                  </div>
+
+                                  {/* Text */}
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-[14px] text-gray-900 leading-[1.35]">
+                                      {n.titleNode}
+                                      <span className="text-gray-500 ml-1.5 whitespace-nowrap">{fmtTime(n.time)}</span>
+                                    </p>
+                                  </div>
+
+                                  {/* Right Image (if any) */}
+                                  {n.rightImage && (
+                                    <div className="w-11 h-11 shrink-0 ml-1 rounded-md overflow-hidden bg-gray-50 border border-gray-100">
+                                      <img src={n.rightImage} className="w-full h-full object-cover" />
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+
                     </div>
                   );
                 })()}
@@ -8805,9 +9329,9 @@ export default function App() {
                 setView('account');
                 setAccountSubView('menu');
               }}
-              className={`flex flex-col items-center gap-1 transition-colors flex-1 min-h-[44px] justify-center ${view === 'account' ? 'text-orange-500' : 'text-gray-300'}`}
+              className={`flex flex-col items-center gap-1 transition-colors flex-1 min-h-[44px] justify-center ${view === 'account' && accountSubView !== 'notifications' ? 'text-orange-500' : 'text-gray-300'}`}
             >
-              <div className={`w-7 h-7 rounded-full overflow-hidden border-2 transition-all ${view === 'account' ? 'border-orange-500' : 'border-gray-200'}`}>
+              <div className={`w-7 h-7 rounded-full overflow-hidden border-2 transition-all ${view === 'account' && accountSubView !== 'notifications' ? 'border-orange-500' : 'border-gray-200'}`}>
                 {ownerProfile?.photoUrl ? (
                   <img src={ownerProfile.photoUrl} alt="Minha conta" className="w-full h-full object-cover" />
                 ) : (
