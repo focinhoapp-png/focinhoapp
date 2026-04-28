@@ -3351,9 +3351,7 @@ export default function App() {
                   ) : null;
                 })()}
               </button>
-              <button onClick={handleLogout} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl flex items-center justify-center transition-colors shrink-0" title="Sair da conta">
-                <LogOut className="w-6 h-6" />
-              </button>
+
             </div>
           </header>
         )}
