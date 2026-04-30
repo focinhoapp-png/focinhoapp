@@ -240,6 +240,7 @@ interface PetEvent {
   imageUrl?: string;
   event_date?: string;
   location?: string;
+  slides?: { url: string; publishAt: string }[];
   created_at: any;
 }
 
@@ -279,6 +280,7 @@ interface Post {
   imageUrl?: string;
   walkId?: string;
   likes: string[];
+  comments?: { id: string; userId: string; userName: string; content: string; createdAt: string }[];
   createdAt: any;
 }
 
@@ -971,7 +973,7 @@ export default function App() {
 
   // Events State
   const [petEvents, setPetEvents] = useState<PetEvent[]>([]);
-  const [eventForm, setEventForm] = useState<Partial<PetEvent>>({ id: '', title: '', description: '', imageUrl: '', event_date: '', location: '' });
+  const [eventForm, setEventForm] = useState<Partial<PetEvent>>({ id: '', title: '', description: '', imageUrl: '', event_date: '', location: '', slides: [] });
   const [eventMessage, setEventMessage] = useState<string | null>(null);
 
   // Promo Events State (Admin)
@@ -1036,6 +1038,9 @@ export default function App() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [isAddingPost, setIsAddingPost] = useState(false);
   const [newPost, setNewPost] = useState<{ content: string, type: 'photo' | 'walk', imageUrl?: string, petId?: string, petName?: string }>({ content: '', type: 'photo' });
+  const [activeCommentPostId, setActiveCommentPostId] = useState<string | null>(null);
+  const [commentText, setCommentText] = useState('');
+  const [editingComment, setEditingComment] = useState<{ postId: string; commentId: string; text: string } | null>(null);
   const [showPostPicker, setShowPostPicker] = useState<{ hashtag: string } | null>(null);
   const [pickerPhotos, setPickerPhotos] = useState<string[]>([]);
   const [postHashtag, setPostHashtag] = useState<string>('');
@@ -2354,6 +2359,72 @@ export default function App() {
     }
   };
 
+  const handleCommentSubmit = async (postId: string) => {
+    if (!user || !commentText.trim()) return;
+    const post = posts.find(p => p.id === postId);
+    if (!post) return;
+
+    const newComment = {
+      id: generateId(),
+      userId: user.id,
+      userName: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Usuário',
+      content: commentText.trim(),
+      createdAt: new Date().toISOString()
+    };
+    
+    const newComments = [...(post.comments || []), newComment];
+    
+    // Optimistic UI update
+    setPosts(prev => prev.map(p => p.id === postId ? { ...p, comments: newComments } : p));
+    setCommentText('');
+    
+    try {
+      await supabase.from('posts').update({ comments: newComments }).eq('id', postId);
+    } catch (err) {
+      console.error('Error adding comment:', err);
+      alert('Erro ao adicionar comentário. Certifique-se de ter rodado o comando SQL no banco de dados!');
+    }
+  };
+
+  const handleEditComment = async (postId: string, commentId: string, newText: string) => {
+    if (!newText.trim()) return;
+    const post = posts.find(p => p.id === postId);
+    if (!post || !post.comments) return;
+
+    const updatedComments = post.comments.map(c => 
+      c.id === commentId ? { ...c, content: newText.trim() } : c
+    );
+
+    // Optimistic update
+    setPosts(prev => prev.map(p => p.id === postId ? { ...p, comments: updatedComments } : p));
+    setEditingComment(null);
+
+    try {
+      await supabase.from('posts').update({ comments: updatedComments }).eq('id', postId);
+    } catch (err) {
+      console.error('Error editing comment:', err);
+      alert('Erro ao editar comentário.');
+    }
+  };
+
+  const handleDeleteComment = async (postId: string, commentId: string) => {
+    if (!window.confirm('Deseja excluir este comentário?')) return;
+    const post = posts.find(p => p.id === postId);
+    if (!post || !post.comments) return;
+
+    const updatedComments = post.comments.filter(c => c.id !== commentId);
+
+    // Optimistic update
+    setPosts(prev => prev.map(p => p.id === postId ? { ...p, comments: updatedComments } : p));
+
+    try {
+      await supabase.from('posts').update({ comments: updatedComments }).eq('id', postId);
+    } catch (err) {
+      console.error('Error deleting comment:', err);
+      alert('Erro ao excluir comentário.');
+    }
+  };
+
   const handleSendOtp = async () => {
     if (!authEmail || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(authEmail)) {
       setAuthError('Por favor, insira um email válido.');
@@ -3150,14 +3221,33 @@ export default function App() {
 
               {/* ── Results Vertical Feed (Carousel) ── */}
               <div className="flex flex-col w-full relative z-[205]">
-                {[...Array(7)].map((_, idx) => (
-                  <div key={idx} className="w-full aspect-square bg-yellow-400 flex items-center justify-center border-b border-yellow-500">
-                    <div className="text-center">
-                      <p className="text-yellow-700 font-black text-2xl">IMAGEM {idx + 1}</p>
-                      <p className="text-yellow-600 font-bold text-sm mt-1">1200 x 1200</p>
+                {[...Array(7)].map((_, idx) => {
+                  const slide = ev.slides?.[idx];
+                  const isPublished = slide && slide.publishAt ? new Date() >= new Date(slide.publishAt) : false;
+                  
+                  return (
+                    <div key={idx} className="w-full aspect-square bg-yellow-400 flex items-center justify-center border-b border-yellow-500 relative overflow-hidden">
+                      {isPublished && slide.url ? (
+                        <img src={slide.url} alt={`Slide ${idx + 1}`} className="w-full h-full object-cover absolute inset-0" />
+                      ) : (
+                        <div className="text-center relative z-10 flex flex-col items-center p-6">
+                          <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mb-4 backdrop-blur-sm">
+                            <Clock className="w-8 h-8 text-yellow-800" />
+                          </div>
+                          <p className="text-yellow-800 font-black text-2xl">IMAGEM {idx + 1}</p>
+                          {slide?.publishAt ? (
+                            <p className="text-yellow-800 font-bold text-sm mt-2 max-w-[200px] leading-tight">
+                              Liberada em:<br />
+                              {new Date(slide.publishAt).toLocaleString('pt-BR')}
+                            </p>
+                          ) : (
+                            <p className="text-yellow-700 font-bold text-sm mt-1">Em breve</p>
+                          )}
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           );
@@ -3932,14 +4022,93 @@ export default function App() {
                                   </div>
 
                                   {/* Actions & Date */}
-                                  <div className="flex items-center gap-4 px-4 pt-3 pb-4">
-                                     <button className="flex items-center gap-1.5 text-gray-400 font-bold text-sm hover:text-orange-500 transition-colors">
-                                       <Heart className="w-6 h-6" />
-                                       {post.likes?.length || 0}
-                                     </button>
-                                     <p className="text-[11px] text-gray-400 font-medium ml-auto mt-1">
-                                       {post.createdAt ? new Date(post.createdAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : 'Recentemente'}
+                                  <div className="flex flex-col gap-2 px-4 pt-3 pb-4">
+                                     <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-4">
+                                           <button onClick={() => handleLikePost(post.id)} className={`transition-colors ${post.likes?.includes(user?.id || '') ? 'text-red-500' : 'text-gray-800 hover:text-gray-500'}`}>
+                                              <Heart className={`w-6 h-6 ${post.likes?.includes(user?.id || '') ? 'fill-red-500' : ''}`} />
+                                           </button>
+                                           <button onClick={() => setActiveCommentPostId(activeCommentPostId === post.id ? null : post.id)} className="transition-colors text-gray-800 hover:text-gray-500">
+                                              <MessageCircle className="w-6 h-6" />
+                                           </button>
+                                           <button className="transition-colors text-gray-800 hover:text-gray-500">
+                                              <Share2 className="w-6 h-6" />
+                                           </button>
+                                        </div>
+                                     </div>
+                                     
+                                     <div className="flex flex-col mt-1 space-y-1 text-[13px]">
+                                        <p className="font-bold text-gray-900">{post.likes?.length || 0} curtidas</p>
+                                     </div>
+
+                                     {/* Comments Section */}
+                                     {post.comments && post.comments.length > 0 && (
+                                       <div className="mt-1 space-y-1">
+                                         {post.comments.length > 2 && (
+                                           <button className="text-gray-500 text-[13px] font-medium hover:text-gray-400">Ver todos os {post.comments.length} comentários</button>
+                                         )}
+                                         {post.comments.slice(-2).map(c => {
+                                            const isOwner = c.userId === user?.id;
+                                            const canEdit = isOwner && (Date.now() - new Date(c.createdAt).getTime() < 2 * 60 * 60 * 1000); // 2 hours
+                                            return (
+                                              <div key={c.id} className="text-[13px] flex items-center justify-between group">
+                                                <p className="flex-1">
+                                                  <span className="font-bold text-gray-900 mr-1.5">{c.userName}</span>
+                                                  <span className="text-gray-800">{c.content}</span>
+                                                </p>
+                                                {isOwner && (
+                                                  <div className="hidden group-hover:flex items-center gap-2 ml-2">
+                                                    {canEdit && (
+                                                      <button onClick={() => setEditingComment({ postId: post.id, commentId: c.id, text: c.content })} className="text-gray-400 hover:text-blue-500">
+                                                        <Edit2 className="w-3 h-3" />
+                                                      </button>
+                                                    )}
+                                                    <button onClick={() => handleDeleteComment(post.id, c.id)} className="text-gray-400 hover:text-red-500">
+                                                      <Trash2 className="w-3 h-3" />
+                                                    </button>
+                                                  </div>
+                                                )}
+                                              </div>
+                                            );
+                                         })}
+                                       </div>
+                                     )}
+                                     
+                                     <p className="text-[10px] text-gray-500 mt-1 uppercase tracking-wider">
+                                       {post.createdAt ? new Date(post.createdAt).toLocaleDateString('pt-BR', { month: 'long', day: 'numeric' }) : 'Recentemente'}
                                      </p>
+
+                                     {/* Add Comment Input */}
+                                     {(activeCommentPostId === post.id || editingComment?.postId === post.id) && (
+                                       <div className="flex gap-2 mt-3 items-center relative">
+                                         <input
+                                           type="text"
+                                           value={editingComment?.postId === post.id ? editingComment.text : (activeCommentPostId === post.id ? commentText : '')}
+                                           onChange={(e) => editingComment?.postId === post.id ? setEditingComment({ ...editingComment, text: e.target.value }) : setCommentText(e.target.value)}
+                                           placeholder="Adicione um comentário..."
+                                           className="flex-1 text-sm outline-none placeholder-gray-500 py-1"
+                                           onKeyDown={(e) => {
+                                             if (e.key === 'Enter') {
+                                                if (editingComment?.postId === post.id) {
+                                                   handleEditComment(post.id, editingComment.commentId, editingComment.text);
+                                                } else {
+                                                   handleCommentSubmit(post.id);
+                                                }
+                                             }
+                                           }}
+                                         />
+                                         {editingComment?.postId === post.id && (
+                                           <button onClick={() => setEditingComment(null)} className="text-gray-400 font-bold text-xs mr-2">Cancelar</button>
+                                         )}
+                                         <button
+                                           onClick={() => editingComment?.postId === post.id ? handleEditComment(post.id, editingComment.commentId, editingComment.text) : handleCommentSubmit(post.id)}
+                                           disabled={editingComment?.postId === post.id ? !editingComment.text.trim() : !commentText.trim()}
+                                           className="text-blue-500 font-semibold text-sm disabled:opacity-50"
+                                         >
+                                           Publicar
+                                         </button>
+                                       </div>
+                                     )}
                                   </div>
                                </div>
                             );
@@ -6500,19 +6669,93 @@ export default function App() {
                                    </div>
                                 )}
                                 {/* Footer actions */}
-                                <div className="flex flex-col gap-3">
-                                   <p className="text-[13px] text-gray-500">{post.likes?.length || 0} curtida(s)</p>
-                                   <div className="flex items-center justify-between border-t border-gray-100 pt-3">
+                                <div className="flex flex-col gap-2 px-4 pt-3 pb-4 border-t border-gray-100">
+                                   <div className="flex items-center justify-between">
                                       <div className="flex items-center gap-4">
-                                         <button className="flex items-center gap-1 text-gray-600 font-medium text-sm">
-                                            <Heart className="w-5 h-5 text-gray-400" /> Curtir
+                                         <button onClick={() => handleLikePost(post.id)} className={`transition-colors ${post.likes?.includes(user?.id || '') ? 'text-red-500' : 'text-gray-800 hover:text-gray-500'}`}>
+                                            <Heart className={`w-5 h-5 ${post.likes?.includes(user?.id || '') ? 'fill-red-500' : ''}`} />
                                          </button>
-                                         <button className="flex items-center gap-1 text-gray-600 font-medium text-sm">
-                                            <MessageCircle className="w-5 h-5 text-gray-400" /> Comentar
+                                         <button onClick={() => setActiveCommentPostId(activeCommentPostId === post.id ? null : post.id)} className="transition-colors text-gray-800 hover:text-gray-500">
+                                            <MessageCircle className="w-5 h-5" />
+                                         </button>
+                                         <button className="transition-colors text-gray-800 hover:text-gray-500">
+                                            <Share2 className="w-5 h-5" />
                                          </button>
                                       </div>
-                                      <button className="text-gray-400"><Share2 className="w-5 h-5" /></button>
                                    </div>
+                                   
+                                   <div className="flex flex-col mt-1 space-y-1 text-[13px]">
+                                      <p className="font-bold text-gray-900">{post.likes?.length || 0} curtidas</p>
+                                   </div>
+
+                                   {/* Comments Section */}
+                                   {post.comments && post.comments.length > 0 && (
+                                     <div className="mt-1 space-y-1">
+                                       {post.comments.length > 2 && (
+                                         <button className="text-gray-500 text-[13px] font-medium hover:text-gray-400">Ver todos os {post.comments.length} comentários</button>
+                                       )}
+                                       {post.comments.slice(-2).map(c => {
+                                          const isOwner = c.userId === user?.id;
+                                          const canEdit = isOwner && (Date.now() - new Date(c.createdAt).getTime() < 2 * 60 * 60 * 1000); // 2 hours
+                                          return (
+                                            <div key={c.id} className="text-[13px] flex items-center justify-between group">
+                                              <p className="flex-1">
+                                                <span className="font-bold text-gray-900 mr-1.5">{c.userName}</span>
+                                                <span className="text-gray-800">{c.content}</span>
+                                              </p>
+                                              {isOwner && (
+                                                <div className="hidden group-hover:flex items-center gap-2 ml-2">
+                                                  {canEdit && (
+                                                    <button onClick={() => setEditingComment({ postId: post.id, commentId: c.id, text: c.content })} className="text-gray-400 hover:text-blue-500">
+                                                      <Edit2 className="w-3 h-3" />
+                                                    </button>
+                                                  )}
+                                                  <button onClick={() => handleDeleteComment(post.id, c.id)} className="text-gray-400 hover:text-red-500">
+                                                    <Trash2 className="w-3 h-3" />
+                                                  </button>
+                                                </div>
+                                              )}
+                                            </div>
+                                          );
+                                       })}
+                                     </div>
+                                   )}
+                                   
+                                   <p className="text-[10px] text-gray-500 mt-1 uppercase tracking-wider">
+                                     {post.createdAt ? new Date(post.createdAt).toLocaleDateString('pt-BR', { month: 'long', day: 'numeric' }) : 'Recentemente'}
+                                   </p>
+
+                                   {/* Add Comment Input */}
+                                   {(activeCommentPostId === post.id || editingComment?.postId === post.id) && (
+                                     <div className="flex gap-2 mt-3 items-center relative">
+                                       <input
+                                         type="text"
+                                         value={editingComment?.postId === post.id ? editingComment.text : (activeCommentPostId === post.id ? commentText : '')}
+                                         onChange={(e) => editingComment?.postId === post.id ? setEditingComment({ ...editingComment, text: e.target.value }) : setCommentText(e.target.value)}
+                                         placeholder="Adicione um comentário..."
+                                         className="flex-1 text-sm outline-none placeholder-gray-500 py-1 bg-transparent"
+                                         onKeyDown={(e) => {
+                                           if (e.key === 'Enter') {
+                                              if (editingComment?.postId === post.id) {
+                                                 handleEditComment(post.id, editingComment.commentId, editingComment.text);
+                                              } else {
+                                                 handleCommentSubmit(post.id);
+                                              }
+                                           }
+                                         }}
+                                       />
+                                       {editingComment?.postId === post.id && (
+                                         <button onClick={() => setEditingComment(null)} className="text-gray-400 font-bold text-xs mr-2">Cancelar</button>
+                                       )}
+                                       <button
+                                         onClick={() => editingComment?.postId === post.id ? handleEditComment(post.id, editingComment.commentId, editingComment.text) : handleCommentSubmit(post.id)}
+                                         disabled={editingComment?.postId === post.id ? !editingComment.text.trim() : !commentText.trim()}
+                                         className="text-[#0B3B8B] font-semibold text-sm disabled:opacity-50"
+                                       >
+                                         Publicar
+                                       </button>
+                                     </div>
+                                   )}
                                 </div>
                               </div>
                            ))
@@ -7613,6 +7856,7 @@ export default function App() {
                                   imageUrl: eventForm.imageUrl || null,
                                   event_date: eventForm.event_date || null,
                                   location: eventForm.location || null,
+                                  slides: eventForm.slides || [],
                                 };
                                 if (eventForm.id) {
                                   await supabase.from('events').update(payload).eq('id', eventForm.id);
@@ -7624,7 +7868,7 @@ export default function App() {
                                 }
                                 const { data } = await supabase.from('events').select('*').order('created_at', { ascending: false });
                                 setPetEvents((data || []) as PetEvent[]);
-                                setEventForm({ id: '', title: '', description: '', imageUrl: '', event_date: '', location: '' });
+                                setEventForm({ id: '', title: '', description: '', imageUrl: '', event_date: '', location: '', slides: [] });
                                 setTimeout(() => setEventMessage(null), 3000);
                               } catch { setError('Erro ao salvar evento.'); }
                             }}
@@ -7657,7 +7901,7 @@ export default function App() {
 
                             {/* Image Upload */}
                             <div className="flex flex-col gap-1.5">
-                              <label className="text-sm font-medium text-gray-600 ml-1">Imagem do Evento</label>
+                              <label className="text-sm font-medium text-gray-600 ml-1">Imagem Principal do Evento</label>
                               <div className="flex gap-2">
                                 {eventForm.imageUrl && (
                                   <div className="w-20 h-20 rounded-xl overflow-hidden relative group shrink-0 border border-gray-200">
@@ -7692,6 +7936,89 @@ export default function App() {
                               </div>
                             </div>
 
+                            {/* Slides Management */}
+                            <div className="flex flex-col gap-2 mt-4 p-4 border border-gray-200 rounded-2xl bg-white">
+                              <div className="flex items-center justify-between">
+                                <label className="text-sm font-bold text-gray-800">Slides da Cobertura (Mínimo 7)</label>
+                                <span className="text-xs text-gray-500 font-bold">{eventForm.slides?.length || 0}/7</span>
+                              </div>
+                              <p className="text-xs text-gray-500 mb-2">Adicione as 7 imagens que formarão o feed vertical do evento. Cada uma pode ter data/hora de liberação.</p>
+                              
+                              <div className="flex flex-col gap-3">
+                                {eventForm.slides?.map((slide, idx) => (
+                                  <div key={idx} className="flex gap-3 items-center border border-gray-100 p-2 rounded-xl bg-gray-50">
+                                    <div className="w-16 h-16 rounded-lg overflow-hidden relative shrink-0 border border-gray-200 bg-gray-200">
+                                      {slide.url ? (
+                                        <img src={slide.url} className="w-full h-full object-cover" alt={`Slide ${idx + 1}`} />
+                                      ) : (
+                                        <div className="w-full h-full flex flex-col items-center justify-center">
+                                          <ImageIcon className="w-5 h-5 text-gray-400" />
+                                        </div>
+                                      )}
+                                      <label className="absolute inset-0 bg-black/40 text-white flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity cursor-pointer">
+                                        <Edit2 className="w-4 h-4" />
+                                        <input
+                                          type="file"
+                                          accept="image/*"
+                                          className="hidden"
+                                          onChange={async (e) => {
+                                            const file = e.target.files?.[0];
+                                            if (!file) return;
+                                            const reader = new FileReader();
+                                            reader.onload = (ev) => {
+                                              const newSlides = [...(eventForm.slides || [])];
+                                              newSlides[idx] = { ...newSlides[idx], url: ev.target?.result as string };
+                                              setEventForm(prev => ({ ...prev, slides: newSlides }));
+                                            };
+                                            reader.readAsDataURL(file);
+                                          }}
+                                        />
+                                      </label>
+                                    </div>
+                                    <div className="flex-1 flex flex-col gap-1.5">
+                                      <label className="text-[10px] font-bold text-gray-400 uppercase">Data de Liberação</label>
+                                      <input
+                                        type="datetime-local"
+                                        value={slide.publishAt}
+                                        onChange={(e) => {
+                                          const newSlides = [...(eventForm.slides || [])];
+                                          newSlides[idx] = { ...newSlides[idx], publishAt: e.target.value };
+                                          setEventForm(prev => ({ ...prev, slides: newSlides }));
+                                        }}
+                                        className="text-xs px-2 py-1.5 border border-gray-200 rounded-lg w-full outline-none focus:border-orange-400"
+                                      />
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const newSlides = [...(eventForm.slides || [])];
+                                        newSlides.splice(idx, 1);
+                                        setEventForm(prev => ({ ...prev, slides: newSlides }));
+                                      }}
+                                      className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors shrink-0"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                ))}
+
+                                {(!eventForm.slides || eventForm.slides.length < 7) && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setEventForm(prev => ({
+                                        ...prev,
+                                        slides: [...(prev.slides || []), { url: '', publishAt: '' }]
+                                      }));
+                                    }}
+                                    className="w-full py-3 border-2 border-dashed border-gray-200 text-gray-500 font-bold rounded-xl hover:bg-gray-50 hover:border-orange-300 transition-colors flex items-center justify-center gap-2 text-sm"
+                                  >
+                                    <Plus className="w-4 h-4" /> Adicionar Imagem ({eventForm.slides?.length || 0}/7)
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+
                             {eventMessage && (
                               <div className="bg-green-50 text-green-600 p-3 rounded-xl text-center text-sm font-bold border border-green-200 mt-1">
                                 {eventMessage}
@@ -7705,7 +8032,7 @@ export default function App() {
                               {eventForm.id && (
                                 <button
                                   type="button"
-                                  onClick={() => setEventForm({ id: '', title: '', description: '', imageUrl: '', event_date: '', location: '' })}
+                                  onClick={() => setEventForm({ id: '', title: '', description: '', imageUrl: '', event_date: '', location: '', slides: [] })}
                                   className="px-6 rounded-2xl border-2 border-gray-100 text-gray-500 font-bold hover:bg-gray-50"
                                 >
                                   Cancelar
@@ -7732,7 +8059,7 @@ export default function App() {
                                 </div>
                                 <div className="flex gap-2 shrink-0">
                                   <button
-                                    onClick={() => setEventForm({ id: ev.id, title: ev.title, description: ev.description || '', imageUrl: ev.imageUrl || '', event_date: ev.event_date || '', location: ev.location || '' })}
+                                    onClick={() => setEventForm({ id: ev.id, title: ev.title, description: ev.description || '', imageUrl: ev.imageUrl || '', event_date: ev.event_date || '', location: ev.location || '', slides: ev.slides || [] })}
                                     className="p-2.5 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-colors"
                                   >
                                     <Edit2 className="w-4 h-4" />
