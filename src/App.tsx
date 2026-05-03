@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useRef, Component, ReactNode } from 'react';
+import React, { useState, useEffect, useRef, Component, useCallback, useMemo } from 'react';
 import {
   Plus,
   QrCode,
@@ -57,11 +57,13 @@ import {
   BellDot,
   BellOff,
   UserPlus,
+  UserCheck,
   Package,
   Store,
   Siren,
   ToggleLeft,
-  ToggleRight
+  ToggleRight,
+  Send
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap } from 'react-leaflet';
@@ -83,34 +85,7 @@ import { saveAs } from 'file-saver';
 const generateId = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
 
 
-// --- Types ---
-enum OperationType {
-  CREATE = 'create',
-  UPDATE = 'update',
-  DELETE = 'delete',
-  LIST = 'list',
-  GET = 'get',
-  WRITE = 'write',
-}
 
-interface FirestoreErrorInfo {
-  error: string;
-  operationType: OperationType;
-  path: string | null;
-  authInfo: {
-    userId?: string;
-    email?: string | null;
-    emailVerified?: boolean;
-    isAnonymous?: boolean;
-    tenantId?: string | null;
-    providerInfo: {
-      providerId: string;
-      displayName: string | null;
-      email: string | null;
-      photoUrl: string | null;
-    }[];
-  }
-}
 
 interface PetProfile {
   id: string;
@@ -139,6 +114,15 @@ interface PetProfile {
   };
   ownerName?: string; // Appended at runtime for finder
   createdAt: any;
+  likes?: string[];
+  compliments?: {
+    id: string;
+    userId: string;
+    userName: string;
+    userPhoto: string;
+    content: string;
+    createdAt: string;
+  }[];
 }
 
 interface OwnerProfile {
@@ -895,7 +879,6 @@ export default function App() {
   const [userCity, setUserCity] = useState<string>('');          // GPS auto-detected city (City - State)
   const [selectedCity, setSelectedCity] = useState<string>(() => localStorage.getItem('focinho_selected_city') || ''); // user-selected city for filtering
   const [showCityPicker, setShowCityPicker] = useState(false);
-  const [cityInputTemp, setCityInputTemp] = useState('');
   const [pickerStep, setPickerStep] = useState<'state' | 'city'>('state');
   const [pickerSelectedState, setPickerSelectedState] = useState<{sigla: string, nome: string} | null>(null);
   const [pickerCities, setPickerCities] = useState<string[]>([]);
@@ -960,13 +943,14 @@ export default function App() {
   const [selectedTagIds, setSelectedTagIds] = useState<Set<string>>(new Set()); // Admin QR selection
   const [tagIdToActivate, setTagIdToActivate] = useState(() => localStorage.getItem('focinho_pending_tag') || '');
   const [finderPet, setFinderPet] = useState<PetProfile | null>(null);
+  const [showComplimentsModal, setShowComplimentsModal] = useState(false);
+  const [complimentText, setComplimentText] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   
   // Admin Banners
   const [adminBanners, setAdminBanners] = useState<any[]>([]);
-  const [adminBannersPage, setAdminBannersPage] = useState(1);
   const [bannerForm, setBannerForm] = useState<{ image_url: string, link_url: string, expires_at: string, file: File | null }>({ image_url: '', link_url: '', expires_at: '', file: null });
   const [bannerMessage, setBannerMessage] = useState<string | null>(null);
 
@@ -1102,6 +1086,74 @@ export default function App() {
   const [sentRequests, setSentRequests] = useState<FriendRequest[]>([]); // pedidos ENVIADOS
   const [friendships, setFriendships] = useState<Friendship[]>([]); // amizades estabelecidas
   const [viewingProfile, setViewingProfile] = useState<{ userId: string; name: string; username?: string; photoUrl?: string } | null>(null);
+  const [profilePetsCount, setProfilePetsCount] = useState(0);
+  const [viewingProfileDetails, setViewingProfileDetails] = useState<any>(null);
+  const [viewingProfileFriendCount, setViewingProfileFriendCount] = useState(0);
+
+  useEffect(() => {
+    if (viewingProfile?.userId) {
+      supabase.from('pets').select('id', { count: 'exact', head: true }).eq('ownerId', viewingProfile.userId)
+        .then(({ count }) => setProfilePetsCount(count || 0));
+      supabase.from('profiles').select('*').eq('id', viewingProfile.userId).maybeSingle()
+        .then(({ data }) => setViewingProfileDetails(data));
+      supabase.from('friendships').select('id', { count: 'exact', head: true })
+        .or(`user1_id.eq.${viewingProfile.userId},user2_id.eq.${viewingProfile.userId}`)
+        .eq('status', 'accepted')
+        .then(({ count }) => setViewingProfileFriendCount(count || 0));
+    } else {
+      setViewingProfileDetails(null);
+      setViewingProfileFriendCount(0);
+      setProfilePetsCount(0);
+    }
+  }, [viewingProfile?.userId]);
+  // Notificações de amizade aceita (da tabela notifications)
+  interface FriendNotification {
+    id: string;
+    user_id: string;
+    type: string;
+    from_user_id?: string;
+    from_user_name?: string;
+    from_user_photo?: string;
+    from_user_username?: string;
+    message?: string;
+    read: boolean;
+    created_at: string;
+  }
+  const [friendNotifications, setFriendNotifications] = useState<FriendNotification[]>([]);
+  // Toast estilo Instagram quando pedido for aceito
+  const [friendAcceptedToast, setFriendAcceptedToast] = useState<{ name: string; photo?: string; username?: string } | null>(null);
+
+  // DM System State
+  interface Message {
+    id: string;
+    conversation_id: string;
+    sender_id: string;
+    content: string;
+    created_at: string;
+    read: boolean;
+  }
+
+  interface Conversation {
+    id: string;
+    user1_id: string;
+    user2_id: string;
+    last_message: string;
+    last_message_at: string;
+    other_user?: {
+      id: string;
+      name: string;
+      username: string;
+      photoUrl: string;
+    };
+    unread_count?: number;
+  }
+
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [activeChat, setActiveChat] = useState<Conversation | null>(null);
+  const [chatMessages, setChatMessages] = useState<Message[]>([]);
+  const [newMessageContent, setNewMessageContent] = useState('');
+  const [loadingChat, setLoadingChat] = useState(false);
+  const chatScrollRef = useRef<HTMLDivElement>(null);
 
   const [showScanner, setShowScanner] = useState(false);
 
@@ -1196,6 +1248,61 @@ export default function App() {
     } catch (err) {
       console.error('Error processing scanned tag:', err);
       alert('Erro ao processar o QR Code. Tente novamente.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLikePet = async (petId: string) => {
+    if (!user) {
+      window.alert("Você precisa estar logado para curtir!");
+      return;
+    }
+    try {
+      const pet = finderPet;
+      if (!pet || pet.id !== petId) return;
+      
+      let newLikes = pet.likes ? [...pet.likes] : [];
+      if (newLikes.includes(user.id)) {
+        newLikes = newLikes.filter(id => id !== user.id);
+      } else {
+        newLikes.push(user.id);
+      }
+      
+      setFinderPet({ ...pet, likes: newLikes });
+      await supabase.from('pets').update({ likes: newLikes }).eq('id', petId);
+    } catch (err) {
+      console.error('Erro ao curtir pet:', err);
+    }
+  };
+
+  const submitCompliment = async () => {
+    if (!user) {
+      window.alert("Você precisa estar logado para deixar um elogio!");
+      return;
+    }
+    if (!complimentText.trim() || !finderPet) return;
+    
+    setLoading(true);
+    try {
+      const newCompliment = {
+        id: generateId(),
+        userId: user.id,
+        userName: ownerProfile?.username || ownerProfile?.name || 'Tutor',
+        userPhoto: ownerProfile?.photoUrl || '',
+        content: complimentText.trim(),
+        createdAt: new Date().toISOString()
+      };
+      
+      const newCompliments = finderPet.compliments ? [...finderPet.compliments, newCompliment] : [newCompliment];
+      
+      setFinderPet({ ...finderPet, compliments: newCompliments });
+      await supabase.from('pets').update({ compliments: newCompliments }).eq('id', finderPet.id);
+      
+      setComplimentText('');
+    } catch (err) {
+      console.error('Erro ao enviar elogio:', err);
+      window.alert('Erro ao enviar elogio. Tente novamente.');
     } finally {
       setLoading(false);
     }
@@ -1629,6 +1736,53 @@ export default function App() {
     return () => { supabase.removeChannel(channel); };
   }, [user]);
 
+  // Fetch & subscribe to friend notifications (accepted requests)
+  useEffect(() => {
+    if (!user) { setFriendNotifications([]); return; }
+
+    const loadFriendNotifs = async () => {
+      try {
+        const { data } = await supabase
+          .from('notifications')
+          .select('*')
+          .eq('user_id', user.id)
+          .in('type', ['friend_accepted', 'friend_accepted_self'])
+          .order('created_at', { ascending: false })
+          .limit(50);
+        setFriendNotifications((data || []) as any[]);
+      } catch (err) {
+        console.warn('Erro ao carregar notificações de amizade (tabela pode não existir ainda):', err);
+      }
+    };
+
+    loadFriendNotifs();
+
+    // Realtime: escutar novas notificações para este usuário
+    const notifChannel = supabase
+      .channel('notifications-' + user.id)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` },
+        async (payload) => {
+          const notif = payload.new as any;
+          // Mostrar toast estilo Instagram apenas para 'friend_accepted' (seu pedido foi aceito)
+          if (notif.type === 'friend_accepted') {
+            setFriendAcceptedToast({
+              name: notif.from_user_name || 'Alguém',
+              photo: notif.from_user_photo || '',
+              username: notif.from_user_username || '',
+            });
+            setTimeout(() => setFriendAcceptedToast(null), 5000);
+          }
+          // Atualizar lista de notificações
+          loadFriendNotifs();
+        }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(notifChannel); };
+  }, [user]);
+
   // Friend action helpers
   const getFriendshipStatus = (targetUserId: string): 'none' | 'pending_sent' | 'pending_received' | 'friends' => {
     if (!user || !targetUserId || targetUserId === user.id) return 'none';
@@ -1695,6 +1849,50 @@ export default function App() {
       setFriendships(prev => [...prev, { id: requestId, user_id_1: fromUserId, user_id_2: user.id, created_at: new Date().toISOString() }]);
       setSuccessMessage('Agora vocês são amigos! 🐾');
       setTimeout(() => setSuccessMessage(null), 3000);
+
+      // ── Notificações de amizade aceita ──
+      // Buscar dados do perfil do usuário atual (quem aceitou)
+      const { data: myProfile } = await supabase
+        .from('owners')
+        .select('name, username, photoUrl')
+        .eq('uid', user.id)
+        .maybeSingle();
+
+      // Buscar dados de quem enviou o pedido
+      const { data: fromProfile } = await supabase
+        .from('owners')
+        .select('name, username, photoUrl')
+        .eq('uid', fromUserId)
+        .maybeSingle();
+
+      const myName = myProfile?.name || myProfile?.username || 'Alguém';
+      const myPhoto = myProfile?.photoUrl || '';
+      const myUsername = myProfile?.username || '';
+
+      // 1) Notificação para QUEM ENVIOU o pedido: "X aceitou seu pedido de amizade"
+      await supabase.from('notifications').insert({
+        user_id: fromUserId,
+        type: 'friend_accepted',
+        from_user_id: user.id,
+        from_user_name: myName,
+        from_user_photo: myPhoto,
+        from_user_username: myUsername,
+        message: `${myName} aceitou seu pedido de amizade 🐾`,
+        read: false,
+      });
+
+      // 2) Notificação para QUEM ACEITOU (usuário atual): "Agora você e X são amigos"
+      await supabase.from('notifications').insert({
+        user_id: user.id,
+        type: 'friend_accepted_self',
+        from_user_id: fromUserId,
+        from_user_name: fromProfile?.name || fromProfile?.username || 'Usuário',
+        from_user_photo: fromProfile?.photoUrl || '',
+        from_user_username: fromProfile?.username || '',
+        message: `Agora você e ${fromProfile?.name || fromProfile?.username || 'Usuário'} são amigos 🐾`,
+        read: false,
+      });
+
     } catch (err) {
       console.error('Erro ao aceitar pedido:', err);
     }
@@ -1723,6 +1921,219 @@ export default function App() {
       console.error('Erro ao remover amigo:', err);
     }
   };
+
+  // --- DM System Logic ---
+  const loadConversations = async () => {
+    if (!user) return;
+    try {
+      const { data, error } = await supabase.from('conversations')
+        .select('*')
+        .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`)
+        .order('last_message_at', { ascending: false });
+        
+      if (error) {
+        console.warn('Conversations table might not exist yet:', error);
+        return;
+      }
+      
+      const convs = (data || []) as Conversation[];
+      
+      // Fetch user details for each conversation
+      const otherUserIds = convs.map(c => c.user1_id === user.id ? c.user2_id : c.user1_id);
+      if (otherUserIds.length > 0) {
+        const { data: ownersData } = await supabase.from('owners').select('uid, name, username, photoUrl').in('uid', otherUserIds);
+        
+        if (ownersData) {
+          const ownersMap = ownersData.reduce((acc: any, owner: any) => {
+            acc[owner.uid] = owner;
+            return acc;
+          }, {});
+          
+          convs.forEach(c => {
+            const otherId = c.user1_id === user.id ? c.user2_id : c.user1_id;
+            c.other_user = ownersMap[otherId] || { id: otherId, name: 'Usuário', username: '' };
+          });
+        }
+      }
+      
+      // Fetch unread counts
+      for (const conv of convs) {
+        const { count } = await supabase.from('messages')
+          .select('*', { count: 'exact', head: true })
+          .eq('conversation_id', conv.id)
+          .neq('sender_id', user.id)
+          .eq('read', false);
+        conv.unread_count = count || 0;
+      }
+      
+      setConversations(convs);
+    } catch (err) {
+      console.error('Erro ao carregar conversas:', err);
+    }
+  };
+
+  const openChat = async (friendId: string, friendData?: { name: string; username?: string; photoUrl?: string }) => {
+    if (!user) return;
+    setLoadingChat(true);
+    
+    // Find or create conversation
+    let conv = conversations.find(c => c.user1_id === friendId || c.user2_id === friendId);
+    
+    if (!conv) {
+      // Try to fetch from DB in case it wasn't loaded
+      const { data: existingConv } = await supabase.from('conversations')
+        .select('*')
+        .or(`and(user1_id.eq.${user.id},user2_id.eq.${friendId}),and(user1_id.eq.${friendId},user2_id.eq.${user.id})`)
+        .maybeSingle();
+        
+      if (existingConv) {
+        conv = existingConv as Conversation;
+      } else {
+        // Create new conversation
+        const { data: newConv, error } = await supabase.from('conversations')
+          .insert({
+            user1_id: user.id,
+            user2_id: friendId,
+            last_message_at: new Date().toISOString() // To show up in list
+          })
+          .select()
+          .single();
+          
+        if (error) {
+          console.error('Error creating conversation:', error);
+          setLoadingChat(false);
+          return;
+        }
+        conv = newConv as Conversation;
+      }
+      
+      if (friendData) {
+         conv.other_user = { id: friendId, ...friendData };
+      }
+      setConversations(prev => [conv!, ...prev.filter(c => c.id !== conv!.id)]);
+    }
+    
+    setActiveChat(conv);
+    setAccountSubView('chat');
+    
+    // Fetch messages
+    const { data: msgs } = await supabase.from('messages')
+      .select('*')
+      .eq('conversation_id', conv.id)
+      .order('created_at', { ascending: true });
+      
+    setChatMessages((msgs || []) as Message[]);
+    
+    // Mark as read
+    const unreadMsgs = msgs?.filter(m => !m.read && m.sender_id !== user.id) || [];
+    if (unreadMsgs.length > 0) {
+      await supabase.from('messages')
+        .update({ read: true })
+        .eq('conversation_id', conv.id)
+        .neq('sender_id', user.id)
+        .eq('read', false);
+        
+      setConversations(prev => prev.map(c => 
+        c.id === conv!.id ? { ...c, unread_count: 0 } : c
+      ));
+    }
+    
+    setLoadingChat(false);
+    setTimeout(() => {
+      chatScrollRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
+  };
+
+  const sendChatMessage = async () => {
+    if (!user || !activeChat || !newMessageContent.trim()) return;
+    
+    const content = newMessageContent.trim();
+    setNewMessageContent('');
+    
+    // Optimistic UI
+    const tempId = `temp-${Date.now()}`;
+    const newMsg: Message = {
+      id: tempId,
+      conversation_id: activeChat.id,
+      sender_id: user.id,
+      content,
+      created_at: new Date().toISOString(),
+      read: false
+    };
+    
+    setChatMessages(prev => [...prev, newMsg]);
+    setTimeout(() => chatScrollRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+    
+    // Update DB
+    const { data: insertedMsg, error } = await supabase.from('messages')
+      .insert({
+        conversation_id: activeChat.id,
+        sender_id: user.id,
+        content
+      })
+      .select()
+      .single();
+      
+    if (!error && insertedMsg) {
+      setChatMessages(prev => prev.map(m => m.id === tempId ? (insertedMsg as Message) : m));
+      
+      // Update conversation last message
+      await supabase.from('conversations')
+        .update({
+          last_message: content,
+          last_message_at: new Date().toISOString()
+        })
+        .eq('id', activeChat.id);
+        
+      setConversations(prev => {
+        const otherConvs = prev.filter(c => c.id !== activeChat.id);
+        const thisConv = prev.find(c => c.id === activeChat.id);
+        if (thisConv) {
+          return [{ ...thisConv, last_message: content, last_message_at: new Date().toISOString() }, ...otherConvs];
+        }
+        return prev;
+      });
+    }
+  };
+
+  // --- Realtime Subscriptions for DM ---
+  useEffect(() => {
+    if (!user) return;
+    
+    // Subscribe to new messages
+    const msgSubscription = supabase.channel('messages-channel')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'messages',
+        filter: `sender_id=neq.${user.id}` // Only listen to messages from others
+      }, async (payload) => {
+        const newMsg = payload.new as Message;
+        
+        // If we are currently in this chat, append and mark read
+        if (activeChat?.id === newMsg.conversation_id) {
+          setChatMessages(prev => [...prev, newMsg]);
+          setTimeout(() => chatScrollRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+          
+          await supabase.from('messages').update({ read: true }).eq('id', newMsg.id);
+        } else {
+          // Update unread count and re-fetch conversations to get latest message
+          loadConversations();
+        }
+      })
+      .subscribe();
+      
+    return () => {
+      supabase.removeChannel(msgSubscription);
+    };
+  }, [user, activeChat]);
+
+  useEffect(() => {
+    if (user && accountSubView === 'menu') {
+      loadConversations();
+    }
+  }, [user, accountSubView]);
+
 
   // Fetch Adoption Pets
 
@@ -1847,7 +2258,7 @@ export default function App() {
       try {
         const { data, error } = await supabase.from('lost_alerts').select('*');
         if (error) {
-          window.alert('Erro(Supabase) ao carregar alertas: ' + error.message);
+          console.error('Erro(Supabase) ao carregar alertas:', error.message);
         }
         let allAlerts = (data || []) as LostAlert[];
 
@@ -1956,23 +2367,6 @@ export default function App() {
     return () => { supabase.removeChannel(channel); };
   }, [user, view]);
 
-  const handleFirestoreError = (error: unknown, operationType: OperationType, path: string | null) => {
-    const errInfo: FirestoreErrorInfo = {
-      error: error instanceof Error ? error.message : String(error),
-      authInfo: {
-        userId: user?.id,
-        email: user?.email,
-        emailVerified: user?.email_confirmed_at != null,
-        isAnonymous: false,
-        tenantId: null,
-        providerInfo: []
-      },
-      operationType,
-      path
-    };
-    console.error('Firestore Error: ', JSON.stringify(errInfo));
-    return JSON.stringify(errInfo);
-  };
 
   const handleSaveReminder = async () => {
     if (!user || !newReminder.title || !newReminder.petName) return;
@@ -2451,48 +2845,11 @@ export default function App() {
   };
 
 
-  // Fetch Feed Posts — Instagram-style: posts do usuário + seguidos primeiro, depois todos os outros
+  // Fetch Feed Posts — Todas as postagens de todos os usuários
   useEffect(() => {
     const fetchPosts = async () => {
-      const { data } = await supabase.from('posts').select('*').order('createdAt', { ascending: false }).limit(100);
-      const allPosts = (data || []) as Post[];
-
-      if (!user) {
-        setPosts(allPosts.slice(0, 50));
-        return;
-      }
-
-      // Buscar quem o usuário segue
-      let followingIds: string[] = [];
-      try {
-        const { data: followsData } = await supabase
-          .from('follows')
-          .select('following_id')
-          .eq('follower_id', user.id);
-        followingIds = (followsData || []).map((f: any) => f.following_id);
-      } catch {
-        // tabela follows pode não existir ainda — sem problema
-      }
-
-      const priorityIds = new Set([user.id, ...followingIds]);
-
-      // Separar: posts prioritários (próprios + seguidos) vs. resto
-      const priorityPosts = allPosts.filter(p => priorityIds.has(p.userId));
-      const otherPosts = allPosts.filter(p => !priorityIds.has(p.userId));
-
-      // Intercalar: blocos de 3 prioritários + 1 do resto (estilo Instagram)
-      const merged: Post[] = [];
-      let pi = 0, oi = 0;
-      while (pi < priorityPosts.length || oi < otherPosts.length) {
-        for (let i = 0; i < 3 && pi < priorityPosts.length; i++, pi++) {
-          merged.push(priorityPosts[pi]);
-        }
-        if (oi < otherPosts.length) {
-          merged.push(otherPosts[oi++]);
-        }
-      }
-
-      setPosts(merged.slice(0, 50));
+      const { data } = await supabase.from('posts').select('*').order('createdAt', { ascending: false });
+      setPosts((data || []) as Post[]);
     };
     fetchPosts();
     const channel = supabase.channel('posts')
@@ -2523,7 +2880,7 @@ export default function App() {
       if (error) throw error;
       setIsAddingPost(false);
       setNewPost({ content: '', type: 'photo', imageUrl: '' });
-      const { data } = await supabase.from('posts').select('*').order('createdAt', { ascending: false }).limit(50);
+      const { data } = await supabase.from('posts').select('*').order('createdAt', { ascending: false });
       setPosts((data || []) as Post[]);
     } catch (err) {
       console.error('Error creating post:', err);
@@ -3362,6 +3719,70 @@ export default function App() {
     } as any));
   };
 
+  // ─── Memoized derived data ───────────────────────────────────────────────
+  // These only recalculate when their actual dependencies change,
+  // preventing expensive re-filtering on every keystroke / state update.
+
+  const availableAdoptionPets = useMemo(
+    () => adoptionPets.filter(p => p.status === 'available' || !p.status),
+    [adoptionPets]
+  );
+
+  const filteredLostAlerts = useMemo(() => {
+    if (!selectedCity) return lostAlerts;
+    const cityName = selectedCity.split(' - ')[0].toLowerCase();
+    return lostAlerts.filter(a => a.city?.toLowerCase().includes(cityName));
+  }, [lostAlerts, selectedCity]);
+
+  const myPostsCount = useMemo(
+    () => posts.filter(p => p.userId === user?.id).length,
+    [posts, user?.id]
+  );
+
+  const viewingProfilePostsCount = useMemo(
+    () => viewingProfile ? posts.filter(p => p.userId === viewingProfile.userId).length : 0,
+    [posts, viewingProfile?.userId]
+  );
+
+  const viewingProfilePosts = useMemo(
+    () => viewingProfile ? posts.filter(p => p.userId === viewingProfile.userId) : [],
+    [posts, viewingProfile?.userId]
+  );
+
+  const filteredPartners = useMemo(() => {
+    if (activePartnerFilter === 'Todos') return partners;
+    return partners.filter(p => p.category === activePartnerFilter);
+  }, [partners, activePartnerFilter]);
+
+  const friendshipStatusMap = useMemo(() => {
+    const map: Record<string, 'none' | 'pending_sent' | 'pending_received' | 'friends'> = {};
+    if (!user) return map;
+    // Pre-index for O(1) lookups
+    const friendSet = new Set(
+      friendships.flatMap(f => {
+        if (f.user_id_1 === user.id) return [f.user_id_2];
+        if (f.user_id_2 === user.id) return [f.user_id_1];
+        return [];
+      })
+    );
+    const sentSet = new Set(sentRequests.map(r => r.to_user_id));
+    const receivedSet = new Set(friendRequests.map(r => r.from_user_id));
+    return { friendSet, sentSet, receivedSet };
+  }, [friendships, sentRequests, friendRequests, user?.id]);
+
+  // Memoize the getFriendshipStatus function so it doesn't recreate on every render
+  const getFriendshipStatusMemo = useCallback((targetUserId: string): 'none' | 'pending_sent' | 'pending_received' | 'friends' => {
+    if (!user || !targetUserId || targetUserId === user.id) return 'none';
+    const { friendSet, sentSet, receivedSet } = friendshipStatusMap as any;
+    if (!friendSet) return getFriendshipStatus(targetUserId);
+    if (friendSet.has(targetUserId)) return 'friends';
+    if (sentSet.has(targetUserId)) return 'pending_sent';
+    if (receivedSet.has(targetUserId)) return 'pending_received';
+    return 'none';
+  }, [friendshipStatusMap, user?.id]);
+
+  // ─────────────────────────────────────────────────────────────────────────
+
   if (loading && view !== 'finder') {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
@@ -4128,10 +4549,16 @@ export default function App() {
                                     <div className="flex items-center gap-3">
                                       <div className="relative">
                                         <div
-                                          className={`w-10 h-10 rounded-full border-2 border-orange-100 overflow-hidden bg-gray-50 p-0.5 ${post.userId !== user?.id ? 'cursor-pointer' : ''}`}
+                                          className={`w-10 h-10 rounded-full border-2 border-orange-100 overflow-hidden bg-gray-50 p-0.5 cursor-pointer`}
                                           onClick={() => {
-                                            if (!user || post.userId === user.id) return;
-                                            setViewingProfile({ userId: post.userId, name: post.userName, photoUrl: post.userPhoto });
+                                            if (!user) return;
+                                            if (post.userId === user.id) {
+                                              setViewingProfile(null);
+                                              setView('account');
+                                              setAccountSubView('main');
+                                            } else {
+                                              setViewingProfile({ userId: post.userId, name: post.userName, photoUrl: post.userPhoto });
+                                            }
                                           }}
                                         >
                                           <img src={post.userPhoto || 'https://picsum.photos/seed/user/100/100'} className="w-full h-full rounded-full object-cover" alt="User" />
@@ -4140,10 +4567,16 @@ export default function App() {
                                       <div>
                                         <p className="text-[14px] text-gray-900 leading-tight">
                                           <span
-                                            className={`font-bold ${post.userId !== user?.id ? 'cursor-pointer hover:underline' : ''}`}
+                                            className={`font-bold cursor-pointer`}
                                             onClick={() => {
-                                              if (!user || post.userId === user.id) return;
-                                              setViewingProfile({ userId: post.userId, name: post.userName, photoUrl: post.userPhoto });
+                                              if (!user) return;
+                                              if (post.userId === user.id) {
+                                                setViewingProfile(null);
+                                                setView('account');
+                                                setAccountSubView('main');
+                                              } else {
+                                                setViewingProfile({ userId: post.userId, name: post.userName, photoUrl: post.userPhoto });
+                                              }
                                             }}
                                           >{post.userName || 'Tutor'}</span>{' '}
                                           {post.type === 'alert' ? 'procurando por ' : post.type === 'adoption' ? 'busca um lar pra ' : 'passeando com '}
@@ -5171,7 +5604,7 @@ export default function App() {
                             const { error: insertError } = await supabase.from('posts').insert(postData);
                             if (insertError) throw insertError;
 
-                            const { data: updatedPosts } = await supabase.from('posts').select('*').order('createdAt', { ascending: false }).limit(50);
+                            const { data: updatedPosts } = await supabase.from('posts').select('*').order('createdAt', { ascending: false });
                             if (updatedPosts) setPosts(updatedPosts as Post[]);
 
                             window.alert('Passeio compartilhado na Timeline com sucesso! 🎉');
@@ -5471,7 +5904,7 @@ export default function App() {
                               {ownerProfile?.name || user?.user_metadata?.full_name || 'Tutor do Pet'}
                             </h2>
                             <div className="text-[15px] font-semibold text-gray-800 mt-0.5">
-                              {friendships.length} {friendships.length === 1 ? 'amigo' : 'amigos'} <span className="font-normal text-gray-500 mx-1">•</span> {posts.filter(p => p.userId === user?.id).length} posts
+                              {friendships.length} {friendships.length === 1 ? 'amigo' : 'amigos'} <span className="font-normal text-gray-500 mx-1">•</span> {myPostsCount} posts
                             </div>
                           </div>
                         </div>
@@ -5540,6 +5973,33 @@ export default function App() {
                       </div>
                       <ChevronRight className="text-gray-300" />
                     </button>
+
+                    {/* ── Mensagens (DM) ── */}
+                    {(() => {
+                      const totalUnread = conversations.reduce((acc, curr) => acc + (curr.unread_count || 0), 0);
+                      return (
+                        <button
+                          onClick={() => setAccountSubView('messages')}
+                          className="p-5 md:p-6 flex items-center gap-4 hover:bg-gray-50 transition-all text-left border-b border-gray-50 last:border-b-0 relative group"
+                        >
+                          <div className="relative">
+                            <MessageCircle className="w-6 h-6 text-gray-900 shrink-0 group-hover:scale-110 transition-transform" />
+                            {totalUnread > 0 && (
+                              <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center shadow">
+                                {totalUnread > 9 ? '9+' : totalUnread}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex-1">
+                            <h4 className="font-bold text-gray-800">Mensagens</h4>
+                            <p className="text-xs text-gray-400">
+                              {totalUnread > 0 ? `${totalUnread} nova${totalUnread > 1 ? 's' : ''}` : 'Converse com seus amigos'}
+                            </p>
+                          </div>
+                          <ChevronRight className="text-gray-300" />
+                        </button>
+                      );
+                    })()}
 
                     <button
                       onClick={() => setAccountSubView('events')}
@@ -6465,12 +6925,65 @@ export default function App() {
                 )}
 
                 {accountSubView === 'pets' && (
-                  <div className="space-y-6">
-                    <div className="flex items-center justify-between">
-                      <button onClick={() => setAccountSubView('menu')} className="flex items-center gap-2 text-orange-500 font-bold text-sm">
-                        <ChevronLeft className="w-4 h-4" /> Voltar ao menu
+                  <div className="absolute inset-0 z-[60] bg-[#F9F7F3] flex flex-col">
+                    <div className="px-6 pt-12 pb-4 flex items-center justify-between sticky top-0 z-10 bg-[#F9F7F3]">
+                      <button onClick={() => setAccountSubView('menu')} className="flex items-center gap-2 text-gray-900 font-medium text-[17px]">
+                        <ChevronLeft className="w-5 h-5 -ml-1" /> Todos os Animais
                       </button>
-                      <Button
+                      <button className="text-gray-500 font-medium text-sm">
+                        Ordenar
+                      </button>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto px-4 py-2 space-y-4">
+                      {userPets.map(pet => {
+                        const days = pet.adoptionDate 
+                          ? Math.ceil(Math.abs(new Date().getTime() - new Date(pet.adoptionDate).getTime()) / (1000 * 60 * 60 * 24))
+                          : (pet as any).created_at 
+                            ? Math.ceil(Math.abs(new Date().getTime() - new Date((pet as any).created_at).getTime()) / (1000 * 60 * 60 * 24))
+                            : 0;
+
+                        const isMale = pet.gender === 'Macho';
+
+                        return (
+                          <div
+                            key={pet.id}
+                            onClick={() => { setSelectedPet(pet); setView('profile'); }}
+                            className="bg-white rounded-[1.2rem] p-4 flex items-center gap-4 shadow-[0_2px_15px_-4px_rgba(0,0,0,0.05)] cursor-pointer hover:shadow-md transition-shadow"
+                          >
+                            <div className="w-[60px] h-[60px] rounded-full overflow-hidden shrink-0 bg-gray-50">
+                              {pet.photoUrl ? (
+                                <img src={pet.photoUrl} alt={pet.name} className="w-full h-full object-cover" />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center">
+                                  <Dog className="w-8 h-8 text-gray-300" />
+                                </div>
+                              )}
+                            </div>
+                            
+                            <div className="flex-1 min-w-0">
+                              <h3 className="font-bold text-[17px] text-gray-900 leading-tight mb-0.5">{pet.name}</h3>
+                              <div className="flex items-center gap-1.5 text-gray-500 text-[14px] mb-1 font-medium">
+                                <span className={isMale ? 'text-[#0a327d] font-bold text-[15px] leading-none' : 'text-pink-500 font-bold text-[15px] leading-none'}>
+                                  {isMale ? '♂' : '♀'}
+                                </span>
+                                <span className="truncate">{pet.breed || 'SRD'}</span>
+                              </div>
+                              <p className="text-[13px] text-gray-400 font-medium">
+                                Fique comigo por {days} dias
+                              </p>
+                            </div>
+
+                            <button className="w-9 h-9 rounded-full bg-[#f4f7ff] text-[#0a327d] flex items-center justify-center shrink-0">
+                              <QrCode className="w-[18px] h-[18px]" />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div className="p-8 pb-12 bg-[#F9F7F3] flex justify-center">
+                      <button 
                         onClick={() => {
                           const petsWithoutTag = userPets.filter(p => !p.tagId);
                           const hasActiveTag = userPets.some(p => p.tagId);
@@ -6481,54 +6994,11 @@ export default function App() {
                             setView('profile');
                           }
                         }}
-                        variant="secondary"
-                        className="!px-4 !py-2 text-xs"
+                        className="text-[#0a327d] font-medium text-[15px] flex items-center gap-1.5 hover:opacity-80 transition-opacity"
                       >
-                        <Plus className="w-4 h-4" /> Novo Pet
-                      </Button>
+                        + Adicionar Animal
+                      </button>
                     </div>
-
-                    <div className="grid gap-4">
-                      {userPets.map(pet => {
-                        const isLost = lostAlerts.some(a => a.petId === pet.id);
-                        return (
-                          <div
-                            key={pet.id}
-                            onClick={() => { setSelectedPet(pet); setView('profile'); }}
-                            className={`bg-white p-4 rounded-3xl shadow-sm border ${isLost ? 'border-red-500 bg-red-50' : 'border-gray-100'} flex items-center gap-4 cursor-pointer hover:border-orange-200 transition-all`}
-                          >
-                            <div className="w-16 h-16 bg-orange-50 rounded-2xl flex items-center justify-center overflow-hidden">
-                              {pet.photoUrl ? (
-                                <img src={pet.photoUrl} alt={pet.name} className="w-full h-full object-cover" />
-                              ) : (
-                                <Dog className="w-8 h-8 text-orange-200" />
-                              )}
-                            </div>
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2">
-                                <h3 className="font-bold text-lg">{pet.name}</h3>
-                                {isLost ? (
-                                  <span className="bg-red-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full animate-pulse">
-                                    PERDIDO
-                                  </span>
-                                ) : pet.tagId ? (
-                                  <span className="bg-green-100 text-green-600 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
-                                    <ShieldCheck className="w-3 h-3" /> PROTEGIDO
-                                  </span>
-                                ) : (
-                                  <span className="bg-gray-100 text-gray-400 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
-                                    <AlertCircle className="w-3 h-3" /> NÃO PROTEGIDO
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-sm text-gray-400">{pet.breed || 'Sem raça definida'}</p>
-                            </div>
-                            <ChevronRight className="text-gray-300" />
-                          </div>
-                        );
-                      })}
-                    </div>
-                    <div className="h-20" /> {/* Spacer to avoid bottom nav overlap */}
                   </div>
                 )}
 
@@ -6622,6 +7092,177 @@ export default function App() {
                       )}
                     </div>
                     <div className="h-20" /> {/* Spacer to avoid bottom nav overlap */}
+                  </div>
+                )}
+
+                {/* --- DM Inbox View --- */}
+                {accountSubView === 'messages' && (
+                  <div className="space-y-6">
+                    <div className="flex items-center gap-4">
+                      <button onClick={() => setAccountSubView('menu')} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+                        <ChevronLeft className="w-6 h-6 text-gray-800" />
+                      </button>
+                      <h2 className="text-2xl font-bold text-gray-900">Mensagens</h2>
+                    </div>
+
+                    <div className="bg-white rounded-[2rem] shadow-sm border border-gray-100 overflow-hidden mb-24">
+                      {conversations.length === 0 ? (
+                        <div className="p-8 text-center space-y-4">
+                          <div className="w-16 h-16 bg-orange-50 rounded-full flex items-center justify-center mx-auto">
+                            <MessageCircle className="w-8 h-8 text-orange-400" />
+                          </div>
+                          <p className="text-gray-500 font-medium">Nenhuma mensagem ainda.</p>
+                          <p className="text-xs text-gray-400">Adicione amigos para começar a conversar!</p>
+                        </div>
+                      ) : (
+                        <div className="divide-y divide-gray-50">
+                          {conversations.map(conv => {
+                            const isUnread = (conv.unread_count || 0) > 0;
+                            return (
+                              <button
+                                key={conv.id}
+                                onClick={() => openChat(conv.other_user!.id, conv.other_user)}
+                                className="w-full p-4 flex items-center gap-4 hover:bg-gray-50 transition-colors text-left"
+                              >
+                                <div className="w-14 h-14 rounded-full border-2 border-gray-100 bg-gray-50 overflow-hidden shrink-0">
+                                  {conv.other_user?.photoUrl ? (
+                                    <img src={conv.other_user.photoUrl} alt="avatar" className="w-full h-full object-cover" />
+                                  ) : (
+                                    <div className="w-full h-full flex items-center justify-center">
+                                      <UserIcon className="w-6 h-6 text-gray-300" />
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex justify-between items-baseline mb-1">
+                                    <h4 className={`text-base truncate ${isUnread ? 'font-black text-gray-900' : 'font-bold text-gray-800'}`}>
+                                      {conv.other_user?.name || 'Usuário'}
+                                    </h4>
+                                  </div>
+                                  <p className={`text-sm truncate ${isUnread ? 'font-bold text-gray-900' : 'text-gray-500'}`}>
+                                    {conv.last_message || 'Nova conversa'}
+                                  </p>
+                                </div>
+                                {isUnread && (
+                                  <div className="w-2.5 h-2.5 bg-orange-500 rounded-full shrink-0" />
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* --- Chat View --- */}
+                {accountSubView === 'chat' && activeChat && (
+                  <div className="fixed inset-0 z-[100] bg-white flex flex-col">
+                    {/* Header */}
+                    <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-3 bg-white/80 backdrop-blur-md sticky top-0 z-10">
+                      <button 
+                        onClick={() => {
+                          setAccountSubView('messages');
+                          setActiveChat(null);
+                          loadConversations();
+                        }} 
+                        className="p-2 -ml-2 hover:bg-gray-50 rounded-full transition-colors"
+                      >
+                        <ChevronLeft className="w-6 h-6 text-gray-800" />
+                      </button>
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full border border-gray-100 bg-gray-50 overflow-hidden shrink-0">
+                          {activeChat.other_user?.photoUrl ? (
+                            <img src={activeChat.other_user.photoUrl} alt="avatar" className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <UserIcon className="w-5 h-5 text-gray-300" />
+                            </div>
+                          )}
+                        </div>
+                        <div>
+                          <h3 className="font-bold text-gray-900 text-sm leading-tight">{activeChat.other_user?.name}</h3>
+                          <p className="text-xs text-gray-500">{activeChat.other_user?.username ? `@${activeChat.other_user.username}` : ''}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Messages Area */}
+                    <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
+                      {loadingChat ? (
+                        <div className="h-full flex items-center justify-center">
+                          <Loader2 className="w-8 h-8 text-orange-500 animate-spin" />
+                        </div>
+                      ) : (
+                        <div className="space-y-4 pb-2">
+                          {chatMessages.length === 0 ? (
+                            <div className="text-center py-10">
+                              <p className="text-gray-400 text-sm font-medium">Inicie uma conversa!</p>
+                            </div>
+                          ) : (
+                            chatMessages.map((msg, i) => {
+                              const isMe = msg.sender_id === user?.id;
+                              const prevMsg = i > 0 ? chatMessages[i - 1] : null;
+                              const showAvatar = !isMe && (!prevMsg || prevMsg.sender_id !== msg.sender_id);
+                              
+                              return (
+                                <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'} items-end gap-2`}>
+                                  {!isMe && (
+                                    <div className="w-8 h-8 shrink-0">
+                                      {showAvatar && (
+                                        <div className="w-full h-full rounded-full border border-gray-100 bg-gray-200 overflow-hidden">
+                                          {activeChat.other_user?.photoUrl ? (
+                                            <img src={activeChat.other_user.photoUrl} className="w-full h-full object-cover" />
+                                          ) : (
+                                            <UserIcon className="w-4 h-4 text-gray-400 m-auto mt-2" />
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                  
+                                  <div 
+                                    className={`max-w-[75%] px-4 py-2.5 text-[15px] font-medium leading-snug shadow-sm ${
+                                      isMe 
+                                        ? 'bg-gradient-to-br from-orange-400 to-orange-500 text-white rounded-[1.2rem] rounded-br-[0.3rem]' 
+                                        : 'bg-white border border-gray-100 text-gray-800 rounded-[1.2rem] rounded-bl-[0.3rem]'
+                                    }`}
+                                  >
+                                    {msg.content}
+                                  </div>
+                                </div>
+                              );
+                            })
+                          )}
+                          <div ref={chatScrollRef} />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Input Area */}
+                    <div className="p-3 bg-white border-t border-gray-100">
+                      <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-full px-4 py-1.5 focus-within:border-orange-300 focus-within:ring-2 focus-within:ring-orange-100 transition-all">
+                        <input
+                          type="text"
+                          placeholder="Mensagem..."
+                          value={newMessageContent}
+                          onChange={(e) => setNewMessageContent(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') sendChatMessage();
+                          }}
+                          className="flex-1 bg-transparent border-none py-2 outline-none text-[15px] text-gray-800 placeholder:text-gray-400"
+                        />
+                        <button
+                          onClick={sendChatMessage}
+                          disabled={!newMessageContent.trim()}
+                          className={`p-2 rounded-full transition-colors ${
+                            newMessageContent.trim() ? 'bg-orange-500 text-white shadow-md hover:bg-orange-600' : 'text-gray-300'
+                          }`}
+                        >
+                          <Navigation className="w-5 h-5 rotate-45 -ml-0.5 mt-0.5" />
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 )}
 
@@ -6843,9 +7484,34 @@ export default function App() {
                                 {/* Header */}
                                 <div className="pb-3 flex items-center justify-between">
                                   <div className="flex items-center gap-3">
-                                     <img src={post.userPhoto || 'https://picsum.photos/seed/user/100/100'} className="w-10 h-10 rounded-full border border-gray-100" />
+                                     <img 
+                                        src={post.userPhoto || 'https://picsum.photos/seed/user/100/100'} 
+                                        className="w-10 h-10 rounded-full border border-gray-100 cursor-pointer"
+                                        onClick={() => {
+                                          if (!user) return;
+                                          if (post.userId === user.id) {
+                                            setViewingProfile(null);
+                                            setView('account');
+                                            setAccountSubView('main');
+                                          } else {
+                                            setViewingProfile({ userId: post.userId, name: post.userName, photoUrl: post.userPhoto });
+                                          }
+                                        }}
+                                     />
                                      <div>
-                                        <p className="text-base font-semibold m-0 text-gray-900">{post.userName}</p>
+                                        <p 
+                                           className="text-base font-semibold m-0 text-gray-900 cursor-pointer"
+                                           onClick={() => {
+                                             if (!user) return;
+                                             if (post.userId === user.id) {
+                                               setViewingProfile(null);
+                                               setView('account');
+                                               setAccountSubView('main');
+                                             } else {
+                                               setViewingProfile({ userId: post.userId, name: post.userName, photoUrl: post.userPhoto });
+                                             }
+                                           }}
+                                        >{post.userName}</p>
                                         <p className="text-[11px] text-gray-400 m-0">{new Date(post.createdAt).toLocaleDateString()}</p>
                                      </div>
                                   </div>
@@ -7066,6 +7732,23 @@ export default function App() {
                       action: () => { setAccountSubView('partners'); },
                       rightImage: p.logo,
                     })),
+                    // Friend notifications (accepted)
+                    ...(notifPrefs.friends ? friendNotifications.map(n => ({
+                      id: `friend-notif-${n.id}`,
+                      avatarUrl: n.from_user_photo || undefined,
+                      titleNode: (
+                        <>
+                          <span className="font-bold">{n.from_user_name || 'Alguém'}</span>
+                          {n.type === 'friend_accepted'
+                            ? ' aceitou seu pedido de amizade '
+                            : ' agora é seu amigo '}
+                          <span>🐾</span>
+                        </>
+                      ),
+                      time: new Date(n.created_at),
+                      action: undefined,
+                      rightImage: undefined,
+                    })) : []),
                   ].sort((a, b) => b.time.getTime() - a.time.getTime());
 
                   const fmtTime = (d: Date) => {
@@ -7468,7 +8151,7 @@ export default function App() {
                                   <p className="text-gray-400 text-sm font-medium">Nenhum pet disponível para adoção {selectedCity && !isAdmin ? `em ${selectedCity.split(' - ')[0]}` : ''} no momento.</p>
                                   {selectedCity && !isAdmin && (
                                     <button
-                                      onClick={() => { setCityInputTemp(''); setSelectedCity(''); localStorage.removeItem('focinho_selected_city'); }}
+                                      onClick={() => { setSelectedCity(''); localStorage.removeItem('focinho_selected_city'); }}
                                       className="mt-3 text-xs font-bold text-orange-500 underline"
                                     >
                                       Ver de todas as cidades
@@ -9172,6 +9855,34 @@ export default function App() {
                       )}
                     </div>
 
+                    <div className="text-[15px] font-semibold text-gray-800 mb-4 flex items-center justify-center gap-4">
+                      <span>{finderPet.likes?.length || 0} curtidas</span>
+                      <span className="text-gray-300">•</span>
+                      <span>{finderPet.compliments?.length || 0} elogios</span>
+                    </div>
+
+                    <div className="flex items-center justify-center gap-3 mb-6">
+                      <button 
+                        onClick={() => handleLikePet(finderPet.id)}
+                        className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-bold transition-all shadow-sm ${finderPet.likes?.includes(user?.id || '') ? 'bg-red-50 text-red-500 border border-red-200' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}
+                      >
+                        <Heart className={`w-5 h-5 ${finderPet.likes?.includes(user?.id || '') ? 'fill-red-500' : ''}`} />
+                        Curtir
+                      </button>
+                      
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                          setShowComplimentsModal(true);
+                        }}
+                        className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-bold transition-all shadow-sm ${finderPet.compliments?.some(c => c.userId === user?.id) ? 'bg-orange-50 text-orange-500 border border-orange-200' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}
+                      >
+                        <Star className={`w-5 h-5 ${finderPet.compliments?.some(c => c.userId === user?.id) ? 'fill-orange-500' : ''}`} />
+                        Elogiar
+                      </button>
+                    </div>
+
                     {finderPet && lostAlerts.some(a => a.petId === finderPet.id) && (
                       <motion.div
                         initial={{ y: 20, opacity: 0 }}
@@ -9780,141 +10491,209 @@ export default function App() {
         {/* Lightbox */}
         <AnimatePresence>
           <ImageCropperModal
-        isOpen={cropModalConfig.isOpen}
-        imageSrc={cropModalConfig.imageSrc}
-        aspectRatio={cropModalConfig.aspectRatio}
-        circularCrop={cropModalConfig.circularCrop}
-        onClose={() => setCropModalConfig(prev => ({ ...prev, isOpen: false }))}
-        onCropComplete={cropModalConfig.onConfirm}
-      />
+            isOpen={cropModalConfig.isOpen}
+            imageSrc={cropModalConfig.imageSrc}
+            aspectRatio={cropModalConfig.aspectRatio}
+            circularCrop={cropModalConfig.circularCrop}
+            onClose={() => setCropModalConfig(prev => ({ ...prev, isOpen: false }))}
+            onCropComplete={cropModalConfig.onConfirm}
+          />
+        </AnimatePresence>
 
         {/* ── Mini Profile Modal (Add Friend) ── */}
         <AnimatePresence>
-          {viewingProfile && user && viewingProfile.userId !== user.id && (
-            <div className="fixed inset-0 z-[150] flex items-end justify-center sm:items-center p-4">
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-                onClick={() => setViewingProfile(null)}
-              />
-              <motion.div
-                initial={{ scale: 0.92, opacity: 0, y: 24 }}
-                animate={{ scale: 1, opacity: 1, y: 0 }}
-                exit={{ scale: 0.92, opacity: 0, y: 24 }}
-                className="bg-white rounded-[2.5rem] p-6 w-full max-w-sm relative z-10 shadow-2xl"
-              >
-                {/* Close */}
+          {viewingProfile && user && (
+            <div className="absolute inset-0 z-[150] bg-[#FFF8F0] flex flex-col overflow-y-auto">
+              {/* Header */}
+              <div className="relative pt-6 px-6 pb-6 bg-white border-b border-gray-100">
+                <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-r from-orange-400 via-pink-500 to-pink-500 rounded-b-[2rem]"></div>
                 <button
                   onClick={() => setViewingProfile(null)}
-                  className="absolute top-4 right-4 p-2 hover:bg-gray-100 rounded-full transition-colors"
+                  className="absolute top-6 left-6 p-2 bg-white/20 backdrop-blur-sm rounded-full text-white hover:bg-white/30 z-10"
                 >
-                  <X className="w-5 h-5 text-gray-500" />
+                  <ChevronLeft className="w-5 h-5" />
                 </button>
 
-                {/* Avatar + Name */}
-                <div className="flex flex-col items-center text-center gap-3 mb-5">
-                  <div className="w-20 h-20 rounded-full overflow-hidden border-4 border-orange-100 bg-gray-100">
-                    {viewingProfile.photoUrl ? (
-                      <img src={viewingProfile.photoUrl} className="w-full h-full object-cover" alt={viewingProfile.name} />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-orange-50">
-                        <UserIcon className="w-10 h-10 text-orange-300" />
-                      </div>
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-lg font-bold text-gray-900">{viewingProfile.name}</p>
-                    {viewingProfile.username && (
-                      <p className="text-sm text-gray-500">@{viewingProfile.username}</p>
-                    )}
-                  </div>
-                </div>
-
-                {/* Friend Action Button */}
-                {(() => {
-                  const status = getFriendshipStatus(viewingProfile.userId);
-                  if (status === 'friends') {
-                    return (
-                      <div className="space-y-2">
-                        <div className="w-full py-3 bg-green-50 border border-green-200 text-green-700 font-bold rounded-2xl flex items-center justify-center gap-2">
-                          <UserPlus className="w-5 h-5" /> Amigos ✓
+                <div className="relative z-10 pt-16">
+                  <div className="flex items-end gap-4 mb-3">
+                    <div className="w-[100px] h-[100px] rounded-full overflow-hidden border-4 border-white bg-white shrink-0 relative shadow-sm">
+                      {viewingProfile.photoUrl ? (
+                        <img src={viewingProfile.photoUrl} className="w-full h-full object-cover" alt={viewingProfile.name} />
+                      ) : (
+                        <div className="w-full h-full bg-gray-100 flex items-center justify-center">
+                          <UserIcon className="w-8 h-8 text-gray-400" />
                         </div>
-                        <button
-                          onClick={async () => {
-                            if (window.confirm(`Remover ${viewingProfile.name} dos seus amigos?`)) {
-                              await removeFriend(viewingProfile.userId);
-                              setViewingProfile(null);
-                            }
-                          }}
-                          className="w-full py-2 text-sm text-red-500 hover:text-red-600 font-semibold transition-colors"
-                        >
-                          Desfazer amizade
-                        </button>
+                      )}
+                    </div>
+                    
+                    <div className="flex-1 pb-2">
+                      <h2 className="text-2xl font-bold text-gray-900 leading-tight">
+                        {viewingProfile.name}
+                      </h2>
+                      <div className="text-[15px] font-semibold text-gray-800 mt-0.5">
+                        {viewingProfileFriendCount} {viewingProfileFriendCount === 1 ? 'amigo' : 'amigos'} <span className="font-normal text-gray-500 mx-1">•</span> {viewingProfilePostsCount} posts
                       </div>
-                    );
-                  }
-                  if (status === 'pending_sent') {
-                    return (
-                      <button
-                        onClick={async () => {
-                          await cancelFriendRequest(viewingProfile.userId);
-                        }}
-                        className="w-full py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-2xl flex items-center justify-center gap-2 transition-colors active:scale-95"
-                      >
-                        <X className="w-5 h-5" /> Cancelar pedido
-                      </button>
-                    );
-                  }
-                  if (status === 'pending_received') {
-                    return (
-                      <div className="space-y-2">
-                        <p className="text-center text-sm text-gray-500 mb-1">Esta pessoa te enviou um pedido!</p>
-                        <div className="flex gap-2">
+                    </div>
+                  </div>
+
+                  {viewingProfileDetails?.bio && (
+                    <div className="text-[15px] text-gray-900 mb-2 px-1 whitespace-pre-wrap">
+                      {viewingProfileDetails.bio}
+                    </div>
+                  )}
+
+                  {viewingProfileDetails?.city && (
+                    <div className="flex items-center gap-1.5 mb-4 px-1 text-[15px] font-semibold text-gray-900">
+                      <MapPin className="w-5 h-5 text-gray-900" style={{ fill: 'currentColor', stroke: 'white', strokeWidth: 1.5 }} />
+                      {viewingProfileDetails.city}
+                    </div>
+                  )}
+
+                  {/* Action Buttons */}
+                  <div className="flex gap-2 px-1 mt-4">
+                    {(() => {
+                      const status = getFriendshipStatusMemo(viewingProfile.userId);
+                      let FriendBtn = null;
+                      if (status === 'friends') {
+                        FriendBtn = (
+                          <button
+                            onClick={async () => {
+                              if (window.confirm(`Remover ${viewingProfile.name} dos seus amigos?`)) {
+                                await removeFriend(viewingProfile.userId);
+                              }
+                            }}
+                            className="flex-1 py-2 bg-white border border-gray-200 text-gray-800 font-semibold text-[15px] rounded-lg flex items-center justify-center gap-2 shadow-sm transition-all"
+                          >
+                            <UserCheck className="w-5 h-5" /> Amigos
+                          </button>
+                        );
+                      } else if (status === 'pending_sent') {
+                        FriendBtn = (
+                          <button
+                            onClick={async () => await cancelFriendRequest(viewingProfile.userId)}
+                            className="flex-1 py-2 bg-white border border-gray-200 text-gray-800 font-semibold text-[15px] rounded-lg flex items-center justify-center gap-2 shadow-sm transition-all"
+                          >
+                            <Clock className="w-5 h-5" /> Pendente
+                          </button>
+                        );
+                      } else if (status === 'pending_received') {
+                        FriendBtn = (
                           <button
                             onClick={async () => {
                               const req = friendRequests.find(r => r.from_user_id === viewingProfile.userId);
                               if (req) await acceptFriendRequest(req.id, req.from_user_id);
-                              setViewingProfile(null);
                             }}
-                            className="flex-1 py-3 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-2xl transition-colors active:scale-95"
+                            className="flex-1 py-2 bg-white border border-green-600 text-green-600 font-semibold text-[15px] rounded-lg flex items-center justify-center gap-2 shadow-sm transition-all"
                           >
-                            Aceitar
+                            <UserPlus className="w-5 h-5" /> Aceitar
                           </button>
+                        );
+                      } else {
+                        FriendBtn = (
                           <button
-                            onClick={async () => {
-                              const req = friendRequests.find(r => r.from_user_id === viewingProfile.userId);
-                              if (req) await declineFriendRequest(req.id);
-                              setViewingProfile(null);
-                            }}
-                            className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-2xl transition-colors active:scale-95"
+                            onClick={async () => await sendFriendRequest(viewingProfile.userId, viewingProfile.name)}
+                            className="flex-1 py-2 bg-white border border-gray-200 text-gray-800 font-semibold text-[15px] rounded-lg flex items-center justify-center gap-2 shadow-sm transition-all"
                           >
-                            Recusar
+                            <UserPlus className="w-5 h-5" /> Adicionar
                           </button>
+                        );
+                      }
+
+                      return (
+                        <>
+                          <button
+                            onClick={() => {
+                               window.alert('Funcionalidade "Meus Pets" em desenvolvimento para perfis públicos.');
+                            }}
+                            className="flex-1 bg-[#E4E6EB] hover:bg-[#D8DADF] text-gray-900 font-semibold py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors active:scale-[0.98]"
+                          >
+                            <Dog className="w-5 h-5" />
+                            Meus Pets
+                          </button>
+                          {FriendBtn}
+                        </>
+                      );
+                    })()}
+                  </div>
+                </div>
+              </div>
+
+              <div className="px-6 mt-4">
+                <h3 className="font-semibold text-lg text-gray-900 mb-4">Posts</h3>
+                
+                {/* Timeline */}
+                <div className="space-y-6 pb-24">
+                  {(() => {
+                    const userPosts = viewingProfilePosts;
+                    if (userPosts.length === 0) {
+                      return (
+                        <div className="text-center py-10 bg-white rounded-3xl border border-gray-100">
+                          <p className="text-gray-500 font-medium">Nenhum post ainda.</p>
                         </div>
+                      );
+                    }
+
+                    return userPosts.map((post, idx) => (
+                      <div key={`profile-post-${post.id}-${idx}`} className="bg-white rounded-[2rem] overflow-hidden shadow-[0_2px_15px_-4px_rgba(0,0,0,0.05)] flex flex-col">
+                         <div className="flex items-center justify-between p-4 z-10 w-full">
+                           <div className="flex items-center gap-3">
+                             <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-50">
+                               <img src={post.userPhoto || 'https://picsum.photos/seed/user/100/100'} className="w-full h-full rounded-full object-cover" alt="User" />
+                             </div>
+                             <div>
+                               <p className="text-[14px] text-gray-900 leading-tight flex items-center gap-1">
+                                 <span className="font-bold">{post.userName || 'Tutor'}</span>
+                                 {post.type === 'alert' && <span className="bg-red-500 text-white text-[10px] px-1.5 rounded-full font-bold">PERDIDO</span>}
+                               </p>
+                               <p className="text-[12px] text-gray-500 font-medium mt-0.5">
+                                  {post.createdAt ? new Date(post.createdAt).toLocaleDateString('pt-BR', { day: 'numeric', month: 'short' }) : 'Recente'}
+                               </p>
+                             </div>
+                           </div>
+                           <button className="text-gray-400">
+                             <MoreVertical className="w-5 h-5" />
+                           </button>
+                         </div>
+
+                         <div className="px-4 pb-3 space-y-1">
+                           <p className="text-[15px] text-gray-800 font-medium leading-snug">
+                             {post.content}
+                           </p>
+                         </div>
+
+                         <div className="w-full aspect-square bg-gray-100 relative">
+                           <img src={post.imageUrl || 'https://picsum.photos/seed/passeio/800/800'} alt="Post" className="w-full h-full object-cover" />
+                         </div>
+
+                         <div className="flex flex-col gap-2 px-4 pt-4 pb-5">
+                            <div className="flex items-center justify-between">
+                               <div className="flex items-center gap-4">
+                                  <button onClick={() => handleLikePost(post.id)} className={`transition-colors ${post.likes?.includes(user?.id || '') ? 'text-red-500' : 'text-gray-800'}`}>
+                                     <Heart className={`w-7 h-7 ${post.likes?.includes(user?.id || '') ? 'fill-red-500' : ''}`} />
+                                  </button>
+                                  <button className="text-gray-800">
+                                     <MessageCircle className="w-7 h-7" />
+                                  </button>
+                                  <button className="text-gray-800">
+                                     <Share2 className="w-7 h-7" />
+                                  </button>
+                               </div>
+                            </div>
+                            <div className="flex flex-col mt-2 space-y-1">
+                               <p className="font-bold text-gray-900 text-sm">{post.likes?.length || 0} curtidas</p>
+                            </div>
+                         </div>
                       </div>
-                    );
-                  }
-                  // status === 'none'
-                  return (
-                    <button
-                      onClick={async () => {
-                        await sendFriendRequest(viewingProfile.userId, viewingProfile.name);
-                        setViewingProfile(null);
-                      }}
-                      className="w-full py-3 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-orange-100 transition-colors active:scale-95"
-                    >
-                      <UserPlus className="w-5 h-5" /> Adicionar amigo
-                    </button>
-                  );
-                })()}
-              </motion.div>
+                    ));
+                  })()}
+                </div>
+              </div>
             </div>
           )}
         </AnimatePresence>
 
-      {lightboxImage && (
+        <AnimatePresence>
+          {lightboxImage && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -9962,6 +10741,81 @@ export default function App() {
                   className="p-2 hover:bg-gray-50 rounded-xl transition-colors"
                 >
                   <X className="w-4 h-4 text-gray-400" />
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* ── Toast estilo Instagram: Pedido de amizade aceito ── */}
+        <AnimatePresence>
+          {friendAcceptedToast && (
+            <motion.div
+              initial={{ y: -120, opacity: 0, scale: 0.92 }}
+              animate={{ y: 16, opacity: 1, scale: 1 }}
+              exit={{ y: -120, opacity: 0, scale: 0.92 }}
+              transition={{ type: 'spring', stiffness: 380, damping: 28 }}
+              className="fixed top-0 left-0 right-0 z-[210] flex justify-center px-4 pointer-events-none"
+            >
+              <div
+                className="bg-white rounded-[28px] px-4 py-3 shadow-2xl border border-gray-100 flex items-center gap-3 max-w-sm w-full pointer-events-auto"
+                style={{ boxShadow: '0 8px 40px 0 rgba(255,100,20,0.13), 0 2px 12px rgba(0,0,0,0.10)' }}
+              >
+                {/* Avatar com anel laranja animado */}
+                <div className="relative shrink-0">
+                  <motion.div
+                    initial={{ scale: 0.7 }}
+                    animate={{ scale: 1 }}
+                    transition={{ type: 'spring', stiffness: 400, damping: 20, delay: 0.08 }}
+                    className="w-[48px] h-[48px] rounded-full p-[2.5px]"
+                    style={{ background: 'linear-gradient(135deg, #f97316, #fb923c, #fdba74)' }}
+                  >
+                    <div className="w-full h-full rounded-full overflow-hidden bg-white">
+                      {friendAcceptedToast.photo ? (
+                        <img src={friendAcceptedToast.photo} alt={friendAcceptedToast.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-orange-100">
+                          <UserIcon className="w-6 h-6 text-orange-400" />
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
+                  {/* Badge de confirmação */}
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ delay: 0.25, type: 'spring', stiffness: 500 }}
+                    className="absolute -bottom-0.5 -right-0.5 w-5 h-5 bg-orange-500 rounded-full border-2 border-white flex items-center justify-center"
+                  >
+                    <span className="text-white text-[9px] font-black">✓</span>
+                  </motion.div>
+                </div>
+
+                {/* Texto */}
+                <div className="flex-1 min-w-0">
+                  <p className="text-[13.5px] text-gray-900 leading-snug">
+                    <span className="font-bold">{friendAcceptedToast.name}</span>
+                    {' aceitou seu pedido de amizade'}
+                  </p>
+                  {friendAcceptedToast.username && (
+                    <p className="text-[11px] text-gray-400 mt-0.5">@{friendAcceptedToast.username}</p>
+                  )}
+                </div>
+
+                {/* Pata emoji animada */}
+                <motion.span
+                  initial={{ rotate: -20, scale: 0.5 }}
+                  animate={{ rotate: [0, -15, 10, -5, 0], scale: 1 }}
+                  transition={{ delay: 0.3, duration: 0.6 }}
+                  className="text-2xl shrink-0"
+                >🐾</motion.span>
+
+                {/* Fechar */}
+                <button
+                  onClick={() => setFriendAcceptedToast(null)}
+                  className="p-1.5 hover:bg-gray-50 rounded-full transition-colors shrink-0"
+                >
+                  <X className="w-3.5 h-3.5 text-gray-400" />
                 </button>
               </div>
             </motion.div>
@@ -10244,6 +11098,84 @@ export default function App() {
                 )}
               </motion.div>
             </div>
+          )}
+        </AnimatePresence>
+
+        {/* Modal de Elogios */}
+        <AnimatePresence>
+          {showComplimentsModal && finderPet && (
+            <motion.div
+              key="compliments-modal"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/60 z-[200] flex items-end justify-center pb-safe sm:items-center sm:p-4"
+              onClick={() => setShowComplimentsModal(false)}
+            >
+              <motion.div
+                initial={{ y: "100%" }}
+                animate={{ y: 0 }}
+                exit={{ y: "100%" }}
+                transition={{ type: "spring", damping: 25, stiffness: 200 }}
+                className="w-full sm:max-w-md bg-[#FFF8F0] sm:rounded-[2rem] rounded-t-[2rem] overflow-hidden flex flex-col max-h-[90vh]"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="p-6 bg-white border-b border-gray-100 flex items-center justify-between shrink-0">
+                  <h2 className="text-xl font-black text-gray-900">Elogios</h2>
+                  <button onClick={() => setShowComplimentsModal(false)} className="p-2 bg-gray-50 text-gray-500 rounded-full hover:bg-gray-100">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                  {finderPet.compliments && finderPet.compliments.length > 0 ? (
+                    finderPet.compliments.map(comp => (
+                      <div key={comp.id} className="bg-white p-4 rounded-3xl shadow-sm border border-gray-100">
+                        <div className="flex items-center gap-3 mb-2">
+                          <img src={comp.userPhoto || 'https://picsum.photos/seed/user/100/100'} className="w-10 h-10 rounded-full object-cover" />
+                          <div>
+                            <p className="font-bold text-gray-900 text-sm leading-tight">{comp.userName}</p>
+                            <p className="text-[11px] text-gray-400">{new Date(comp.createdAt).toLocaleDateString()}</p>
+                          </div>
+                        </div>
+                        <p className="text-gray-700 text-[15px] pl-13 leading-snug">{comp.content}</p>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-10">
+                      <Star className="w-12 h-12 text-gray-200 mx-auto mb-3" />
+                      <p className="text-gray-500 font-medium">Nenhum elogio ainda. Seja o primeiro a elogiar!</p>
+                    </div>
+                  )}
+                </div>
+
+                {user ? (
+                  <div className="p-4 bg-white border-t border-gray-100 shrink-0">
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Escreva um elogio lindo..."
+                        value={complimentText}
+                        onChange={(e) => setComplimentText(e.target.value)}
+                        className="flex-1 bg-gray-50 border border-gray-200 rounded-full px-5 py-3 text-[15px] text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500/20"
+                        onKeyDown={(e) => e.key === 'Enter' && submitCompliment()}
+                      />
+                      <button
+                        onClick={submitCompliment}
+                        disabled={loading || !complimentText.trim()}
+                        className="w-12 h-12 bg-orange-500 hover:bg-orange-600 text-white rounded-full flex items-center justify-center shrink-0 disabled:opacity-50 transition-colors"
+                      >
+                        <Send className="w-5 h-5 ml-1" />
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-4 bg-white border-t border-gray-100 shrink-0 text-center">
+                    <p className="text-sm text-gray-500 font-medium">Faça login para deixar um elogio.</p>
+                  </div>
+                )}
+              </motion.div>
+            </motion.div>
           )}
         </AnimatePresence>
 
