@@ -284,6 +284,25 @@ interface Post {
   createdAt: any;
 }
 
+interface FriendRequest {
+  id: string;
+  from_user_id: string;
+  to_user_id: string;
+  status: 'pending';
+  created_at: string;
+  // enriched at runtime:
+  fromUserName?: string;
+  fromUserPhoto?: string;
+  fromUserUsername?: string;
+}
+
+interface Friendship {
+  id: string;
+  user_id_1: string;
+  user_id_2: string;
+  created_at: string;
+}
+
 // --- Helpers ---
 
 const formatPhoneMask = (value: string) => {
@@ -1078,6 +1097,12 @@ export default function App() {
   const [creatingFamily, setCreatingFamily] = useState(false);
   const [joiningFamily, setJoiningFamily] = useState(false);
 
+  // Friend System State
+  const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([]); // pedidos RECEBIDOS
+  const [sentRequests, setSentRequests] = useState<FriendRequest[]>([]); // pedidos ENVIADOS
+  const [friendships, setFriendships] = useState<Friendship[]>([]); // amizades estabelecidas
+  const [viewingProfile, setViewingProfile] = useState<{ userId: string; name: string; username?: string; photoUrl?: string } | null>(null);
+
   const [showScanner, setShowScanner] = useState(false);
 
   const [cropModalConfig, setCropModalConfig] = useState({
@@ -1537,7 +1562,170 @@ export default function App() {
     return () => { supabase.removeChannel(channel); };
   }, [user]);
 
+  // Fetch Friend Requests & Friendships
+  useEffect(() => {
+    if (!user) {
+      setFriendRequests([]);
+      setSentRequests([]);
+      setFriendships([]);
+      return;
+    }
+    const loadFriendData = async () => {
+      try {
+        // Pedidos recebidos (eu sou o to_user_id)
+        const { data: received } = await supabase
+          .from('friend_requests')
+          .select('*')
+          .eq('to_user_id', user.id)
+          .eq('status', 'pending');
+
+        // Pedidos enviados (eu sou o from_user_id)
+        const { data: sent } = await supabase
+          .from('friend_requests')
+          .select('*')
+          .eq('from_user_id', user.id)
+          .eq('status', 'pending');
+
+        // Amizades
+        const { data: friendsData } = await supabase
+          .from('friendships')
+          .select('*')
+          .or(`user_id_1.eq.${user.id},user_id_2.eq.${user.id}`);
+
+        // Enriquecer pedidos recebidos com dados do remetente
+        let enrichedReceived: FriendRequest[] = (received || []) as FriendRequest[];
+        if (enrichedReceived.length > 0) {
+          const fromIds = enrichedReceived.map(r => r.from_user_id);
+          const { data: ownersData } = await supabase
+            .from('owners')
+            .select('uid, name, username, photoUrl')
+            .in('uid', fromIds);
+          if (ownersData) {
+            const ownerMap = ownersData.reduce((acc: any, o: any) => { acc[o.uid] = o; return acc; }, {});
+            enrichedReceived = enrichedReceived.map(r => ({
+              ...r,
+              fromUserName: ownerMap[r.from_user_id]?.name || 'Usuário',
+              fromUserPhoto: ownerMap[r.from_user_id]?.photoUrl || '',
+              fromUserUsername: ownerMap[r.from_user_id]?.username || '',
+            }));
+          }
+        }
+
+        setFriendRequests(enrichedReceived);
+        setSentRequests((sent || []) as FriendRequest[]);
+        setFriendships((friendsData || []) as Friendship[]);
+      } catch (err) {
+        console.warn('Erro ao carregar dados de amizade:', err);
+      }
+    };
+
+    loadFriendData();
+
+    // Realtime subscription
+    const channel = supabase.channel('friends-' + user.id)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'friend_requests' }, loadFriendData)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'friendships' }, loadFriendData)
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user]);
+
+  // Friend action helpers
+  const getFriendshipStatus = (targetUserId: string): 'none' | 'pending_sent' | 'pending_received' | 'friends' => {
+    if (!user || !targetUserId || targetUserId === user.id) return 'none';
+    const isFriend = friendships.some(f =>
+      (f.user_id_1 === user.id && f.user_id_2 === targetUserId) ||
+      (f.user_id_2 === user.id && f.user_id_1 === targetUserId)
+    );
+    if (isFriend) return 'friends';
+    const sent = sentRequests.some(r => r.to_user_id === targetUserId);
+    if (sent) return 'pending_sent';
+    const received = friendRequests.some(r => r.from_user_id === targetUserId);
+    if (received) return 'pending_received';
+    return 'none';
+  };
+
+  const sendFriendRequest = async (toUserId: string, toUserName?: string) => {
+    if (!user) return;
+    try {
+      const { error } = await supabase.from('friend_requests').insert({
+        from_user_id: user.id,
+        to_user_id: toUserId,
+        status: 'pending',
+      });
+      if (error) throw error;
+      // Refresh sent requests
+      const { data } = await supabase.from('friend_requests').select('*').eq('from_user_id', user.id).eq('status', 'pending');
+      setSentRequests((data || []) as FriendRequest[]);
+      setSuccessMessage(`Pedido de amizade enviado para ${toUserName || 'o usuário'}!`);
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } catch (err: any) {
+      console.error('Erro ao enviar pedido de amizade:', err);
+      if (err?.code === '23505') {
+        setError('Você já enviou um pedido para esta pessoa.');
+      } else {
+        setError('Erro ao enviar pedido. Tente novamente.');
+      }
+      setTimeout(() => setError(null), 3000);
+    }
+  };
+
+  const cancelFriendRequest = async (toUserId: string) => {
+    if (!user) return;
+    try {
+      await supabase.from('friend_requests').delete()
+        .eq('from_user_id', user.id).eq('to_user_id', toUserId);
+      setSentRequests(prev => prev.filter(r => r.to_user_id !== toUserId));
+    } catch (err) {
+      console.error('Erro ao cancelar pedido:', err);
+    }
+  };
+
+  const acceptFriendRequest = async (requestId: string, fromUserId: string) => {
+    if (!user) return;
+    try {
+      // Criar amizade bidirecional
+      await supabase.from('friendships').insert({
+        user_id_1: fromUserId,
+        user_id_2: user.id,
+      });
+      // Deletar o pedido
+      await supabase.from('friend_requests').delete().eq('id', requestId);
+      // Atualizar estado local
+      setFriendRequests(prev => prev.filter(r => r.id !== requestId));
+      setFriendships(prev => [...prev, { id: requestId, user_id_1: fromUserId, user_id_2: user.id, created_at: new Date().toISOString() }]);
+      setSuccessMessage('Agora vocês são amigos! 🐾');
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } catch (err) {
+      console.error('Erro ao aceitar pedido:', err);
+    }
+  };
+
+  const declineFriendRequest = async (requestId: string) => {
+    if (!user) return;
+    try {
+      await supabase.from('friend_requests').delete().eq('id', requestId);
+      setFriendRequests(prev => prev.filter(r => r.id !== requestId));
+    } catch (err) {
+      console.error('Erro ao recusar pedido:', err);
+    }
+  };
+
+  const removeFriend = async (friendUserId: string) => {
+    if (!user) return;
+    try {
+      await supabase.from('friendships').delete()
+        .or(`and(user_id_1.eq.${user.id},user_id_2.eq.${friendUserId}),and(user_id_1.eq.${friendUserId},user_id_2.eq.${user.id})`);
+      setFriendships(prev => prev.filter(f =>
+        !((f.user_id_1 === user.id && f.user_id_2 === friendUserId) ||
+          (f.user_id_2 === user.id && f.user_id_1 === friendUserId))
+      ));
+    } catch (err) {
+      console.error('Erro ao remover amigo:', err);
+    }
+  };
+
   // Fetch Adoption Pets
+
   useEffect(() => {
     const fetchAdoption = async () => {
       const { data } = await supabase.from('adoption_pets').select('*');
@@ -3295,7 +3483,7 @@ export default function App() {
                     ...products.map(p => `prod-${p.id}`),
                     ...partners.map(p => `part-${p.id}`),
                   ];
-                  const unseenCount = allIds.filter(id => !seenNotifIds.has(id)).length;
+                  const unseenCount = allIds.filter(id => !seenNotifIds.has(id)).length + friendRequests.length;
                   return unseenCount > 0 ? (
                     <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white" />
                   ) : null;
@@ -3939,13 +4127,25 @@ export default function App() {
                                   <div className="flex items-center justify-between p-4 bg-white/50 backdrop-blur-sm z-10 w-full rounded-t-[2rem]">
                                     <div className="flex items-center gap-3">
                                       <div className="relative">
-                                        <div className="w-10 h-10 rounded-full border-2 border-orange-100 overflow-hidden bg-gray-50 p-0.5">
+                                        <div
+                                          className={`w-10 h-10 rounded-full border-2 border-orange-100 overflow-hidden bg-gray-50 p-0.5 ${post.userId !== user?.id ? 'cursor-pointer' : ''}`}
+                                          onClick={() => {
+                                            if (!user || post.userId === user.id) return;
+                                            setViewingProfile({ userId: post.userId, name: post.userName, photoUrl: post.userPhoto });
+                                          }}
+                                        >
                                           <img src={post.userPhoto || 'https://picsum.photos/seed/user/100/100'} className="w-full h-full rounded-full object-cover" alt="User" />
                                         </div>
                                       </div>
                                       <div>
                                         <p className="text-[14px] text-gray-900 leading-tight">
-                                          <span className="font-bold">{post.userName || 'Tutor'}</span>{' '}
+                                          <span
+                                            className={`font-bold ${post.userId !== user?.id ? 'cursor-pointer hover:underline' : ''}`}
+                                            onClick={() => {
+                                              if (!user || post.userId === user.id) return;
+                                              setViewingProfile({ userId: post.userId, name: post.userName, photoUrl: post.userPhoto });
+                                            }}
+                                          >{post.userName || 'Tutor'}</span>{' '}
                                           {post.type === 'alert' ? 'procurando por ' : post.type === 'adoption' ? 'busca um lar pra ' : 'passeando com '}
                                           <button
                                             className="font-bold text-gray-900"
@@ -5271,7 +5471,7 @@ export default function App() {
                               {ownerProfile?.name || user?.user_metadata?.full_name || 'Tutor do Pet'}
                             </h2>
                             <div className="text-[15px] font-semibold text-gray-800 mt-0.5">
-                              0 amigos <span className="font-normal text-gray-500 mx-1">•</span> 0 posts
+                              {friendships.length} {friendships.length === 1 ? 'amigo' : 'amigos'} <span className="font-normal text-gray-500 mx-1">•</span> {posts.filter(p => p.userId === user?.id).length} posts
                             </div>
                           </div>
                         </div>
@@ -5289,13 +5489,8 @@ export default function App() {
                           </div>
                         )}
 
-                        {/* Buttons (Full Width) */}
+                        {/* Buttons (Full Width) — own profile: only Meus Pets */}
                         <div className="flex gap-2 px-1 mt-4">
-                          <button 
-                            className="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors active:scale-[0.98]"
-                          >
-                            <Plus className="w-5 h-5" /> Adicionar amigo
-                          </button>
                           <button 
                             onClick={() => setAccountSubView('pets')} 
                             className="flex-1 bg-[#E4E6EB] hover:bg-[#D8DADF] text-gray-900 font-semibold py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors active:scale-[0.98]"
@@ -5380,7 +5575,7 @@ export default function App() {
                         ...products.map(p => `prod-${p.id}`),
                         ...partners.map(p => `part-${p.id}`),
                       ];
-                      const unseenCount = allIds.filter(id => !seenNotifIds.has(id)).length;
+                      const unseenCount = allIds.filter(id => !seenNotifIds.has(id)).length + friendRequests.length;
                       return (
                         <button
                           onClick={() => { setAccountSubView('notifications'); markAllSeen(allIds); }}
@@ -6895,6 +7090,58 @@ export default function App() {
 
                       {/* Feed de Notificações */}
                       <div className="px-2">
+
+                        {/* ── Pedidos de Amizade ── */}
+                        {friendRequests.length > 0 && (
+                          <div className="mb-4 mt-2">
+                            <p className="text-[12px] font-black text-gray-400 uppercase tracking-widest px-2 mb-2">
+                              Pedidos de amizade
+                            </p>
+                            <div className="space-y-2">
+                              {friendRequests.map(req => (
+                                <div key={req.id} className="flex items-center gap-3 px-3 py-3 bg-blue-50/60 rounded-2xl border border-blue-100">
+                                  {/* Avatar */}
+                                  <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-100 border border-gray-200 shrink-0">
+                                    {req.fromUserPhoto ? (
+                                      <img src={req.fromUserPhoto} alt={req.fromUserName} className="w-full h-full object-cover" />
+                                    ) : (
+                                      <div className="w-full h-full flex items-center justify-center bg-orange-100">
+                                        <UserIcon className="w-6 h-6 text-orange-400" />
+                                      </div>
+                                    )}
+                                  </div>
+                                  {/* Info */}
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-[14px] font-bold text-gray-900 truncate">
+                                      {req.fromUserName || 'Usuário'}
+                                    </p>
+                                    {req.fromUserUsername && (
+                                      <p className="text-[12px] text-gray-500">@{req.fromUserUsername}</p>
+                                    )}
+                                    <p className="text-[11px] text-gray-400 mt-0.5">Quer ser seu amigo</p>
+                                  </div>
+                                  {/* Actions */}
+                                  <div className="flex flex-col gap-1.5 shrink-0">
+                                    <button
+                                      onClick={() => acceptFriendRequest(req.id, req.from_user_id)}
+                                      className="px-4 py-1.5 bg-orange-500 hover:bg-orange-600 text-white text-[12px] font-bold rounded-xl transition-colors active:scale-95"
+                                    >
+                                      Aceitar
+                                    </button>
+                                    <button
+                                      onClick={() => declineFriendRequest(req.id)}
+                                      className="px-4 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 text-[12px] font-bold rounded-xl transition-colors active:scale-95"
+                                    >
+                                      Recusar
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                            <div className="h-px bg-gray-100 mt-4 mb-2" />
+                          </div>
+                        )}
+
                         {feed.length === 0 ? (
                           <div className="flex flex-col items-center justify-center py-12 px-6 gap-3">
                             <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center">
@@ -9540,6 +9787,132 @@ export default function App() {
         onClose={() => setCropModalConfig(prev => ({ ...prev, isOpen: false }))}
         onCropComplete={cropModalConfig.onConfirm}
       />
+
+        {/* ── Mini Profile Modal (Add Friend) ── */}
+        <AnimatePresence>
+          {viewingProfile && user && viewingProfile.userId !== user.id && (
+            <div className="fixed inset-0 z-[150] flex items-end justify-center sm:items-center p-4">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+                onClick={() => setViewingProfile(null)}
+              />
+              <motion.div
+                initial={{ scale: 0.92, opacity: 0, y: 24 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.92, opacity: 0, y: 24 }}
+                className="bg-white rounded-[2.5rem] p-6 w-full max-w-sm relative z-10 shadow-2xl"
+              >
+                {/* Close */}
+                <button
+                  onClick={() => setViewingProfile(null)}
+                  className="absolute top-4 right-4 p-2 hover:bg-gray-100 rounded-full transition-colors"
+                >
+                  <X className="w-5 h-5 text-gray-500" />
+                </button>
+
+                {/* Avatar + Name */}
+                <div className="flex flex-col items-center text-center gap-3 mb-5">
+                  <div className="w-20 h-20 rounded-full overflow-hidden border-4 border-orange-100 bg-gray-100">
+                    {viewingProfile.photoUrl ? (
+                      <img src={viewingProfile.photoUrl} className="w-full h-full object-cover" alt={viewingProfile.name} />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-orange-50">
+                        <UserIcon className="w-10 h-10 text-orange-300" />
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-lg font-bold text-gray-900">{viewingProfile.name}</p>
+                    {viewingProfile.username && (
+                      <p className="text-sm text-gray-500">@{viewingProfile.username}</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Friend Action Button */}
+                {(() => {
+                  const status = getFriendshipStatus(viewingProfile.userId);
+                  if (status === 'friends') {
+                    return (
+                      <div className="space-y-2">
+                        <div className="w-full py-3 bg-green-50 border border-green-200 text-green-700 font-bold rounded-2xl flex items-center justify-center gap-2">
+                          <UserPlus className="w-5 h-5" /> Amigos ✓
+                        </div>
+                        <button
+                          onClick={async () => {
+                            if (window.confirm(`Remover ${viewingProfile.name} dos seus amigos?`)) {
+                              await removeFriend(viewingProfile.userId);
+                              setViewingProfile(null);
+                            }
+                          }}
+                          className="w-full py-2 text-sm text-red-500 hover:text-red-600 font-semibold transition-colors"
+                        >
+                          Desfazer amizade
+                        </button>
+                      </div>
+                    );
+                  }
+                  if (status === 'pending_sent') {
+                    return (
+                      <button
+                        onClick={async () => {
+                          await cancelFriendRequest(viewingProfile.userId);
+                        }}
+                        className="w-full py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-2xl flex items-center justify-center gap-2 transition-colors active:scale-95"
+                      >
+                        <X className="w-5 h-5" /> Cancelar pedido
+                      </button>
+                    );
+                  }
+                  if (status === 'pending_received') {
+                    return (
+                      <div className="space-y-2">
+                        <p className="text-center text-sm text-gray-500 mb-1">Esta pessoa te enviou um pedido!</p>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={async () => {
+                              const req = friendRequests.find(r => r.from_user_id === viewingProfile.userId);
+                              if (req) await acceptFriendRequest(req.id, req.from_user_id);
+                              setViewingProfile(null);
+                            }}
+                            className="flex-1 py-3 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-2xl transition-colors active:scale-95"
+                          >
+                            Aceitar
+                          </button>
+                          <button
+                            onClick={async () => {
+                              const req = friendRequests.find(r => r.from_user_id === viewingProfile.userId);
+                              if (req) await declineFriendRequest(req.id);
+                              setViewingProfile(null);
+                            }}
+                            className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-2xl transition-colors active:scale-95"
+                          >
+                            Recusar
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  }
+                  // status === 'none'
+                  return (
+                    <button
+                      onClick={async () => {
+                        await sendFriendRequest(viewingProfile.userId, viewingProfile.name);
+                        setViewingProfile(null);
+                      }}
+                      className="w-full py-3 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-orange-100 transition-colors active:scale-95"
+                    >
+                      <UserPlus className="w-5 h-5" /> Adicionar amigo
+                    </button>
+                  );
+                })()}
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
 
       {lightboxImage && (
             <motion.div
