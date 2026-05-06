@@ -10367,10 +10367,10 @@ export default function App() {
                     <div className="flex items-center justify-center gap-3 mb-6">
                       <button 
                         onClick={() => handleLikePet(finderPet.id)}
-                        className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-bold transition-all shadow-sm ${finderPet.likes?.includes(user?.id || '') ? 'bg-red-50 text-red-500 border border-red-200' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}
+                        className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-bold transition-all shadow-sm ${finderPet.likes?.includes(user?.id || '') ? 'bg-orange-50 text-orange-500 border border-orange-200' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}
                       >
-                        <Heart className={`w-5 h-5 ${finderPet.likes?.includes(user?.id || '') ? 'fill-red-500' : ''}`} />
-                        Curtir
+                        <Heart className={`w-5 h-5 ${finderPet.likes?.includes(user?.id || '') ? 'fill-orange-500 text-orange-500' : ''}`} />
+                        {finderPet.likes?.includes(user?.id || '') ? 'Curtiu' : 'Curtir'}
                       </button>
                       
                       <button 
