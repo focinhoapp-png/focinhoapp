@@ -63,7 +63,14 @@ import {
   Siren,
   ToggleLeft,
   ToggleRight,
-  Send
+  Send,
+  MessageSquare,
+  Ban,
+  UserX,
+  Reply,
+  Check,
+  CheckCheck,
+  Image as ImgIcon
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap } from 'react-leaflet';
@@ -284,6 +291,26 @@ interface Friendship {
   id: string;
   user_id_1: string;
   user_id_2: string;
+  created_at: string;
+}
+
+interface PostComment {
+  id: string;
+  post_id: string;
+  user_id: string;
+  user_name: string;
+  user_photo?: string;
+  content: string;
+  parent_id?: string | null;
+  created_at: string;
+  updated_at?: string;
+  replies?: PostComment[];
+}
+
+interface BlockedUser {
+  id: string;
+  user_id: string;
+  blocked_user_id: string;
   created_at: string;
 }
 
@@ -1129,6 +1156,8 @@ export default function App() {
     conversation_id: string;
     sender_id: string;
     content: string;
+    image_url?: string;
+    status: 'sent' | 'delivered' | 'read';
     created_at: string;
     read: boolean;
   }
@@ -1153,7 +1182,23 @@ export default function App() {
   const [chatMessages, setChatMessages] = useState<Message[]>([]);
   const [newMessageContent, setNewMessageContent] = useState('');
   const [loadingChat, setLoadingChat] = useState(false);
+  const [chatImagePreview, setChatImagePreview] = useState<string | null>(null);
+  const [sendingChatImage, setSendingChatImage] = useState(false);
+  const [unreadConvCount, setUnreadConvCount] = useState(0);
   const chatScrollRef = useRef<HTMLDivElement>(null);
+  const chatImageInputRef = useRef<HTMLInputElement>(null);
+
+  // Post Comments (nova tabela)
+  const [postComments, setPostComments] = useState<Record<string, PostComment[]>>({});
+  const [loadingComments, setLoadingComments] = useState<Record<string, boolean>>({});
+  const [replyingTo, setReplyingTo] = useState<{ postId: string; comment: PostComment } | null>(null);
+  const [editingPostComment, setEditingPostComment] = useState<{ id: string; text: string } | null>(null);
+
+  // Blocked Users
+  const [blockedUsers, setBlockedUsers] = useState<BlockedUser[]>([]);
+
+  // Social notifications count
+  const [unreadNotifCount, setUnreadNotifCount] = useState(0);
 
   const [showScanner, setShowScanner] = useState(false);
 
@@ -1378,9 +1423,16 @@ export default function App() {
     const loginParam = params.get('login');
 
     if (installParam === '1' || installParam === 'true') {
-      setView('install_pwa');
-      setLoading(false);
-      return;
+      const pendingTag = localStorage.getItem('focinho_pending_tag');
+      if (pendingTag) {
+        setView('install_pwa');
+        setLoading(false);
+        return;
+      } else {
+        // If there's no pending tag, the user shouldn't be here. Redirect to root.
+        window.history.replaceState({}, '', '/');
+        // fall through to normal logic
+      }
     }
 
     // Vindo do tutorial de instalação: forçar tela de login
@@ -1736,52 +1788,7 @@ export default function App() {
     return () => { supabase.removeChannel(channel); };
   }, [user]);
 
-  // Fetch & subscribe to friend notifications (accepted requests)
-  useEffect(() => {
-    if (!user) { setFriendNotifications([]); return; }
-
-    const loadFriendNotifs = async () => {
-      try {
-        const { data } = await supabase
-          .from('notifications')
-          .select('*')
-          .eq('user_id', user.id)
-          .in('type', ['friend_accepted', 'friend_accepted_self'])
-          .order('created_at', { ascending: false })
-          .limit(50);
-        setFriendNotifications((data || []) as any[]);
-      } catch (err) {
-        console.warn('Erro ao carregar notificações de amizade (tabela pode não existir ainda):', err);
-      }
-    };
-
-    loadFriendNotifs();
-
-    // Realtime: escutar novas notificações para este usuário
-    const notifChannel = supabase
-      .channel('notifications-' + user.id)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` },
-        async (payload) => {
-          const notif = payload.new as any;
-          // Mostrar toast estilo Instagram apenas para 'friend_accepted' (seu pedido foi aceito)
-          if (notif.type === 'friend_accepted') {
-            setFriendAcceptedToast({
-              name: notif.from_user_name || 'Alguém',
-              photo: notif.from_user_photo || '',
-              username: notif.from_user_username || '',
-            });
-            setTimeout(() => setFriendAcceptedToast(null), 5000);
-          }
-          // Atualizar lista de notificações
-          loadFriendNotifs();
-        }
-      )
-      .subscribe();
-
-    return () => { supabase.removeChannel(notifChannel); };
-  }, [user]);
+  // Hook de notificações de amizade substituído pelo novo sistema unificado (abaixo)
 
   // Friend action helpers
   const getFriendshipStatus = (targetUserId: string): 'none' | 'pending_sent' | 'pending_received' | 'friends' => {
@@ -2044,11 +2051,13 @@ export default function App() {
     }, 100);
   };
 
-  const sendChatMessage = async () => {
-    if (!user || !activeChat || !newMessageContent.trim()) return;
-    
+  const sendChatMessage = async (imageDataUrl?: string) => {
+    if (!user || !activeChat) return;
     const content = newMessageContent.trim();
+    if (!content && !imageDataUrl) return;
+    
     setNewMessageContent('');
+    setChatImagePreview(null);
     
     // Optimistic UI
     const tempId = `temp-${Date.now()}`;
@@ -2056,7 +2065,9 @@ export default function App() {
       id: tempId,
       conversation_id: activeChat.id,
       sender_id: user.id,
-      content,
+      content: content || '',
+      image_url: imageDataUrl,
+      status: 'sent',
       created_at: new Date().toISOString(),
       read: false
     };
@@ -2064,12 +2075,13 @@ export default function App() {
     setChatMessages(prev => [...prev, newMsg]);
     setTimeout(() => chatScrollRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
     
-    // Update DB
     const { data: insertedMsg, error } = await supabase.from('messages')
       .insert({
         conversation_id: activeChat.id,
         sender_id: user.id,
-        content
+        content: content || '',
+        image_url: imageDataUrl || null,
+        status: 'sent',
       })
       .select()
       .single();
@@ -2077,62 +2089,294 @@ export default function App() {
     if (!error && insertedMsg) {
       setChatMessages(prev => prev.map(m => m.id === tempId ? (insertedMsg as Message) : m));
       
-      // Update conversation last message
+      const lastMsg = imageDataUrl ? (content || '📷 Imagem') : content;
       await supabase.from('conversations')
-        .update({
-          last_message: content,
-          last_message_at: new Date().toISOString()
-        })
+        .update({ last_message: lastMsg, last_message_at: new Date().toISOString() })
         .eq('id', activeChat.id);
         
       setConversations(prev => {
         const otherConvs = prev.filter(c => c.id !== activeChat.id);
         const thisConv = prev.find(c => c.id === activeChat.id);
         if (thisConv) {
-          return [{ ...thisConv, last_message: content, last_message_at: new Date().toISOString() }, ...otherConvs];
+          return [{ ...thisConv, last_message: lastMsg, last_message_at: new Date().toISOString() }, ...otherConvs];
         }
         return prev;
       });
+
+      // Notificação para o outro usuário
+      const otherId = activeChat.user1_id === user.id ? activeChat.user2_id : activeChat.user1_id;
+      const myName = ownerProfile?.name || ownerProfile?.username || 'Alguém';
+      await supabase.from('notifications').insert({
+        user_id: otherId,
+        type: 'message',
+        from_user_id: user.id,
+        from_user_name: myName,
+        from_user_photo: ownerProfile?.photoUrl || '',
+        from_user_username: ownerProfile?.username || '',
+        message: imageDataUrl ? `${myName} enviou uma imagem` : `${myName}: ${content.slice(0, 60)}`,
+        conversation_id: activeChat.id,
+        read: false,
+      }).then(() => {}).catch(() => {}); // Non-blocking
     }
   };
 
-  // --- Realtime Subscriptions for DM ---
+  const sendChatImageMessage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setSendingChatImage(true);
+    try {
+      const reader = new FileReader();
+      const dataUrl = await new Promise<string>((resolve) => {
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.readAsDataURL(file);
+      });
+      await sendChatMessage(dataUrl);
+    } catch (err) {
+      console.error('Error sending image:', err);
+    } finally {
+      setSendingChatImage(false);
+      if (chatImageInputRef.current) chatImageInputRef.current.value = '';
+    }
+  };
+
+
+  // Realtime subscription for DM messages
   useEffect(() => {
     if (!user) return;
     
-    // Subscribe to new messages
-    const msgSubscription = supabase.channel('messages-channel')
+    const msgSubscription = supabase.channel('messages-channel-' + user.id)
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
         table: 'messages',
-        filter: `sender_id=neq.${user.id}` // Only listen to messages from others
       }, async (payload) => {
         const newMsg = payload.new as Message;
+        if (newMsg.sender_id === user.id) return; // Skip own messages
         
-        // If we are currently in this chat, append and mark read
         if (activeChat?.id === newMsg.conversation_id) {
           setChatMessages(prev => [...prev, newMsg]);
           setTimeout(() => chatScrollRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
-          
-          await supabase.from('messages').update({ read: true }).eq('id', newMsg.id);
+          await supabase.from('messages').update({ read: true, status: 'read' }).eq('id', newMsg.id);
         } else {
-          // Update unread count and re-fetch conversations to get latest message
           loadConversations();
+          setUnreadConvCount(prev => prev + 1);
         }
       })
       .subscribe();
       
-    return () => {
-      supabase.removeChannel(msgSubscription);
-    };
+    return () => { supabase.removeChannel(msgSubscription); };
   }, [user, activeChat]);
 
+  // Realtime subscription for notifications
   useEffect(() => {
-    if (user && accountSubView === 'menu') {
+    if (!user) return;
+    const loadNotifs = async () => {
+      try {
+        const { data } = await supabase.from('notifications')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(50);
+        setFriendNotifications((data || []) as any[]);
+        
+        const { count } = await supabase.from('notifications')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+          .eq('read', false);
+        setUnreadNotifCount(count || 0);
+      } catch {}
+    };
+    loadNotifs();
+
+    const notifSub = supabase.channel('notifs-count-' + user.id)
+      .on('postgres_changes', {
+        event: 'INSERT', schema: 'public', table: 'notifications',
+        filter: `user_id=eq.${user.id}`
+      }, (payload) => {
+        const notif = payload.new as any;
+        setUnreadNotifCount(prev => prev + 1);
+        if (notif.type === 'friend_accepted') {
+          setFriendAcceptedToast({
+            name: notif.from_user_name || 'Alguém',
+            photo: notif.from_user_photo || '',
+            username: notif.from_user_username || '',
+          });
+          setTimeout(() => setFriendAcceptedToast(null), 5000);
+        }
+        setFriendNotifications((prev: any[]) => [notif, ...prev]);
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(notifSub); };
+  }, [user]);
+
+  useEffect(() => {
+    if (user && (view === 'chat' || accountSubView === 'menu')) {
       loadConversations();
     }
-  }, [user, accountSubView]);
+  }, [user, view, accountSubView]);
+
+  // Fetch blocked users
+  useEffect(() => {
+    if (!user) { setBlockedUsers([]); return; }
+    const load = async () => {
+      const { data } = await supabase.from('blocked_users').select('*').eq('user_id', user.id);
+      setBlockedUsers((data || []) as BlockedUser[]);
+    };
+    load();
+  }, [user]);
+
+  const blockUser = async (targetUserId: string, targetName?: string) => {
+    if (!user || !window.confirm(`Bloquear ${targetName || 'este usuário'}? Você não verá mais o conteúdo desta pessoa.`)) return;
+    try {
+      await supabase.from('blocked_users').insert({ user_id: user.id, blocked_user_id: targetUserId });
+      setBlockedUsers(prev => [...prev, { id: Date.now().toString(), user_id: user.id, blocked_user_id: targetUserId, created_at: new Date().toISOString() }]);
+      // Also remove friendship if exists
+      await supabase.from('friendships').delete()
+        .or(`and(user_id_1.eq.${user.id},user_id_2.eq.${targetUserId}),and(user_id_1.eq.${targetUserId},user_id_2.eq.${user.id})`);
+      setFriendships(prev => prev.filter(f =>
+        !((f.user_id_1 === user.id && f.user_id_2 === targetUserId) ||
+          (f.user_id_2 === user.id && f.user_id_1 === targetUserId))
+      ));
+      setViewingProfile(null);
+      setSuccessMessage('Usuário bloqueado.');
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } catch (err) {
+      console.error('Erro ao bloquear:', err);
+    }
+  };
+
+  const unblockUser = async (targetUserId: string) => {
+    if (!user) return;
+    try {
+      await supabase.from('blocked_users').delete().eq('user_id', user.id).eq('blocked_user_id', targetUserId);
+      setBlockedUsers(prev => prev.filter(b => b.blocked_user_id !== targetUserId));
+    } catch (err) {
+      console.error('Erro ao desbloquear:', err);
+    }
+  };
+
+  const isBlocked = (targetUserId: string) =>
+    blockedUsers.some(b => b.blocked_user_id === targetUserId);
+
+  // --- Post Comments (nova tabela) ---
+  const fetchPostComments = async (postId: string) => {
+    setLoadingComments(prev => ({ ...prev, [postId]: true }));
+    try {
+      const { data } = await supabase.from('post_comments')
+        .select('*')
+        .eq('post_id', postId)
+        .is('parent_id', null)
+        .order('created_at', { ascending: true });
+      const { data: replies } = await supabase.from('post_comments')
+        .select('*')
+        .eq('post_id', postId)
+        .not('parent_id', 'is', null)
+        .order('created_at', { ascending: true });
+      
+      const comments = (data || []) as PostComment[];
+      const replyMap: Record<string, PostComment[]> = {};
+      (replies || []).forEach((r: any) => {
+        if (!replyMap[r.parent_id]) replyMap[r.parent_id] = [];
+        replyMap[r.parent_id].push(r as PostComment);
+      });
+      comments.forEach(c => { c.replies = replyMap[c.id] || []; });
+      setPostComments(prev => ({ ...prev, [postId]: comments }));
+    } catch (err) {
+      console.warn('post_comments table may not exist yet:', err);
+    } finally {
+      setLoadingComments(prev => ({ ...prev, [postId]: false }));
+    }
+  };
+
+  const submitPostComment = async (postId: string, content: string, parentId?: string) => {
+    if (!user || !content.trim()) return;
+    const myName = ownerProfile?.name || ownerProfile?.username || user.email?.split('@')[0] || 'Usuário';
+    const myPhoto = ownerProfile?.photoUrl || '';
+    
+    try {
+      const { data: inserted } = await supabase.from('post_comments').insert({
+        post_id: postId,
+        user_id: user.id,
+        user_name: myName,
+        user_photo: myPhoto,
+        content: content.trim(),
+        parent_id: parentId || null,
+      }).select().single();
+      
+      if (inserted) {
+        setPostComments(prev => {
+          const current = prev[postId] || [];
+          if (parentId) {
+            return { ...prev, [postId]: current.map(c => c.id === parentId
+              ? { ...c, replies: [...(c.replies || []), inserted as PostComment] }
+              : c
+            )};
+          }
+          return { ...prev, [postId]: [...current, { ...(inserted as PostComment), replies: [] }] };
+        });
+        // Notify post owner
+        const post = posts.find(p => p.id === postId);
+        if (post && post.userId !== user.id) {
+          await supabase.from('notifications').insert({
+            user_id: post.userId,
+            type: 'comment',
+            from_user_id: user.id,
+            from_user_name: myName,
+            from_user_photo: myPhoto,
+            from_user_username: ownerProfile?.username || '',
+            message: `${myName} comentou: "${content.slice(0, 50)}"`,
+            post_id: postId,
+            read: false,
+          }).then(() => {}).catch(() => {});
+        }
+      }
+    } catch (err) {
+      console.error('Erro ao comentar:', err);
+      alert('Erro ao comentar. Execute o SQL de migração no Supabase!');
+    }
+  };
+
+  const deletePostComment = async (postId: string, commentId: string) => {
+    if (!user || !window.confirm('Excluir comentário?')) return;
+    try {
+      await supabase.from('post_comments').delete().eq('id', commentId);
+      setPostComments(prev => {
+        const current = prev[postId] || [];
+        return { ...prev, [postId]: current.filter(c => c.id !== commentId).map(c => ({
+          ...c, replies: (c.replies || []).filter(r => r.id !== commentId)
+        })) };
+      });
+    } catch (err) {
+      console.error('Erro ao excluir comentário:', err);
+    }
+  };
+
+  const editPostComment = async (postId: string, commentId: string, newContent: string) => {
+    if (!newContent.trim()) return;
+    try {
+      await supabase.from('post_comments').update({ content: newContent.trim(), updated_at: new Date().toISOString() }).eq('id', commentId);
+      setPostComments(prev => {
+        const current = prev[postId] || [];
+        return { ...prev, [postId]: current.map(c => {
+          if (c.id === commentId) return { ...c, content: newContent.trim() };
+          return { ...c, replies: (c.replies || []).map(r => r.id === commentId ? { ...r, content: newContent.trim() } : r) };
+        }) };
+      });
+      setEditingPostComment(null);
+    } catch (err) {
+      console.error('Erro ao editar comentário:', err);
+    }
+  };
+
+  const markAllNotifsRead = async () => {
+    if (!user) return;
+    try {
+      await supabase.from('notifications').update({ read: true }).eq('user_id', user.id).eq('read', false);
+      setUnreadNotifCount(0);
+      setFriendNotifications((prev: any[]) => prev.map((n: any) => ({ ...n, read: true })));
+    } catch {}
+  };
+
 
 
   // Fetch Adoption Pets
@@ -2899,6 +3143,21 @@ export default function App() {
     try {
       await supabase.from('posts').update({ likes: newLikes }).eq('id', postId);
       setPosts(prev => prev.map(p => p.id === postId ? { ...p, likes: newLikes } : p));
+      // Send notification when liking (not unlike) a post from someone else
+      if (!isLiked && post.userId !== user.id) {
+        const myName = ownerProfile?.name || ownerProfile?.username || 'Alguém';
+        await supabase.from('notifications').insert({
+          user_id: post.userId,
+          type: 'like',
+          from_user_id: user.id,
+          from_user_name: myName,
+          from_user_photo: ownerProfile?.photoUrl || '',
+          from_user_username: ownerProfile?.username || '',
+          message: `${myName} curtiu sua publicação ❤️`,
+          post_id: postId,
+          read: false,
+        }).then(() => {}).catch(() => {});
+      }
     } catch (err) {
       console.error('Error liking post:', err);
     }
@@ -4904,6 +5163,237 @@ export default function App() {
               </motion.div>
             )}
 
+            {/* ═══════════════════════════════════════
+                CHAT SCREEN
+            ═══════════════════════════════════════ */}
+            {view === 'chat' && (
+              <motion.div
+                key="chat"
+                initial={{ opacity: 0, x: 40 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -40 }}
+                className="fixed inset-0 bg-[#F8F9FA] flex flex-col z-40"
+                style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+              >
+                {/* ── Chat: Conversation List ── */}
+                {!activeChat && (
+                  <>
+                    {/* Header */}
+                    <div className="bg-white border-b border-gray-100 px-4 pt-safe-top pb-3 flex items-center gap-3 sticky top-0 z-10 shadow-sm">
+                      <button onClick={() => { setView('dashboard'); }} className="p-2 -ml-1">
+                        <ChevronLeft className="w-6 h-6 text-gray-800" />
+                      </button>
+                      <h1 className="text-[18px] font-bold text-gray-900 flex-1">Mensagens</h1>
+                      <span className="text-xs text-gray-400 font-medium">{conversations.length} conversa{conversations.length !== 1 ? 's' : ''}</span>
+                    </div>
+
+                    {/* Conversations List */}
+                    <div className="flex-1 overflow-y-auto">
+                      {conversations.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center h-full py-20 px-6 text-center">
+                          <div className="w-20 h-20 bg-orange-50 rounded-full flex items-center justify-center mb-4">
+                            <MessageSquare className="w-10 h-10 text-orange-300" />
+                          </div>
+                          <h3 className="text-[17px] font-bold text-gray-800 mb-2">Nenhuma conversa ainda</h3>
+                          <p className="text-[13px] text-gray-500 leading-snug max-w-[240px]">Adicione amigos e comece a conversar com eles aqui!</p>
+                        </div>
+                      ) : (
+                        <div className="divide-y divide-gray-50">
+                          {conversations.map(conv => {
+                            const other = conv.other_user;
+                            const isUnread = (conv.unread_count || 0) > 0;
+                            const fmt = (d: string) => {
+                              const date = new Date(d);
+                              const now = new Date();
+                              const diff = now.getTime() - date.getTime();
+                              if (diff < 86400000) return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                              if (diff < 604800000) return date.toLocaleDateString('pt-BR', { weekday: 'short' });
+                              return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+                            };
+                            return (
+                              <button
+                                key={conv.id}
+                                onClick={() => openChat(conv.user1_id === user?.id ? conv.user2_id : conv.user1_id, other)}
+                                className="w-full flex items-center gap-3 px-4 py-3.5 bg-white hover:bg-gray-50 active:bg-gray-100 transition-colors"
+                              >
+                                <div className="relative shrink-0">
+                                  <div className="w-14 h-14 rounded-full overflow-hidden bg-gray-100 border border-gray-200">
+                                    {other?.photoUrl ? (
+                                      <img src={other.photoUrl} alt={other.name} className="w-full h-full object-cover" />
+                                    ) : (
+                                      <div className="w-full h-full flex items-center justify-center bg-orange-50">
+                                        <UserIcon className="w-7 h-7 text-orange-300" />
+                                      </div>
+                                    )}
+                                  </div>
+                                  {isUnread && (
+                                    <span className="absolute bottom-0.5 right-0.5 w-3.5 h-3.5 bg-orange-500 rounded-full border-2 border-white" />
+                                  )}
+                                </div>
+                                <div className="flex-1 min-w-0 text-left">
+                                  <div className="flex items-center justify-between mb-0.5">
+                                    <span className={`text-[15px] truncate ${isUnread ? 'font-bold text-gray-900' : 'font-semibold text-gray-700'}`}>
+                                      {other?.name || other?.username || 'Usuário'}
+                                    </span>
+                                    {conv.last_message_at && (
+                                      <span className={`text-[11px] shrink-0 ml-2 ${isUnread ? 'text-orange-500 font-bold' : 'text-gray-400'}`}>
+                                        {fmt(conv.last_message_at)}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center justify-between">
+                                    <span className={`text-[13px] truncate max-w-[200px] ${isUnread ? 'font-semibold text-gray-800' : 'text-gray-500'}`}>
+                                      {conv.last_message || 'Iniciar conversa...'}
+                                    </span>
+                                    {(conv.unread_count || 0) > 0 && (
+                                      <span className="min-w-[20px] h-5 bg-orange-500 rounded-full text-white text-[10px] font-black flex items-center justify-center px-1.5 ml-2 shrink-0">
+                                        {conv.unread_count}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                      <div className="h-24" />
+                    </div>
+                  </>
+                )}
+
+                {/* ── Chat: Active Conversation ── */}
+                {activeChat && (() => {
+                  const other = activeChat.other_user;
+                  const fmtTime = (d: string) => new Date(d).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                  return (
+                    <>
+                      {/* Header */}
+                      <div className="bg-white border-b border-gray-100 px-3 pb-3 pt-safe-top flex items-center gap-3 sticky top-0 z-10 shadow-sm">
+                        <button onClick={() => { setActiveChat(null); loadConversations(); }} className="p-2 -ml-1 shrink-0">
+                          <ChevronLeft className="w-6 h-6 text-gray-800" />
+                        </button>
+                        <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-100 border border-gray-200 shrink-0">
+                          {other?.photoUrl ? (
+                            <img src={other.photoUrl} alt={other.name} className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full bg-orange-50 flex items-center justify-center">
+                              <UserIcon className="w-5 h-5 text-orange-300" />
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-gray-900 text-[15px] truncate">{other?.name || other?.username || 'Usuário'}</p>
+                          {other?.username && <p className="text-[12px] text-gray-400 truncate">@{other.username}</p>}
+                        </div>
+                      </div>
+
+                      {/* Messages */}
+                      <div className="flex-1 overflow-y-auto px-3 py-4 space-y-2" style={{ background: 'linear-gradient(180deg, #FFF8F0 0%, #F8F9FA 100%)' }}>
+                        {loadingChat ? (
+                          <div className="flex items-center justify-center h-full">
+                            <div className="w-8 h-8 border-3 border-orange-500 border-t-transparent rounded-full animate-spin" />
+                          </div>
+                        ) : chatMessages.length === 0 ? (
+                          <div className="flex flex-col items-center justify-center py-16 text-center">
+                            <div className="w-16 h-16 bg-orange-50 rounded-full flex items-center justify-center mb-3">
+                              <MessageSquare className="w-8 h-8 text-orange-200" />
+                            </div>
+                            <p className="text-[13px] text-gray-400">Diga olá! 🐾</p>
+                          </div>
+                        ) : (
+                          chatMessages.map((msg, i) => {
+                            const isMine = msg.sender_id === user?.id;
+                            const showAvatar = !isMine && (i === 0 || chatMessages[i-1]?.sender_id !== msg.sender_id);
+                            return (
+                              <div key={msg.id} className={`flex items-end gap-2 ${isMine ? 'justify-end' : 'justify-start'}`}>
+                                {!isMine && (
+                                  <div className="w-7 h-7 rounded-full overflow-hidden bg-gray-100 shrink-0 mb-1">
+                                    {showAvatar && other?.photoUrl ? (
+                                      <img src={other.photoUrl} className="w-full h-full object-cover" alt="" />
+                                    ) : (
+                                      <div className={`w-full h-full ${showAvatar ? 'bg-orange-100 flex items-center justify-center' : ''}`}>
+                                        {showAvatar && <UserIcon className="w-4 h-4 text-orange-400" />}
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                                <div className={`max-w-[72%] ${isMine ? '' : ''}`}>
+                                  {msg.image_url && (
+                                    <div className={`rounded-2xl overflow-hidden mb-1 max-w-[240px] ${isMine ? 'ml-auto' : ''}`}>
+                                      <img src={msg.image_url} alt="Imagem" className="w-full rounded-2xl object-cover max-h-[280px]" />
+                                    </div>
+                                  )}
+                                  {msg.content && (
+                                    <div className={`px-4 py-2.5 rounded-2xl text-[14px] leading-snug shadow-sm ${
+                                      isMine
+                                        ? 'bg-orange-500 text-white rounded-br-sm'
+                                        : 'bg-white text-gray-800 rounded-bl-sm border border-gray-100'
+                                    }`}>
+                                      {msg.content}
+                                    </div>
+                                  )}
+                                  <div className={`flex items-center gap-1 mt-0.5 ${isMine ? 'justify-end' : 'justify-start'}`}>
+                                    <span className="text-[10px] text-gray-400">{fmtTime(msg.created_at)}</span>
+                                    {isMine && (
+                                      msg.read || msg.status === 'read'
+                                        ? <CheckCheck className="w-3.5 h-3.5 text-blue-500" />
+                                        : <Check className="w-3.5 h-3.5 text-gray-400" />
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
+                        <div ref={chatScrollRef} />
+                      </div>
+
+                      {/* Input */}
+                      <div className="bg-white border-t border-gray-100 px-3 py-3 flex items-end gap-2" style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          ref={chatImageInputRef}
+                          onChange={sendChatImageMessage}
+                          className="hidden"
+                        />
+                        <button
+                          onClick={() => chatImageInputRef.current?.click()}
+                          disabled={sendingChatImage}
+                          className="w-9 h-9 flex items-center justify-center text-gray-400 hover:text-orange-500 transition-colors shrink-0 mb-0.5"
+                        >
+                          {sendingChatImage ? (
+                            <div className="w-5 h-5 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
+                          ) : (
+                            <ImgIcon className="w-5 h-5" />
+                          )}
+                        </button>
+                        <div className="flex-1 bg-gray-50 border border-gray-200 rounded-2xl px-4 py-2.5 flex items-center gap-2">
+                          <textarea
+                            value={newMessageContent}
+                            onChange={e => { setNewMessageContent(e.target.value); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px'; }}
+                            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChatMessage(); }}}
+                            placeholder="Mensagem..."
+                            rows={1}
+                            className="flex-1 bg-transparent resize-none text-[14px] text-gray-800 placeholder-gray-400 outline-none leading-snug max-h-[120px]"
+                            style={{ height: '22px' }}
+                          />
+                        </div>
+                        <button
+                          onClick={() => sendChatMessage()}
+                          disabled={!newMessageContent.trim()}
+                          className="w-10 h-10 bg-orange-500 rounded-full flex items-center justify-center text-white shadow-md shadow-orange-200 disabled:opacity-40 disabled:shadow-none active:scale-95 transition-all shrink-0"
+                        >
+                          <Send className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </>
+                  );
+                })()}
+              </motion.div>
+            )}
+
             {/* Lembretes */}
             {view === 'reminders' && (
               <motion.div key="reminders" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
@@ -5974,32 +6464,27 @@ export default function App() {
                       <ChevronRight className="text-gray-300" />
                     </button>
 
-                    {/* ── Mensagens (DM) ── */}
-                    {(() => {
-                      const totalUnread = conversations.reduce((acc, curr) => acc + (curr.unread_count || 0), 0);
-                      return (
-                        <button
-                          onClick={() => setAccountSubView('messages')}
-                          className="p-5 md:p-6 flex items-center gap-4 hover:bg-gray-50 transition-all text-left border-b border-gray-50 last:border-b-0 relative group"
-                        >
-                          <div className="relative">
-                            <MessageCircle className="w-6 h-6 text-gray-900 shrink-0 group-hover:scale-110 transition-transform" />
-                            {totalUnread > 0 && (
-                              <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center shadow">
-                                {totalUnread > 9 ? '9+' : totalUnread}
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex-1">
-                            <h4 className="font-bold text-gray-800">Mensagens</h4>
-                            <p className="text-xs text-gray-400">
-                              {totalUnread > 0 ? `${totalUnread} nova${totalUnread > 1 ? 's' : ''}` : 'Converse com seus amigos'}
-                            </p>
-                          </div>
-                          <ChevronRight className="text-gray-300" />
-                        </button>
-                      );
-                    })()}
+                    {/* ── Lembretes ── */}
+                    <button
+                      onClick={() => setView('reminders')}
+                      className="p-5 md:p-6 flex items-center gap-4 hover:bg-gray-50 transition-all text-left border-b border-gray-50 last:border-b-0 relative group"
+                    >
+                      <div className="relative">
+                        <Bell className="w-6 h-6 text-gray-900 shrink-0 group-hover:scale-110 transition-transform" />
+                        {reminders.length > 0 && (
+                          <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center shadow">
+                            {reminders.length > 9 ? '9+' : reminders.length}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-bold text-gray-800">Lembretes</h4>
+                        <p className="text-xs text-gray-400">
+                          {reminders.length > 0 ? `${reminders.length} lembrete${reminders.length > 1 ? 's' : ''}` : 'Vacinas, consultas e cuidados'}
+                        </p>
+                      </div>
+                      <ChevronRight className="text-gray-300" />
+                    </button>
 
                     <button
                       onClick={() => setAccountSubView('events')}
@@ -7732,23 +8217,41 @@ export default function App() {
                       action: () => { setAccountSubView('partners'); },
                       rightImage: p.logo,
                     })),
-                    // Friend notifications (accepted)
-                    ...(notifPrefs.friends ? friendNotifications.map(n => ({
-                      id: `friend-notif-${n.id}`,
-                      avatarUrl: n.from_user_photo || undefined,
-                      titleNode: (
-                        <>
-                          <span className="font-bold">{n.from_user_name || 'Alguém'}</span>
-                          {n.type === 'friend_accepted'
-                            ? ' aceitou seu pedido de amizade '
-                            : ' agora é seu amigo '}
-                          <span>🐾</span>
-                        </>
-                      ),
-                      time: new Date(n.created_at),
-                      action: undefined,
-                      rightImage: undefined,
-                    })) : []),
+                    // Social Notifications (Like, Comment, Friend, Message)
+                    ...(notifPrefs.friends ? friendNotifications.map(n => {
+                      let textNode = null;
+                      let action = undefined;
+
+                      if (n.type === 'like') {
+                        textNode = <><span className="font-bold">{n.from_user_name || 'Alguém'}</span> curtiu sua publicação ❤️</>;
+                      } else if (n.type === 'comment') {
+                        textNode = <><span className="font-bold">{n.from_user_name || 'Alguém'}</span> comentou na sua publicação: "{n.message?.split(': "')[1]?.slice(0, -1) || '...'}"</>;
+                      } else if (n.type === 'message') {
+                        textNode = <><span className="font-bold">{n.from_user_name || 'Alguém'}</span> enviou uma mensagem 💬</>;
+                        action = () => {
+                           if (n.conversation_id && n.from_user_id) {
+                             openChat(n.from_user_id, { name: n.from_user_name, photoUrl: n.from_user_photo, username: n.from_user_username });
+                             setView('chat');
+                           }
+                        };
+                      } else if (n.type === 'friend_accepted') {
+                        textNode = <><span className="font-bold">{n.from_user_name || 'Alguém'}</span> aceitou seu pedido de amizade 🐾</>;
+                      } else if (n.type === 'friend_accepted_self') {
+                        textNode = <>Agora você e <span className="font-bold">{n.from_user_name || 'Alguém'}</span> são amigos 🐾</>;
+                      } else {
+                        textNode = <>{n.message}</>;
+                      }
+
+                      return {
+                        id: `notif-${n.id}`,
+                        avatarUrl: n.from_user_photo || undefined,
+                        titleNode: textNode,
+                        time: new Date(n.created_at),
+                        action: action,
+                        rightImage: undefined,
+                        isUnread: !n.read
+                      };
+                    }) : []),
                   ].sort((a, b) => b.time.getTime() - a.time.getTime());
 
                   const fmtTime = (d: Date) => {
@@ -10436,11 +10939,20 @@ export default function App() {
             </button>
 
             <button
-              onClick={() => setView('reminders')}
-              className={`flex flex-col items-center gap-1 transition-colors flex-1 min-h-[44px] justify-center ${view === 'reminders' ? 'text-orange-500' : 'text-gray-300'}`}
+              onClick={() => {
+                setView('chat');
+                setUnreadConvCount(0);
+                loadConversations();
+              }}
+              className={`flex flex-col items-center gap-1 transition-colors flex-1 min-h-[44px] justify-center relative ${view === 'chat' ? 'text-orange-500' : 'text-gray-300'}`}
             >
-              <Bell className="w-6 h-6" />
-              <span translate="no" className="text-[11px] font-bold uppercase">Lembretes</span>
+              <MessageSquare className="w-6 h-6" />
+              <span translate="no" className="text-[11px] font-bold uppercase">Chat</span>
+              {unreadConvCount > 0 && (
+                <span className="absolute top-1 right-1/2 translate-x-4 min-w-[18px] h-[18px] bg-red-500 rounded-full border-2 border-white text-white text-[9px] font-black flex items-center justify-center px-1">
+                  {unreadConvCount > 9 ? '9+' : unreadConvCount}
+                </span>
+              )}
             </button>
 
             <button
@@ -10550,7 +11062,8 @@ export default function App() {
                   )}
 
                   {/* Action Buttons */}
-                  <div className="flex gap-2 px-1 mt-4">
+                  <div className="flex flex-col gap-2 px-1 mt-4">
+                    <div className="flex gap-2">
                     {(() => {
                       const status = getFriendshipStatusMemo(viewingProfile.userId);
                       let FriendBtn = null;
@@ -10599,21 +11112,58 @@ export default function App() {
                         );
                       }
 
+                      const isFriendStatus = status === 'friends';
                       return (
                         <>
-                          <button
-                            onClick={() => {
-                               window.alert('Funcionalidade "Meus Pets" em desenvolvimento para perfis públicos.');
-                            }}
-                            className="flex-1 bg-[#E4E6EB] hover:bg-[#D8DADF] text-gray-900 font-semibold py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors active:scale-[0.98]"
-                          >
-                            <Dog className="w-5 h-5" />
-                            Meus Pets
-                          </button>
+                          {isFriendStatus && (
+                            <button
+                              onClick={() => {
+                                openChat(viewingProfile.userId, {
+                                  name: viewingProfile.name,
+                                  username: viewingProfileDetails?.username,
+                                  photoUrl: viewingProfile.photoUrl,
+                                });
+                                setViewingProfile(null);
+                                setView('chat');
+                              }}
+                              className="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors active:scale-[0.98] shadow-md shadow-orange-200"
+                            >
+                              <MessageSquare className="w-5 h-5" />
+                              Mensagem
+                            </button>
+                          )}
+                          {!isFriendStatus && (
+                            <button
+                              onClick={() => {
+                                 window.alert('Funcionalidade "Meus Pets" em desenvolvimento para perfis públicos.');
+                              }}
+                              className="flex-1 bg-[#E4E6EB] hover:bg-[#D8DADF] text-gray-900 font-semibold py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors active:scale-[0.98]"
+                            >
+                              <Dog className="w-5 h-5" />
+                              Meus Pets
+                            </button>
+                          )}
                           {FriendBtn}
                         </>
                       );
                     })()}
+                    </div>
+                    {/* Block button */}
+                    {isBlocked(viewingProfile.userId) ? (
+                      <button
+                        onClick={() => unblockUser(viewingProfile.userId)}
+                        className="w-full py-2 bg-gray-100 text-gray-500 font-semibold text-[14px] rounded-lg flex items-center justify-center gap-2"
+                      >
+                        <Ban className="w-4 h-4" /> Desbloquear usuário
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => blockUser(viewingProfile.userId, viewingProfile.name)}
+                        className="w-full py-2 bg-red-50 text-red-500 font-semibold text-[14px] rounded-lg flex items-center justify-center gap-2 hover:bg-red-100 transition-colors"
+                      >
+                        <Ban className="w-4 h-4" /> Bloquear usuário
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
