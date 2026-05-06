@@ -1314,8 +1314,15 @@ export default function App() {
         newLikes.push(user.id);
       }
       
+      // Update local states
       setFinderPet({ ...pet, likes: newLikes });
-      await supabase.from('pets').update({ likes: newLikes }).eq('id', petId);
+      setPets(prev => prev.map(p => p.id === petId ? { ...p, likes: newLikes } : p));
+      
+      // Update Database
+      const { error } = await supabase.from('pets').update({ likes: newLikes }).eq('id', petId);
+      if (error) {
+        console.error('Erro no Supabase ao salvar curtida:', error);
+      }
     } catch (err) {
       console.error('Erro ao curtir pet:', err);
     }
