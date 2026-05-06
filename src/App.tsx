@@ -1298,72 +1298,9 @@ export default function App() {
     }
   };
 
-  const handleLikePet = async (petId: string) => {
-    if (!user) {
-      window.alert("Você precisa estar logado para curtir!");
-      return;
-    }
-    try {
-      const pet = finderPet;
-      if (!pet || pet.id !== petId) return;
-      
-      let newLikes = pet.likes ? [...pet.likes] : [];
-      if (newLikes.includes(user.id)) {
-        newLikes = newLikes.filter(id => id !== user.id);
-      } else {
-        newLikes.push(user.id);
-      }
-      
-      // Update local states
-      setFinderPet({ ...pet, likes: newLikes });
-      setPets(prev => prev.map(p => p.id === petId ? { ...p, likes: newLikes } : p));
-      
-      // Update Database
-      const { error } = await supabase.from('pets').update({ likes: newLikes }).eq('id', petId);
-      if (error) {
-        console.error('Erro no Supabase ao salvar curtida:', error);
-      }
-    } catch (err) {
-      console.error('Erro ao curtir pet:', err);
-    }
-  };
 
-  const submitCompliment = async () => {
-    if (!user) {
-      window.alert("Você precisa estar logado para deixar um elogio!");
-      return;
-    }
-    if (!complimentText.trim() || !finderPet) return;
-    
-    setLoading(true);
-    try {
-      const newCompliment = {
-        id: generateId(),
-        userId: user.id,
-        userName: ownerProfile?.username || ownerProfile?.name || 'Tutor',
-        userPhoto: ownerProfile?.photoUrl || '',
-        content: complimentText.trim(),
-        createdAt: new Date().toISOString()
-      };
-      
-      const newCompliments = finderPet.compliments ? [...finderPet.compliments, newCompliment] : [newCompliment];
-      
-      setFinderPet({ ...finderPet, compliments: newCompliments });
-      setPets(prev => prev.map(p => p.id === finderPet.id ? { ...p, compliments: newCompliments } : p));
-      
-      const { error } = await supabase.from('pets').update({ compliments: newCompliments }).eq('id', finderPet.id);
-      if (error) {
-        console.error('Erro no Supabase ao salvar elogio:', error);
-      }
-      
-      setComplimentText('');
-    } catch (err) {
-      console.error('Erro ao enviar elogio:', err);
-      window.alert('Erro ao enviar elogio. Tente novamente.');
-    } finally {
-      setLoading(false);
-    }
-  };
+
+
 
   const openPetFinderById = async (petId: string) => {
     setLoading(true);
@@ -10370,34 +10307,6 @@ export default function App() {
                       )}
                     </div>
 
-                    <div className="text-[15px] font-semibold text-gray-800 mb-4 flex items-center justify-center gap-4">
-                      <span>{finderPet.likes?.length || 0} curtidas</span>
-                      <span className="text-gray-300">•</span>
-                      <span>{finderPet.compliments?.length || 0} elogios</span>
-                    </div>
-
-                    <div className="flex items-center justify-center gap-3 mb-6">
-                      <button 
-                        onClick={() => handleLikePet(finderPet.id)}
-                        className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-bold transition-all shadow-sm ${finderPet.likes?.includes(user?.id || '') ? 'bg-orange-50 text-orange-500 border border-orange-200' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}
-                      >
-                        <Heart className={`w-5 h-5 ${finderPet.likes?.includes(user?.id || '') ? 'fill-orange-500 text-orange-500' : ''}`} />
-                        {finderPet.likes?.includes(user?.id || '') ? 'Curtiu' : 'Curtir'}
-                      </button>
-                      
-                      <button 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          e.preventDefault();
-                          setShowComplimentsModal(true);
-                        }}
-                        className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-bold transition-all shadow-sm ${finderPet.compliments?.some(c => c.userId === user?.id) ? 'bg-orange-50 text-orange-500 border border-orange-200' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}
-                      >
-                        <Star className={`w-5 h-5 ${finderPet.compliments?.some(c => c.userId === user?.id) ? 'fill-orange-500' : ''}`} />
-                        Elogiar
-                      </button>
-                    </div>
-
                     {finderPet && lostAlerts.some(a => a.petId === finderPet.id) && (
                       <motion.div
                         initial={{ y: 20, opacity: 0 }}
@@ -11663,83 +11572,6 @@ export default function App() {
           )}
         </AnimatePresence>
 
-        {/* Modal de Elogios */}
-        <AnimatePresence>
-          {showComplimentsModal && finderPet && (
-            <motion.div
-              key="compliments-modal"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/60 z-[200] flex items-end justify-center pb-safe sm:items-center sm:p-4"
-              onClick={() => setShowComplimentsModal(false)}
-            >
-              <motion.div
-                initial={{ y: "100%" }}
-                animate={{ y: 0 }}
-                exit={{ y: "100%" }}
-                transition={{ type: "spring", damping: 25, stiffness: 200 }}
-                className="w-full sm:max-w-md bg-[#FFF8F0] sm:rounded-[2rem] rounded-t-[2rem] overflow-hidden flex flex-col max-h-[90vh]"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="p-6 bg-white border-b border-gray-100 flex items-center justify-between shrink-0">
-                  <h2 className="text-xl font-black text-gray-900">Elogios</h2>
-                  <button onClick={() => setShowComplimentsModal(false)} className="p-2 bg-gray-50 text-gray-500 rounded-full hover:bg-gray-100">
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-
-                <div className="flex-1 overflow-y-auto p-6 space-y-4">
-                  {finderPet.compliments && finderPet.compliments.length > 0 ? (
-                    finderPet.compliments.map(comp => (
-                      <div key={comp.id} className="bg-white p-4 rounded-3xl shadow-sm border border-gray-100">
-                        <div className="flex items-center gap-3 mb-2">
-                          <img src={comp.userPhoto || 'https://picsum.photos/seed/user/100/100'} className="w-10 h-10 rounded-full object-cover" />
-                          <div>
-                            <p className="font-bold text-gray-900 text-sm leading-tight">{comp.userName}</p>
-                            <p className="text-[11px] text-gray-400">{new Date(comp.createdAt).toLocaleDateString()}</p>
-                          </div>
-                        </div>
-                        <p className="text-gray-700 text-[15px] pl-13 leading-snug">{comp.content}</p>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-center py-10">
-                      <Star className="w-12 h-12 text-gray-200 mx-auto mb-3" />
-                      <p className="text-gray-500 font-medium">Nenhum elogio ainda. Seja o primeiro a elogiar!</p>
-                    </div>
-                  )}
-                </div>
-
-                {user ? (
-                  <div className="p-4 bg-white border-t border-gray-100 shrink-0">
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        placeholder="Escreva um elogio lindo..."
-                        value={complimentText}
-                        onChange={(e) => setComplimentText(e.target.value)}
-                        className="flex-1 bg-gray-50 border border-gray-200 rounded-full px-5 py-3 text-[15px] text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500/20"
-                        onKeyDown={(e) => e.key === 'Enter' && submitCompliment()}
-                      />
-                      <button
-                        onClick={submitCompliment}
-                        disabled={loading || !complimentText.trim()}
-                        className="w-12 h-12 bg-orange-500 hover:bg-orange-600 text-white rounded-full flex items-center justify-center shrink-0 disabled:opacity-50 transition-colors"
-                      >
-                        <Send className="w-5 h-5 ml-1" />
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="p-4 bg-white border-t border-gray-100 shrink-0 text-center">
-                    <p className="text-sm text-gray-500 font-medium">Faça login para deixar um elogio.</p>
-                  </div>
-                )}
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
 
         <AnimatePresence>
           {showScanner && (
