@@ -1349,7 +1349,12 @@ export default function App() {
       const newCompliments = finderPet.compliments ? [...finderPet.compliments, newCompliment] : [newCompliment];
       
       setFinderPet({ ...finderPet, compliments: newCompliments });
-      await supabase.from('pets').update({ compliments: newCompliments }).eq('id', finderPet.id);
+      setPets(prev => prev.map(p => p.id === finderPet.id ? { ...p, compliments: newCompliments } : p));
+      
+      const { error } = await supabase.from('pets').update({ compliments: newCompliments }).eq('id', finderPet.id);
+      if (error) {
+        console.error('Erro no Supabase ao salvar elogio:', error);
+      }
       
       setComplimentText('');
     } catch (err) {
