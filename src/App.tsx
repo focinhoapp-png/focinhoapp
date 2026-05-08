@@ -759,7 +759,7 @@ function CityStatePicker({ state, city, onStateChange, onCityChange, label = 'Lo
 
 // --- SOS Alert Card (Instagram-style) ---
 
-function SOSAlertCard({ alert, user, onEdit, onFound, onShare, onOpenFinder, isTimeline, onGoToAlerts, onLike, onComment }: {
+function SOSAlertCard({ alert, user, onEdit, onFound, onShare, onOpenFinder, isTimeline, onGoToAlerts, onLike, onComment, onViewComments }: {
   key?: string;
   alert: LostAlert;
   user: any;
@@ -771,6 +771,7 @@ function SOSAlertCard({ alert, user, onEdit, onFound, onShare, onOpenFinder, isT
   onGoToAlerts?: () => void;
   onLike?: () => void;
   onComment?: (text: string) => void;
+  onViewComments?: () => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [showCommentInput, setShowCommentInput] = useState(false);
@@ -930,7 +931,7 @@ function SOSAlertCard({ alert, user, onEdit, onFound, onShare, onOpenFinder, isT
             <div className="px-4 pb-1 space-y-0.5">
               {commentCount > 2 && (
                 <button
-                  onClick={() => setShowCommentInput(true)}
+                  onClick={() => onViewComments ? onViewComments() : setShowCommentInput(true)}
                   className="text-gray-400 text-xs font-medium hover:text-gray-600 transition-colors"
                 >
                   Ver todos os {commentCount} comentários
@@ -1014,13 +1015,14 @@ function SOSAlertCard({ alert, user, onEdit, onFound, onShare, onOpenFinder, isT
 }
 
 // --- Adoption Timeline Card (Instagram-style) ---
-function AdoptionTimelineCard({ pet, user, onShare, onLike, onComment, onOpenProfile }: {
+function AdoptionTimelineCard({ pet, user, onShare, onLike, onComment, onOpenProfile, onViewComments }: {
   pet: AdoptionPet;
   user: any;
   onShare: () => void | Promise<void>;
   onLike?: () => void;
   onComment?: (text: string) => void;
   onOpenProfile?: () => void;
+  onViewComments?: () => void;
 }) {
   const [showCommentInput, setShowCommentInput] = useState(false);
   const [localCommentText, setLocalCommentText] = useState('');
@@ -1129,7 +1131,7 @@ function AdoptionTimelineCard({ pet, user, onShare, onLike, onComment, onOpenPro
           <div className="pt-1 space-y-0.5">
             {commentCount > 2 && (
               <button
-                onClick={() => setShowCommentInput(true)}
+                onClick={() => onViewComments ? onViewComments() : setShowCommentInput(true)}
                 className="text-gray-400 text-xs font-medium hover:text-gray-600 transition-colors"
               >
                 Ver todos os {commentCount} comentários
@@ -3534,40 +3536,60 @@ export default function App() {
 
   const handleEditComment = async (postId: string, commentId: string, newText: string) => {
     if (!newText.trim()) return;
-    const post = posts.find(p => p.id === postId);
-    if (!post || !post.comments) return;
-
-    const updatedComments = post.comments.map(c => 
-      c.id === commentId ? { ...c, content: newText.trim() } : c
-    );
-
-    // Optimistic update
-    setPosts(prev => prev.map(p => p.id === postId ? { ...p, comments: updatedComments } : p));
-    setEditingComment(null);
-
-    try {
-      await supabase.from('posts').update({ comments: updatedComments }).eq('id', postId);
-    } catch (err) {
-      console.error('Error editing comment:', err);
-      alert('Erro ao editar comentário.');
+    
+    let post = posts.find(p => p.id === postId);
+    if (post && post.comments) {
+      const updatedComments = post.comments.map(c => c.id === commentId ? { ...c, content: newText.trim() } : c);
+      setPosts(prev => prev.map(p => p.id === postId ? { ...p, comments: updatedComments } : p));
+      setEditingComment(null);
+      try { await supabase.from('posts').update({ comments: updatedComments }).eq('id', postId); } catch (err) { console.error(err); }
+      return;
+    }
+    
+    let alert = lostAlerts.find(a => a.id === postId);
+    if (alert && alert.comments) {
+      const updatedComments = alert.comments.map(c => c.id === commentId ? { ...c, content: newText.trim() } : c);
+      setLostAlerts(prev => prev.map(a => a.id === postId ? { ...a, comments: updatedComments } : a));
+      setEditingComment(null);
+      try { await supabase.from('lost_alerts').update({ comments: updatedComments }).eq('id', postId); } catch (err) { console.error(err); }
+      return;
+    }
+    
+    let adoption = adoptionPets.find(ap => ap.id === postId);
+    if (adoption && adoption.comments) {
+      const updatedComments = adoption.comments.map(c => c.id === commentId ? { ...c, content: newText.trim() } : c);
+      setAdoptionPets(prev => prev.map(ap => ap.id === postId ? { ...ap, comments: updatedComments } : ap));
+      setEditingComment(null);
+      try { await supabase.from('adoption_pets').update({ comments: updatedComments }).eq('id', postId); } catch (err) { console.error(err); }
+      return;
     }
   };
 
   const handleDeleteComment = async (postId: string, commentId: string) => {
     if (!window.confirm('Deseja excluir este comentário?')) return;
-    const post = posts.find(p => p.id === postId);
-    if (!post || !post.comments) return;
-
-    const updatedComments = post.comments.filter(c => c.id !== commentId);
-
-    // Optimistic update
-    setPosts(prev => prev.map(p => p.id === postId ? { ...p, comments: updatedComments } : p));
-
-    try {
-      await supabase.from('posts').update({ comments: updatedComments }).eq('id', postId);
-    } catch (err) {
-      console.error('Error deleting comment:', err);
-      alert('Erro ao excluir comentário.');
+    
+    let post = posts.find(p => p.id === postId);
+    if (post && post.comments) {
+      const updatedComments = post.comments.filter(c => c.id !== commentId);
+      setPosts(prev => prev.map(p => p.id === postId ? { ...p, comments: updatedComments } : p));
+      try { await supabase.from('posts').update({ comments: updatedComments }).eq('id', postId); } catch (err) { console.error(err); }
+      return;
+    }
+    
+    let alert = lostAlerts.find(a => a.id === postId);
+    if (alert && alert.comments) {
+      const updatedComments = alert.comments.filter(c => c.id !== commentId);
+      setLostAlerts(prev => prev.map(a => a.id === postId ? { ...a, comments: updatedComments } : a));
+      try { await supabase.from('lost_alerts').update({ comments: updatedComments }).eq('id', postId); } catch (err) { console.error(err); }
+      return;
+    }
+    
+    let adoption = adoptionPets.find(ap => ap.id === postId);
+    if (adoption && adoption.comments) {
+      const updatedComments = adoption.comments.filter(c => c.id !== commentId);
+      setAdoptionPets(prev => prev.map(ap => ap.id === postId ? { ...ap, comments: updatedComments } : ap));
+      try { await supabase.from('adoption_pets').update({ comments: updatedComments }).eq('id', postId); } catch (err) { console.error(err); }
+      return;
     }
   };
 
@@ -5070,6 +5092,7 @@ export default function App() {
                                     onGoToAlerts={() => setView('lost_pets')}
                                     onLike={() => handleLikeAlert(alert.id)}
                                     onComment={(text) => handleCommentAlert(alert.id, text)}
+                                    onViewComments={() => setViewingCommentsPostId(alert.id)}
                                     onFound={async () => {
                                        if (window.confirm(`Você encontrou ${alert.petName}?`)) {
                                           await supabase.from('lost_alerts').delete().eq('id', alert.id);
@@ -5100,6 +5123,7 @@ export default function App() {
                                     onOpenProfile={() => { setAdoptionFocusPet(pet.id); setView('account'); setAccountSubView('adoption'); }}
                                     onLike={() => handleLikeAdoption(pet.id)}
                                     onComment={(text) => handleCommentAdoption(pet.id, text)}
+                                    onViewComments={() => setViewingCommentsPostId(pet.id)}
                                     onShare={async () => {
                                        if (navigator.share) {
                                           try {
@@ -11673,7 +11697,10 @@ export default function App() {
 
               <div className="flex-1 overflow-y-auto px-4 py-4 space-y-5">
                 {(() => {
-                  const post = posts.find(p => p.id === viewingCommentsPostId);
+                  let post: any = posts.find(p => p.id === viewingCommentsPostId);
+                  if (!post) post = lostAlerts.find(a => a.id === viewingCommentsPostId);
+                  if (!post) post = adoptionPets.find(ap => ap.id === viewingCommentsPostId);
+
                   if (!post || !post.comments || post.comments.length === 0) {
                     return (
                       <div className="flex flex-col items-center justify-center py-20 text-center gap-3">
@@ -11743,7 +11770,13 @@ export default function App() {
                         if (editingComment) {
                           await handleEditComment(editingComment.postId, editingComment.commentId, commentText.trim());
                         } else if (viewingCommentsPostId) {
-                          await handleCommentSubmit(viewingCommentsPostId);
+                          if (posts.some(p => p.id === viewingCommentsPostId)) {
+                            await handleCommentSubmit(viewingCommentsPostId);
+                          } else if (lostAlerts.some(a => a.id === viewingCommentsPostId)) {
+                            await handleCommentAlert(viewingCommentsPostId, commentText.trim());
+                          } else if (adoptionPets.some(ap => ap.id === viewingCommentsPostId)) {
+                            await handleCommentAdoption(viewingCommentsPostId, commentText.trim());
+                          }
                         }
                         setCommentText('');
                       }
@@ -11757,7 +11790,13 @@ export default function App() {
                       if (editingComment) {
                         await handleEditComment(editingComment.postId, editingComment.commentId, commentText.trim());
                       } else if (viewingCommentsPostId) {
-                        await handleCommentSubmit(viewingCommentsPostId);
+                        if (posts.some(p => p.id === viewingCommentsPostId)) {
+                          await handleCommentSubmit(viewingCommentsPostId);
+                        } else if (lostAlerts.some(a => a.id === viewingCommentsPostId)) {
+                          await handleCommentAlert(viewingCommentsPostId, commentText.trim());
+                        } else if (adoptionPets.some(ap => ap.id === viewingCommentsPostId)) {
+                          await handleCommentAdoption(viewingCommentsPostId, commentText.trim());
+                        }
                       }
                       setCommentText('');
                     }}
