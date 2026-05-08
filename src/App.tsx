@@ -4446,7 +4446,7 @@ export default function App() {
         {eventInfoEvent && (() => {
           const ev = eventInfoEvent;
           const start = ev.event_date ? new Date(ev.event_date + 'T12:00:00') : null;
-          const end = start ? new Date(start.getTime() + 15 * 24 * 60 * 60 * 1000) : null;
+          const end = ev.title.includes('Concurso') ? new Date('2026-06-29T23:59:59') : start ? new Date(start.getTime() + 15 * 24 * 60 * 60 * 1000) : null;
           const fmtDate = (d: Date) => d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
           const dateRange = start && end ? `${fmtDate(start)} — ${fmtDate(end)}` : '';
           const daysLeft = end ? Math.max(0, Math.ceil((end.getTime() - Date.now()) / 86400000)) : null;
@@ -8162,7 +8162,8 @@ export default function App() {
                               const now = new Date().getTime();
                               const getStatusWeight = (ev: typeof a) => {
                                 if (!ev.event_date) return 2;
-                                const end = new Date(ev.event_date + 'T12:00:00').getTime() + 15 * 24 * 60 * 60 * 1000;
+                                const start = new Date(ev.event_date + 'T12:00:00');
+                                const end = ev.title.includes('Concurso') ? new Date('2026-06-29T23:59:59').getTime() : start.getTime() + 15 * 24 * 60 * 60 * 1000;
                                 return now > end ? 2 : 1; // 1 = Acontecendo (first), 2 = Concluído (second)
                               };
                               const weightDiff = getStatusWeight(a) - getStatusWeight(b);
@@ -8175,7 +8176,7 @@ export default function App() {
                               // Derive status from event_date (+15 days = end date)
                             const now = new Date();
                             const start = ev.event_date ? new Date(ev.event_date + 'T12:00:00') : null;
-                            const end = start ? new Date(start.getTime() + 15 * 24 * 60 * 60 * 1000) : null;
+                            const end = ev.title.includes('Concurso') ? new Date('2026-06-29T23:59:59') : start ? new Date(start.getTime() + 15 * 24 * 60 * 60 * 1000) : null;
                             let evStatus: 'Acontecendo' | 'Concluído' | 'Em breve' = 'Em breve';
                             if (start && end) {
                               if (now > end) evStatus = 'Concluído';
@@ -12307,3 +12308,4 @@ export default function App() {
 
 
 
+// Force hot reload
