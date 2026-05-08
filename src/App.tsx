@@ -3375,14 +3375,20 @@ export default function App() {
   useEffect(() => {
     const fetchPosts = async () => {
       const { data } = await supabase.from('posts').select('*').order('createdAt', { ascending: false });
-      setPosts((data || []) as Post[]);
+      const allPosts = (data || []) as Post[];
+      // Always show the logged-in user's current profile photo on their own posts
+      const currentPhoto = ownerProfile?.photoUrl || user?.user_metadata?.avatar_url || '';
+      const patchedPosts = allPosts.map(p =>
+        (p.userId === user?.id && currentPhoto) ? { ...p, userPhoto: currentPhoto } : p
+      );
+      setPosts(patchedPosts);
     };
     fetchPosts();
     const channel = supabase.channel('posts')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, fetchPosts)
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [user]);
+  }, [user, ownerProfile?.photoUrl]);
 
   const handleCreatePost = async () => {
     if (!user || !newPost.content) return;
@@ -3393,7 +3399,7 @@ export default function App() {
         id: postId,
         userId: user.id,
         userName: ownerProfile?.username || ownerProfile?.name || user.user_metadata?.full_name || user.email?.split('@')[0] || 'Usuário',
-        userPhoto: user.user_metadata?.avatar_url || '',
+        userPhoto: ownerProfile?.photoUrl || user.user_metadata?.avatar_url || '',
         type: newPost.type,
         content: newPost.content,
         imageUrl: newPost.imageUrl,
@@ -5193,11 +5199,11 @@ export default function App() {
                                               setView('account');
                                               setAccountSubView('main');
                                             } else {
-                                              setViewingProfile({ userId: post.userId, name: post.userName, photoUrl: post.userPhoto });
+                                              setViewingProfile({ userId: post.userId, name: post.userName, photoUrl: (post.userId === user?.id && ownerProfile?.photoUrl ? ownerProfile.photoUrl : post.userPhoto) });
                                             }
                                           }}
                                         >
-                                          <img src={post.userPhoto || 'https://picsum.photos/seed/user/100/100'} className="w-full h-full rounded-full object-cover" alt="User" />
+                                          <img src={(post.userId === user?.id && ownerProfile?.photoUrl ? ownerProfile.photoUrl : post.userPhoto) || 'https://ui-avatars.com/api/?name=User&background=FFEDD5&color=EA580C'} className="w-full h-full rounded-full object-cover" alt="User" />
                                         </div>
                                       </div>
                                       <div>
@@ -5211,7 +5217,7 @@ export default function App() {
                                                 setView('account');
                                                 setAccountSubView('main');
                                               } else {
-                                                setViewingProfile({ userId: post.userId, name: post.userName, photoUrl: post.userPhoto });
+                                                setViewingProfile({ userId: post.userId, name: post.userName, photoUrl: (post.userId === user?.id && ownerProfile?.photoUrl ? ownerProfile.photoUrl : post.userPhoto) });
                                               }
                                             }}
                                           >{post.userName || 'Tutor'}</span>{' '}
@@ -8384,7 +8390,7 @@ export default function App() {
                                 <div className="pb-3 flex items-center justify-between">
                                   <div className="flex items-center gap-3">
                                      <img 
-                                        src={post.userPhoto || 'https://picsum.photos/seed/user/100/100'} 
+                                        src={(post.userId === user?.id && ownerProfile?.photoUrl ? ownerProfile.photoUrl : post.userPhoto) || 'https://ui-avatars.com/api/?name=User&background=FFEDD5&color=EA580C'} 
                                         className="w-10 h-10 rounded-full border border-gray-100 cursor-pointer"
                                         onClick={() => {
                                           if (!user) return;
@@ -8393,7 +8399,7 @@ export default function App() {
                                             setView('account');
                                             setAccountSubView('main');
                                           } else {
-                                            setViewingProfile({ userId: post.userId, name: post.userName, photoUrl: post.userPhoto });
+                                            setViewingProfile({ userId: post.userId, name: post.userName, photoUrl: (post.userId === user?.id && ownerProfile?.photoUrl ? ownerProfile.photoUrl : post.userPhoto) });
                                           }
                                         }}
                                      />
@@ -8407,7 +8413,7 @@ export default function App() {
                                                setView('account');
                                                setAccountSubView('main');
                                              } else {
-                                               setViewingProfile({ userId: post.userId, name: post.userName, photoUrl: post.userPhoto });
+                                               setViewingProfile({ userId: post.userId, name: post.userName, photoUrl: (post.userId === user?.id && ownerProfile?.photoUrl ? ownerProfile.photoUrl : post.userPhoto) });
                                              }
                                            }}
                                         >{post.userName}</p>
@@ -8550,7 +8556,7 @@ export default function App() {
                       return (a.city || '').toLowerCase().includes(userCity);
                     }).map(a => ({
                       id: `sos-${a.id}`,
-                      avatarUrl: a.ownerPhotoUrl || 'https://picsum.photos/seed/user/100/100',
+                      avatarUrl: a.ownerPhotoUrl || 'https://ui-avatars.com/api/?name=User&background=FFEDD5&color=EA580C',
                       titleNode: (
                         <>
                           <span className="font-bold cursor-pointer hover:underline" onClick={(e) => { e.stopPropagation(); window.alert('Perfil do usuário em desenvolvimento'); }}>{a.ownerName || a.ownerUsername || 'Tutor'}</span>
@@ -8570,7 +8576,7 @@ export default function App() {
                     // Adoption
                     ...adoptionPets.filter(p => notifPrefs.adoption && (p.status === 'available' || !p.status)).map(p => ({
                       id: `adop-${p.id}`,
-                      avatarUrl: p.ownerPhotoUrl || 'https://picsum.photos/seed/user/100/100',
+                      avatarUrl: p.ownerPhotoUrl || 'https://ui-avatars.com/api/?name=User&background=FFEDD5&color=EA580C',
                       titleNode: (
                         <>
                           <span className="font-bold cursor-pointer hover:underline" onClick={(e) => { e.stopPropagation(); window.alert('Perfil do usuário em desenvolvimento'); }}>{p.ownerName || p.ownerUsername || 'Tutor'}</span>
@@ -11660,7 +11666,7 @@ export default function App() {
                          <div className="flex items-center justify-between p-4 z-10 w-full">
                            <div className="flex items-center gap-3">
                              <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-50">
-                               <img src={post.userPhoto || 'https://picsum.photos/seed/user/100/100'} className="w-full h-full rounded-full object-cover" alt="User" />
+                               <img src={(post.userId === user?.id && ownerProfile?.photoUrl ? ownerProfile.photoUrl : post.userPhoto) || 'https://ui-avatars.com/api/?name=User&background=FFEDD5&color=EA580C'} className="w-full h-full rounded-full object-cover" alt="User" />
                              </div>
                              <div>
                                <p className="text-[14px] text-gray-900 leading-tight flex items-center gap-1">
@@ -11758,7 +11764,7 @@ export default function App() {
                     return (
                       <div key={c.id} className="flex gap-3 group">
                         <div className="w-9 h-9 rounded-full overflow-hidden shrink-0 bg-gray-100 border border-gray-200">
-                           <img src={c.userPhoto || 'https://picsum.photos/seed/user/100/100'} className="w-full h-full object-cover" alt="User" />
+                           <img src={c.userPhoto || 'https://ui-avatars.com/api/?name=User&background=FFEDD5&color=EA580C'} className="w-full h-full object-cover" alt="User" />
                         </div>
                         <div className="flex-1">
                           <p className="text-[14px]">
@@ -11796,7 +11802,7 @@ export default function App() {
               {/* Input area */}
               <div className="px-4 py-3 bg-white border-t border-gray-100 flex items-center gap-3 shrink-0 mb-6">
                 <div className="w-10 h-10 rounded-full overflow-hidden shrink-0 bg-gray-100">
-                  <img src={ownerProfile?.photoUrl || 'https://picsum.photos/seed/user/100/100'} className="w-full h-full object-cover" alt="Me" />
+                  <img src={ownerProfile?.photoUrl || 'https://ui-avatars.com/api/?name=User&background=FFEDD5&color=EA580C'} className="w-full h-full object-cover" alt="Me" />
                 </div>
                 <div className="flex-1 relative">
                   <input
