@@ -1327,6 +1327,44 @@ export default function App() {
   const [editingAdoptionPetId, setEditingAdoptionPetId] = useState<string | null>(null);
   const [fireworksActive, setFireworksActive] = useState(false);
 
+  // Helper to render post content with clickable event hashtags
+  const renderPostContent = (content: any) => {
+    try {
+      if (!content || typeof content !== 'string') return content;
+      const parts = content.split(/(#Evento_[^\s]+)/g);
+      return parts.map((part, i) => {
+        if (part.startsWith('#Evento_')) {
+          return (
+            <span
+              key={i}
+              style={{ color: '#ea580c', cursor: 'pointer', fontWeight: 'bold' }}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const searchTitle = part.replace('#Evento_', '').replace(/_/g, '').toLowerCase();
+                const event = petEvents.find(ev => ev?.title?.replace(/\s+/g, '')?.toLowerCase() === searchTitle);
+                if (event) {
+                  setSelectedEventId(event.id);
+                  setAccountSubView('eventDetail');
+                  setView('account');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                } else {
+                  window.alert('Evento não encontrado!');
+                }
+              }}
+            >
+              {part}
+            </span>
+          );
+        }
+        return <span key={i}>{part}</span>;
+      });
+    } catch (err) {
+      console.error("Error in renderPostContent:", err);
+      return content;
+    }
+  };
+
   // Walk State
   const [walkSubView, setWalkSubView] = useState<'record' | 'history'>('record');
   const [isWalking, setIsWalking] = useState(false);
@@ -5242,8 +5280,8 @@ export default function App() {
 
                                   {/* Caption */}
                                   <div className="px-4 pb-3 space-y-1">
-                                    <p className="text-sm text-gray-800 font-medium leading-relaxed">
-                                      {post.content}
+                                    <p className="text-sm text-gray-800 font-medium leading-relaxed whitespace-pre-wrap">
+                                      {renderPostContent(post.content)}
                                     </p>
                                   </div>
 
@@ -8381,8 +8419,8 @@ export default function App() {
                                   </button>
                                 </div>
                                 {/* Post Content */}
-                                <div className="pb-3 text-sm text-[#0B3B8B] font-medium break-words">
-                                   {post.content}
+                                <div className="pb-3 text-sm text-[#0B3B8B] font-medium break-words whitespace-pre-wrap">
+                                   {renderPostContent(post.content)}
                                 </div>
                                 {/* Image Grid mockup depending on content or single image */}
                                 {post.imageUrl && (
@@ -11640,8 +11678,8 @@ export default function App() {
                          </div>
 
                          <div className="px-4 pb-3 space-y-1">
-                           <p className="text-[15px] text-gray-800 font-medium leading-snug">
-                             {post.content}
+                           <p className="text-[15px] text-gray-800 font-medium leading-snug whitespace-pre-wrap">
+                             {renderPostContent(post.content)}
                            </p>
                          </div>
 
