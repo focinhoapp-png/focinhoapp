@@ -72,7 +72,7 @@ import {
   CheckCheck,
   Image as ImgIcon
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence, Reorder } from 'motion/react';
 import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -96,6 +96,7 @@ const generateId = () => Math.random().toString(36).slice(2) + Date.now().toStri
 
 interface PetProfile {
   id: string;
+  orderIndex?: number;
   ownerId: string;
   tagId: string;
   name: string;
@@ -138,6 +139,7 @@ interface OwnerProfile {
   username?: string;
   bio?: string;
   photoUrl?: string;
+  coverUrl?: string;
   gender?: string;
   birthday?: string;
   phone?: string;
@@ -186,6 +188,8 @@ interface AdoptionPet {
   ownerName?: string;
   ownerUsername?: string;
   ownerPhotoUrl?: string;
+  likes?: string[];       // array of user IDs
+  comments?: { id: string; userId: string; userName: string; content: string; createdAt: string }[];
 }
 
 interface Product {
@@ -211,6 +215,8 @@ interface LostAlert {
   reward?: string;
   contactPhone: string;
   createdAt: any;
+  likes?: string[];       // array of user IDs
+  comments?: { id: string; userId: string; userName: string; content: string; createdAt: string }[];
 }
 
 interface Partner {
@@ -753,7 +759,7 @@ function CityStatePicker({ state, city, onStateChange, onCityChange, label = 'Lo
 
 // --- SOS Alert Card (Instagram-style) ---
 
-function SOSAlertCard({ alert, user, onEdit, onFound, onShare, onOpenFinder }: {
+function SOSAlertCard({ alert, user, onEdit, onFound, onShare, onOpenFinder, isTimeline, onGoToAlerts, onLike, onComment }: {
   key?: string;
   alert: LostAlert;
   user: any;
@@ -761,9 +767,30 @@ function SOSAlertCard({ alert, user, onEdit, onFound, onShare, onOpenFinder }: {
   onFound: () => void | Promise<void>;
   onShare: () => void | Promise<void>;
   onOpenFinder?: () => void;
+  isTimeline?: boolean;
+  onGoToAlerts?: () => void;
+  onLike?: () => void;
+  onComment?: (text: string) => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [showCommentInput, setShowCommentInput] = useState(false);
+  const [localCommentText, setLocalCommentText] = useState('');
   const mainImage = alert.petPhoto || null;
+
+  const likes = alert.likes || [];
+  const comments = alert.comments || [];
+  const isLiked = user ? likes.includes(user.id) : false;
+  const likeCount = likes.length;
+  const commentCount = comments.length;
+  // last 2 comments preview
+  const previewComments = comments.slice(-2);
+
+  const handleSubmitComment = () => {
+    if (!localCommentText.trim() || !onComment) return;
+    onComment(localCommentText.trim());
+    setLocalCommentText('');
+    setShowCommentInput(false);
+  };
 
   return (
     <div className="bg-white border border-gray-100 rounded-[2rem] overflow-hidden shadow-sm">
@@ -858,36 +885,290 @@ function SOSAlertCard({ alert, user, onEdit, onFound, onShare, onOpenFinder }: {
       </div>
 
       {/* ── Action buttons ── */}
-      <div className="flex flex-wrap items-center gap-4 px-4 pt-3 pb-3">
+      {isTimeline ? (
+        /* Timeline mode: like, comment, share, see alert */
+        <>
+          <div className="flex items-center gap-4 px-4 pt-3 pb-1">
+            <button
+              onClick={onLike}
+              className={`flex items-center gap-1.5 font-bold text-sm transition-all active:scale-90 ${
+                isLiked ? 'text-red-500' : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <Heart className={`w-6 h-6 transition-all ${isLiked ? 'fill-red-500 scale-110' : ''}`} />
+            </button>
+            <button
+              onClick={() => setShowCommentInput(v => !v)}
+              className={`flex items-center gap-1.5 font-bold text-sm transition-colors ${
+                showCommentInput ? 'text-orange-500' : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <MessageCircle className="w-6 h-6" />
+            </button>
+            <button
+              onClick={onShare}
+              className="flex items-center gap-1.5 text-gray-500 font-bold text-sm hover:text-gray-700 transition-colors"
+            >
+              <Share2 className="w-6 h-6" />
+            </button>
+            <button
+              onClick={onGoToAlerts}
+              className="ml-auto flex items-center gap-2 bg-red-50 text-red-600 font-bold text-sm px-4 py-2 rounded-full hover:bg-red-100 transition-colors"
+            >
+              <Siren className="w-4 h-4" />
+              Ver Alerta
+            </button>
+          </div>
+
+          {/* Like count */}
+          {likeCount > 0 && (
+            <p className="font-bold text-gray-900 text-sm px-4 pb-1">{likeCount} curtida{likeCount !== 1 ? 's' : ''}</p>
+          )}
+
+          {/* Comments preview */}
+          {commentCount > 0 && (
+            <div className="px-4 pb-1 space-y-0.5">
+              {commentCount > 2 && (
+                <button
+                  onClick={() => setShowCommentInput(true)}
+                  className="text-gray-400 text-xs font-medium hover:text-gray-600 transition-colors"
+                >
+                  Ver todos os {commentCount} comentários
+                </button>
+              )}
+              {previewComments.map(c => (
+                <p key={c.id} className="text-sm text-gray-800">
+                  <span className="font-bold">{c.userName}</span>{' '}{c.content}
+                </p>
+              ))}
+            </div>
+          )}
+
+          {/* Comment input */}
+          {showCommentInput && user && (
+            <div className="px-4 pb-3 pt-1 flex items-center gap-2 border-t border-gray-50 mt-1">
+              <input
+                type="text"
+                placeholder="Adicionar um comentário..."
+                value={localCommentText}
+                onChange={e => setLocalCommentText(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleSubmitComment()}
+                autoFocus
+                className="flex-1 text-sm bg-gray-50 rounded-full px-4 py-2 outline-none border border-gray-200 focus:border-orange-400 transition-all"
+              />
+              <button
+                onClick={handleSubmitComment}
+                disabled={!localCommentText.trim()}
+                className="text-orange-500 font-bold text-sm disabled:opacity-40 transition-opacity"
+              >
+                Publicar
+              </button>
+            </div>
+          )}
+
+          <div className="px-4 pb-4 pt-1">
+            <p className="text-[11px] text-gray-400 font-medium">
+              {new Date(alert.createdAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
+            </p>
+          </div>
+        </>
+      ) : (
+        /* Alerts page mode: found, share, contact */
+        <>
+          <div className="flex flex-wrap items-center gap-4 px-4 pt-3 pb-3">
+            <button
+              onClick={onFound}
+              className="flex items-center gap-1.5 text-green-600 font-bold text-sm hover:text-green-700 transition-colors"
+            >
+              <CheckCircle2 className="w-6 h-6" />
+              Encontrado
+            </button>
+            <button
+              onClick={onShare}
+              className="flex items-center gap-1.5 text-gray-500 font-bold text-sm hover:text-gray-700 transition-colors"
+            >
+              <Share2 className="w-5 h-5" />
+              Compartilhar
+            </button>
+            <button
+              onClick={() => {
+                const phone = (alert.contactPhone || '').replace(/\D/g, '');
+                if (!phone) { window.alert('Este alerta não possui telefone de contato.'); return; }
+                window.open(`https://wa.me/55${phone}?text=${encodeURIComponent(`Olá! Queria falar sobre o alerta do animal perdido: ${alert.petName}`)}`, '_blank');
+              }}
+              className="ml-auto flex items-center gap-1.5 text-gray-500 font-bold text-sm hover:text-gray-700 transition-colors"
+            >
+              <MessageCircle className="w-5 h-5" />
+              Contato
+            </button>
+          </div>
+          <div className="px-4 pb-4">
+            <p className="text-[11px] text-gray-400 font-medium">
+              {new Date(alert.createdAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
+            </p>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// --- Adoption Timeline Card (Instagram-style) ---
+function AdoptionTimelineCard({ pet, user, onShare, onLike, onComment, onOpenProfile }: {
+  pet: AdoptionPet;
+  user: any;
+  onShare: () => void | Promise<void>;
+  onLike?: () => void;
+  onComment?: (text: string) => void;
+  onOpenProfile?: () => void;
+}) {
+  const [showCommentInput, setShowCommentInput] = useState(false);
+  const [localCommentText, setLocalCommentText] = useState('');
+
+  const likes = pet.likes || [];
+  const comments = pet.comments || [];
+  const isLiked = user ? likes.includes(user.id) : false;
+  const likeCount = likes.length;
+  const commentCount = comments.length;
+  const previewComments = comments.slice(-2);
+
+  const handleSubmitComment = () => {
+    if (!localCommentText.trim() || !onComment) return;
+    onComment(localCommentText.trim());
+    setLocalCommentText('');
+    setShowCommentInput(false);
+  };
+
+  return (
+    <div className="bg-white border border-gray-100 rounded-[2rem] overflow-hidden shadow-sm">
+      {/* ── Header ── */}
+      <div className="flex items-center justify-between px-4 py-3">
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            {pet.ownerPhotoUrl ? (
+              <img src={pet.ownerPhotoUrl} alt="Tutor" className="w-10 h-10 rounded-full object-cover border border-gray-100" />
+            ) : (
+              <div className="w-10 h-10 rounded-full bg-pink-50 flex items-center justify-center border border-pink-100">
+                <UserIcon className="w-5 h-5 text-pink-300" />
+              </div>
+            )}
+            <div className="absolute -bottom-1 -right-1 bg-gradient-to-r from-pink-500 to-rose-500 rounded-full p-1 border-2 border-white">
+              <Heart className="w-2.5 h-2.5 text-white" />
+            </div>
+          </div>
+          <div>
+            <p className="text-[14px] text-gray-900 leading-tight">
+              <span className="font-bold">{pet.ownerUsername || pet.ownerName || 'Tutor do Pet'}</span> busca um lar pra{' '}
+              {onOpenProfile ? (
+                <button onClick={onOpenProfile} className="font-bold text-gray-900 hover:underline">
+                  {pet.name}
+                </button>
+              ) : (
+                <span className="font-bold">{pet.name}</span>
+              )}
+            </p>
+            <p className="text-[12px] text-gray-500 font-medium leading-tight mt-0.5">
+               {pet.city || 'Localização não informada'}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Photo ── */}
+      <div className="w-full aspect-square bg-gray-100 relative">
+        <img src={pet.photoUrl || 'https://picsum.photos/seed/pet/800/600'} alt={pet.name} className="w-full h-full object-cover" />
+        <div className="absolute top-3 left-3 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-[10px] font-black px-3 py-1.5 rounded-full uppercase shadow-lg flex items-center gap-1">
+          Para Adoção
+        </div>
+      </div>
+
+      {/* ── Action buttons ── */}
+      <div className="flex items-center gap-4 px-4 pt-3 pb-1">
         <button
-          onClick={onFound}
-          className="flex items-center gap-1.5 text-green-600 font-bold text-sm hover:text-green-700 transition-colors"
+          onClick={onLike}
+          className={`flex items-center gap-1.5 font-bold text-sm transition-all active:scale-90 ${
+            isLiked ? 'text-pink-500' : 'text-gray-500 hover:text-gray-700'
+          }`}
         >
-          <CheckCircle2 className="w-6 h-6" />
-          Encontrado
+          <Heart className={`w-6 h-6 transition-all ${isLiked ? 'fill-pink-500 scale-110' : ''}`} />
+        </button>
+        <button
+          onClick={() => setShowCommentInput(v => !v)}
+          className={`flex items-center gap-1.5 font-bold text-sm transition-colors ${
+            showCommentInput ? 'text-pink-500' : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          <MessageCircle className="w-6 h-6" />
         </button>
         <button
           onClick={onShare}
           className="flex items-center gap-1.5 text-gray-500 font-bold text-sm hover:text-gray-700 transition-colors"
         >
-          <Share2 className="w-5 h-5" />
-          Compartilhar
+          <Share2 className="w-6 h-6" />
         </button>
-        <button
-          onClick={() => {
-            const phone = (alert.contactPhone || '').replace(/\D/g, '');
-            if (!phone) { window.alert('Este alerta não possui telefone de contato.'); return; }
-            window.open(`https://wa.me/55${phone}?text=${encodeURIComponent(`Olá! Queria falar sobre o alerta do animal perdido: ${alert.petName}`)}`, '_blank');
-          }}
-          className="ml-auto flex items-center gap-1.5 text-gray-500 font-bold text-sm hover:text-gray-700 transition-colors"
-        >
-          <MessageCircle className="w-5 h-5" />
-          Contato
-        </button>
+        
+        {onOpenProfile && (
+          <button
+            onClick={onOpenProfile}
+            className="ml-auto flex items-center gap-2 bg-pink-50 text-pink-600 font-bold text-sm px-4 py-2 rounded-full hover:bg-pink-100 transition-colors"
+          >
+            <UserIcon className="w-4 h-4" />
+            Ver Perfil
+          </button>
+        )}
       </div>
-      <div className="px-4 pb-4">
+
+      {/* Like count */}
+      {likeCount > 0 && (
+        <p className="font-bold text-gray-900 text-sm px-4 pb-1">{likeCount} curtida{likeCount !== 1 ? 's' : ''}</p>
+      )}
+
+      {/* Caption & Comments */}
+      <div className="px-4 pb-1 space-y-1">
+        {commentCount > 0 && (
+          <div className="pt-1 space-y-0.5">
+            {commentCount > 2 && (
+              <button
+                onClick={() => setShowCommentInput(true)}
+                className="text-gray-400 text-xs font-medium hover:text-gray-600 transition-colors"
+              >
+                Ver todos os {commentCount} comentários
+              </button>
+            )}
+            {previewComments.map(c => (
+              <p key={c.id} className="text-sm text-gray-800">
+                <span className="font-bold">{c.userName}</span>{' '}{c.content}
+              </p>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Comment input */}
+      {showCommentInput && user && (
+        <div className="px-4 pb-3 pt-1 flex items-center gap-2 border-t border-gray-50 mt-1">
+          <input
+            type="text"
+            placeholder="Adicionar um comentário..."
+            value={localCommentText}
+            onChange={e => setLocalCommentText(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleSubmitComment()}
+            autoFocus
+            className="flex-1 text-sm bg-gray-50 rounded-full px-4 py-2 outline-none border border-gray-200 focus:border-pink-400 transition-all"
+          />
+          <button
+            onClick={handleSubmitComment}
+            disabled={!localCommentText.trim()}
+            className="text-pink-500 font-bold text-sm disabled:opacity-40 transition-opacity"
+          >
+            Publicar
+          </button>
+        </div>
+      )}
+
+      <div className="px-4 pb-4 pt-1">
         <p className="text-[11px] text-gray-400 font-medium">
-          {new Date(alert.createdAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
+          {pet.createdAt ? new Date(pet.createdAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : 'Recentemente'}
         </p>
       </div>
     </div>
@@ -1069,7 +1350,10 @@ export default function App() {
   const [isAddingPost, setIsAddingPost] = useState(false);
   const [newPost, setNewPost] = useState<{ content: string, type: 'photo' | 'walk', imageUrl?: string, petId?: string, petName?: string }>({ content: '', type: 'photo' });
   const [activeCommentPostId, setActiveCommentPostId] = useState<string | null>(null);
+  const [viewingCommentsPostId, setViewingCommentsPostId] = useState<string | null>(null);
   const [commentText, setCommentText] = useState('');
+  const [activeAdoptionCommentId, setActiveAdoptionCommentId] = useState<string | null>(null);
+  const [adoptionCommentText, setAdoptionCommentText] = useState('');
   const [editingComment, setEditingComment] = useState<{ postId: string; commentId: string; text: string } | null>(null);
   const [showPostPicker, setShowPostPicker] = useState<{ hashtag: string } | null>(null);
   const [pickerPhotos, setPickerPhotos] = useState<string[]>([]);
@@ -1112,15 +1396,19 @@ export default function App() {
   const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([]); // pedidos RECEBIDOS
   const [sentRequests, setSentRequests] = useState<FriendRequest[]>([]); // pedidos ENVIADOS
   const [friendships, setFriendships] = useState<Friendship[]>([]); // amizades estabelecidas
-  const [viewingProfile, setViewingProfile] = useState<{ userId: string; name: string; username?: string; photoUrl?: string } | null>(null);
+  const [viewingProfile, setViewingProfile] = useState<{ userId: string; name: string; username?: string; photoUrl?: string; coverUrl?: string } | null>(null);
   const [profilePetsCount, setProfilePetsCount] = useState(0);
   const [viewingProfileDetails, setViewingProfileDetails] = useState<any>(null);
   const [viewingProfileFriendCount, setViewingProfileFriendCount] = useState(0);
+  const [viewingProfilePets, setViewingProfilePets] = useState<PetProfile[]>([]);
+  const [showViewingProfilePets, setShowViewingProfilePets] = useState(false);
 
   useEffect(() => {
     if (viewingProfile?.userId) {
       supabase.from('pets').select('id', { count: 'exact', head: true }).eq('ownerId', viewingProfile.userId)
         .then(({ count }) => setProfilePetsCount(count || 0));
+      supabase.from('pets').select('*').eq('ownerId', viewingProfile.userId).order('created_at', { ascending: false })
+        .then(({ data }) => setViewingProfilePets(data as PetProfile[] || []));
       supabase.from('profiles').select('*').eq('id', viewingProfile.userId).maybeSingle()
         .then(({ data }) => setViewingProfileDetails(data));
       supabase.from('friendships').select('id', { count: 'exact', head: true })
@@ -1131,6 +1419,8 @@ export default function App() {
       setViewingProfileDetails(null);
       setViewingProfileFriendCount(0);
       setProfilePetsCount(0);
+      setViewingProfilePets([]);
+      setShowViewingProfilePets(false);
     }
   }, [viewingProfile?.userId]);
   // Notificações de amizade aceita (da tabela notifications)
@@ -1591,6 +1881,9 @@ export default function App() {
         } catch (familyErr) {
           console.warn('Could not fetch family pets (non-critical):', familyErr);
         }
+
+        // Sort by orderIndex
+        allPets.sort((a, b) => (a.orderIndex || 0) - (b.orderIndex || 0));
 
         setUserPets(allPets);
       } catch (err) {
@@ -3083,6 +3376,25 @@ export default function App() {
     }
   };
 
+  const handleReorderPets = async (newOrder: PetProfile[]) => {
+    setUserPets(newOrder); // Optimistic UI update
+
+    try {
+      const updates = newOrder.map((pet, index) => ({
+        id: pet.id,
+        orderIndex: index
+      }));
+      
+      // Update each pet in Supabase
+      // Assuming a relatively small number of pets per user, sequential or Promise.all updates are fine
+      await Promise.all(
+        updates.map(u => supabase.from('pets').update({ orderIndex: u.orderIndex }).eq('id', u.id))
+      );
+    } catch (e) {
+      console.error('Error reordering pets:', e);
+    }
+  };
+
   const handleLikePost = async (postId: string) => {
     if (!user) return;
     const post = posts.find(p => p.id === postId);
@@ -3109,6 +3421,87 @@ export default function App() {
       }
     } catch (err) {
       console.error('Error liking post:', err);
+    }
+  };
+
+  const handleLikeAlert = async (alertId: string) => {
+    if (!user) return;
+    const alertItem = lostAlerts.find(a => a.id === alertId);
+    if (!alertItem) return;
+    const currentLikes = alertItem.likes || [];
+    const isLiked = currentLikes.includes(user.id);
+    const newLikes = isLiked
+      ? currentLikes.filter(id => id !== user.id)
+      : [...currentLikes, user.id];
+    // Optimistic update
+    setLostAlerts(prev => prev.map(a => a.id === alertId ? { ...a, likes: newLikes } : a));
+    try {
+      await supabase.from('lost_alerts').update({ likes: newLikes }).eq('id', alertId);
+    } catch (err) {
+      console.error('Error liking alert:', err);
+      // Revert on error
+      setLostAlerts(prev => prev.map(a => a.id === alertId ? { ...a, likes: currentLikes } : a));
+    }
+  };
+
+  const handleCommentAlert = async (alertId: string, text: string) => {
+    if (!user || !text.trim()) return;
+    const alertItem = lostAlerts.find(a => a.id === alertId);
+    if (!alertItem) return;
+    const newComment = {
+      id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
+      userId: user.id,
+      userName: ownerProfile?.username || ownerProfile?.name || user.email?.split('@')[0] || 'Usuário',
+      content: text.trim(),
+      createdAt: new Date().toISOString(),
+    };
+    const newComments = [...(alertItem.comments || []), newComment];
+    // Optimistic update
+    setLostAlerts(prev => prev.map(a => a.id === alertId ? { ...a, comments: newComments } : a));
+    try {
+      await supabase.from('lost_alerts').update({ comments: newComments }).eq('id', alertId);
+    } catch (err) {
+      console.error('Error commenting on alert:', err);
+    }
+  };
+
+  const handleLikeAdoption = async (petId: string) => {
+    if (!user) return;
+    const pet = adoptionPets.find(p => p.id === petId);
+    if (!pet) return;
+    const currentLikes = pet.likes || [];
+    const isLiked = currentLikes.includes(user.id);
+    const newLikes = isLiked
+      ? currentLikes.filter(id => id !== user.id)
+      : [...currentLikes, user.id];
+    // Optimistic update
+    setAdoptionPets(prev => prev.map(p => p.id === petId ? { ...p, likes: newLikes } : p));
+    try {
+      await supabase.from('adoption_pets').update({ likes: newLikes }).eq('id', petId);
+    } catch (err) {
+      console.error('Error liking adoption pet:', err);
+      setAdoptionPets(prev => prev.map(p => p.id === petId ? { ...p, likes: currentLikes } : p));
+    }
+  };
+
+  const handleCommentAdoption = async (petId: string, text: string) => {
+    if (!user || !text.trim()) return;
+    const pet = adoptionPets.find(p => p.id === petId);
+    if (!pet) return;
+    const newComment = {
+      id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
+      userId: user.id,
+      userName: ownerProfile?.username || ownerProfile?.name || user.email?.split('@')[0] || 'Usuário',
+      content: text.trim(),
+      createdAt: new Date().toISOString(),
+    };
+    const newComments = [...(pet.comments || []), newComment];
+    // Optimistic update
+    setAdoptionPets(prev => prev.map(p => p.id === petId ? { ...p, comments: newComments } : p));
+    try {
+      await supabase.from('adoption_pets').update({ comments: newComments }).eq('id', petId);
+    } catch (err) {
+      console.error('Error commenting on adoption pet:', err);
     }
   };
 
@@ -3686,6 +4079,27 @@ export default function App() {
     } catch (err) {
       console.error(err);
       setError('Erro ao recortar foto.');
+    }
+    
+    // reset input
+    e.target.value = '';
+  };
+
+  const handleOwnerCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      // 21:9 aspect ratio for cover photo, not circular
+      const croppedBlob = await requestCrop(file, 21 / 9, false);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setOwnerProfile(prev => ({ ...prev, coverUrl: reader.result as string } as any));
+      };
+      reader.readAsDataURL(croppedBlob);
+    } catch (err) {
+      console.error(err);
+      setError('Erro ao recortar foto de capa.');
     }
     
     // reset input
@@ -4455,28 +4869,34 @@ export default function App() {
 
                 {/* ── Pet Selector Row ─────────────────────────── */}
                 <div className="mb-2">
-                  <div className="flex gap-5 overflow-x-auto pb-3 pt-3 px-2 no-scrollbar">
-                    {userPets.map((pet, index) => {
+                  <div className="flex gap-5 overflow-x-auto pb-3 pt-3 px-2 no-scrollbar items-start">
+                    <Reorder.Group as="div" axis="x" values={userPets} onReorder={handleReorderPets} className="flex gap-5 items-start">
+                      {userPets.map((pet, index) => {
                       const hasTag = !!pet.tagId;
                       const isSelected = index === currentPetIndex;
 
                       return (
-                        <motion.button
+                        <Reorder.Item
+                          as="div"
                           key={pet.id}
-                          whileTap={{ scale: 0.93 }}
-                          onClick={() => { 
-                            if (isSelected) {
-                              // Se já está selecionado, abrir perfil
-                              setSelectedPet(pet); setView('profile'); 
-                            } else {
-                              // Se não, seleciona e foca
-                              setCurrentPetIndex(index);
-                            }
-                          }}
-                          className={`flex flex-col items-center gap-2 shrink-0 group transition-all duration-300 ${
-                            isSelected ? 'scale-100 opacity-100' : 'scale-90 opacity-60 blur-[1px]'
-                          }`}
+                          value={pet}
+                          className="shrink-0 cursor-grab active:cursor-grabbing"
                         >
+                          <motion.button
+                            whileTap={{ scale: 0.93 }}
+                            onClick={() => { 
+                              if (isSelected) {
+                                // Se já está selecionado, abrir perfil
+                                setSelectedPet(pet); setView('profile'); 
+                              } else {
+                                // Se não, seleciona e foca
+                                setCurrentPetIndex(index);
+                              }
+                            }}
+                            className={`flex flex-col items-center gap-2 group transition-all duration-300 ${
+                              isSelected ? 'scale-100 opacity-100' : 'scale-90 opacity-60 blur-[1px]'
+                            }`}
+                          >
                           {/* Circle avatar */}
                           <div className="relative">
                             <div
@@ -4520,9 +4940,11 @@ export default function App() {
                           }`}>
                             {pet.name}
                           </span>
-                        </motion.button>
+                          </motion.button>
+                        </Reorder.Item>
                       );
                     })}
+                    </Reorder.Group>
 
                     {/* Add new pet button */}
                     <motion.button
@@ -4639,11 +5061,15 @@ export default function App() {
                             const alert = item.data;
                             return (
                                <div key={`alert-${alert.id}-${idx}`}>
-                                  <SOSAlertCard
+                                 <SOSAlertCard
                                     alert={alert}
                                     user={user}
                                     onOpenFinder={() => openPetFinderById(alert.petId)}
                                     onEdit={() => {}} /* feed uses read-only */
+                                    isTimeline={true}
+                                    onGoToAlerts={() => setView('lost_pets')}
+                                    onLike={() => handleLikeAlert(alert.id)}
+                                    onComment={(text) => handleCommentAlert(alert.id, text)}
                                     onFound={async () => {
                                        if (window.confirm(`Você encontrou ${alert.petName}?`)) {
                                           await supabase.from('lost_alerts').delete().eq('id', alert.id);
@@ -4667,85 +5093,25 @@ export default function App() {
                           } else if (item.type === 'adoption') {
                             const pet = item.data;
                             return (
-                               <div key={`adopt-${pet.id}-${idx}`} className="bg-white border border-gray-100 rounded-[2rem] overflow-hidden shadow-sm">
-                                  {/* Header */}
-                                  <div className="flex items-center justify-between px-4 py-3">
-                                    <div className="flex items-center gap-3">
-                                      <div className="relative">
-                                        {pet.ownerPhotoUrl ? (
-                                          <img src={pet.ownerPhotoUrl} alt="Tutor" className="w-10 h-10 rounded-full object-cover border border-gray-100" />
-                                        ) : (
-                                          <div className="w-10 h-10 rounded-full bg-pink-50 flex items-center justify-center border border-pink-100">
-                                            <UserIcon className="w-5 h-5 text-pink-300" />
-                                          </div>
-                                        )}
-                                        <div className="absolute -bottom-1 -right-1 bg-gradient-to-r from-pink-500 to-rose-500 rounded-full p-1 border-2 border-white">
-                                          <Heart className="w-2.5 h-2.5 text-white" />
-                                        </div>
-                                      </div>
-                                      <div>
-                                        <p className="text-[14px] text-gray-900 leading-tight">
-                                          <span className="font-bold">{pet.ownerUsername || pet.ownerName || 'Tutor do Pet'}</span> busca um lar pra{' '}
-                                          <button
-                                            className="font-bold text-gray-900"
-                                            onClick={() => { setAdoptionFocusPet(pet.id); setView('account'); setAccountSubView('adoption'); }}
-                                          >{pet.name}</button>
-                                        </p>
-                                        <p className="text-[12px] text-gray-500 font-medium leading-tight mt-0.5">
-                                           {pet.city || 'Localização não informada'}
-                                        </p>
-                                      </div>
-                                    </div>
-                                  </div>
-
-                                  {/* Photo */}
-                                  <div className="w-full aspect-square bg-gray-100 relative">
-                                    <img src={pet.photoUrl || 'https://picsum.photos/seed/pet/800/600'} alt={pet.name} className="w-full h-full object-cover" />
-                                    <div className="absolute top-3 left-3 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-[10px] font-black px-3 py-1.5 rounded-full uppercase shadow-lg flex items-center gap-1">
-                                      Para Adoção
-                                    </div>
-                                  </div>
-
-                                  {/* Buttons */}
-                                  <div className="flex flex-wrap items-center gap-4 px-4 pt-3 pb-3">
-                                     <div className="flex items-center gap-1.5 font-bold text-sm text-green-600">
-                                       <CheckCircle2 className="w-6 h-6" />
-                                       Disponível
-                                     </div>
-                                     <button
-                                       onClick={async () => {
-                                         if (navigator.share) {
-                                           try {
-                                              await navigator.share({
-                                                 title: `Ação de Adoção: ${pet.name}`,
-                                                 text: `Conheça ${pet.name}, para adoção!`,
-                                                 url: window.location.href,
-                                              });
-                                           } catch {}
-                                         }
-                                       }}
-                                       className="flex items-center gap-1.5 text-gray-500 font-bold text-sm hover:text-gray-700 transition-colors"
-                                     >
-                                       <Share2 className="w-5 h-5" />
-                                       Compartilhar
-                                     </button>
-                                     <button
-                                       onClick={() => {
-                                          const phone = (pet.contactPhone || '').replace(/\D/g, '');
-                                          if (!phone) { window.alert('Este pet não possui telefone de contato.'); return; }
-                                          window.open(`https://wa.me/55${phone}?text=${encodeURIComponent(`Olá! Queria falar sobre a adoção do ${pet.name}.`)}`, '_blank');
-                                       }}
-                                       className="ml-auto flex items-center gap-1.5 text-pink-600 font-bold text-sm hover:text-pink-700 transition-colors"
-                                     >
-                                       <MessageCircle className="w-5 h-5" />
-                                       Quero Adotar
-                                     </button>
-                                  </div>
-                                  <div className="px-4 pb-4">
-                                     <p className="text-[11px] text-gray-400 font-medium">
-                                       {pet.createdAt ? new Date(pet.createdAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : 'Recentemente'}
-                                     </p>
-                                  </div>
+                               <div key={`adopt-${pet.id}-${idx}`}>
+                                 <AdoptionTimelineCard
+                                    pet={pet}
+                                    user={user}
+                                    onOpenProfile={() => { setAdoptionFocusPet(pet.id); setView('account'); setAccountSubView('adoption'); }}
+                                    onLike={() => handleLikeAdoption(pet.id)}
+                                    onComment={(text) => handleCommentAdoption(pet.id, text)}
+                                    onShare={async () => {
+                                       if (navigator.share) {
+                                          try {
+                                             await navigator.share({
+                                                title: `Ação de Adoção: ${pet.name}`,
+                                                text: `Conheça ${pet.name}, para adoção!`,
+                                                url: window.location.href,
+                                             });
+                                          } catch {}
+                                       }
+                                    }}
+                                 />
                                </div>
                             )
                           } else if (item.type === 'post') {
@@ -4869,7 +5235,7 @@ export default function App() {
                                            <button onClick={() => handleLikePost(post.id)} className={`transition-colors ${post.likes?.includes(user?.id || '') ? 'text-red-500' : 'text-gray-800 hover:text-gray-500'}`}>
                                               <Heart className={`w-6 h-6 ${post.likes?.includes(user?.id || '') ? 'fill-red-500' : ''}`} />
                                            </button>
-                                           <button onClick={() => setActiveCommentPostId(activeCommentPostId === post.id ? null : post.id)} className="transition-colors text-gray-800 hover:text-gray-500">
+                                           <button onClick={() => setViewingCommentsPostId(post.id)} className="transition-colors text-gray-800 hover:text-gray-500">
                                               <MessageCircle className="w-6 h-6" />
                                            </button>
                                            <button className="transition-colors text-gray-800 hover:text-gray-500">
@@ -4886,7 +5252,7 @@ export default function App() {
                                      {post.comments && post.comments.length > 0 && (
                                        <div className="mt-1 space-y-1">
                                          {post.comments.length > 2 && (
-                                           <button className="text-gray-500 text-[13px] font-medium hover:text-gray-400">Ver todos os {post.comments.length} comentários</button>
+                                           <button onClick={() => setViewingCommentsPostId(post.id)} className="text-gray-500 text-[13px] font-medium hover:text-gray-400">Ver todos os {post.comments.length} comentários</button>
                                          )}
                                          {post.comments.slice(-2).map(c => {
                                             const isOwner = c.userId === user?.id;
@@ -6312,7 +6678,12 @@ export default function App() {
                     {/* Facebook-style Profile Header */}
                     <div className="relative">
                       {/* Cover Photo */}
-                      <div className="h-32 bg-gradient-to-r from-orange-400 to-pink-500 w-full relative">
+                      <div className="h-32 w-full relative">
+                        {ownerProfile?.coverUrl ? (
+                          <img src={ownerProfile.coverUrl} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full bg-gradient-to-r from-orange-400 to-pink-500" />
+                        )}
                         {/* Settings Button → opens full-page settings */}
                         <div className="absolute top-4 right-4 z-20">
                           <button
@@ -6327,7 +6698,7 @@ export default function App() {
                       
                       <div className="px-4 pt-0 pb-6 border-b border-gray-100">
                         {/* Profile Photo and Name/Stats row */}
-                        <div className="flex items-end gap-3 -mt-12 mb-3 relative z-10">
+                        <div className="flex items-end gap-4 -mt-6 mb-3 relative z-10">
                           <div className="w-[104px] h-[104px] rounded-full border-4 border-white bg-gray-100 overflow-hidden shrink-0 shadow-sm relative">
                             {ownerProfile?.photoUrl ? (
                               <img src={ownerProfile.photoUrl} alt="Perfil" className="w-full h-full object-cover" />
@@ -6338,7 +6709,7 @@ export default function App() {
                             )}
                           </div>
                           
-                          <div className="flex-1 pb-2">
+                          <div className="flex-1 pb-0 mb-1">
                             <h2 className="text-2xl font-bold text-gray-900 leading-tight">
                               {ownerProfile?.name || user?.user_metadata?.full_name || 'Tutor do Pet'}
                             </h2>
@@ -6743,6 +7114,37 @@ export default function App() {
                           )}
                         </label>
                         <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Foto de Perfil</p>
+                      </div>
+
+                      <div className="flex flex-col items-center gap-4">
+                        <label className="cursor-pointer group relative w-full h-32">
+                          <input type="file" accept="image/*" className="hidden" onChange={handleOwnerCoverUpload} />
+                          <div className="w-full h-full bg-gray-50 rounded-2xl flex items-center justify-center relative overflow-hidden border-2 border-dashed border-gray-200 group-hover:border-orange-300 transition-all">
+                            {ownerProfile?.coverUrl ? (
+                              <img src={ownerProfile.coverUrl} className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="flex flex-col items-center gap-2 text-gray-400 group-hover:text-orange-400 transition-all">
+                                <Camera className="w-8 h-8" />
+                                <span className="text-xs font-bold uppercase tracking-widest">Adicionar Capa</span>
+                              </div>
+                            )}
+                            <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                              <span className="text-white text-[12px] font-bold uppercase tracking-widest">Alterar Capa</span>
+                            </div>
+                          </div>
+                          {ownerProfile?.coverUrl && (
+                            <button
+                              onClick={(e) => {
+                                e.preventDefault();
+                                setOwnerProfile(prev => ({ ...prev, coverUrl: '' } as any));
+                              }}
+                              className="absolute -top-2 -right-2 p-1.5 bg-red-500 text-white rounded-full shadow-lg hover:bg-red-600 transition-colors z-10"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          )}
+                        </label>
+                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Foto de Capa</p>
                       </div>
 
                       <div className="grid gap-4">
@@ -7970,7 +8372,7 @@ export default function App() {
                                          <button onClick={() => handleLikePost(post.id)} className={`transition-colors ${post.likes?.includes(user?.id || '') ? 'text-red-500' : 'text-gray-800 hover:text-gray-500'}`}>
                                             <Heart className={`w-5 h-5 ${post.likes?.includes(user?.id || '') ? 'fill-red-500' : ''}`} />
                                          </button>
-                                         <button onClick={() => setActiveCommentPostId(activeCommentPostId === post.id ? null : post.id)} className="transition-colors text-gray-800 hover:text-gray-500">
+                                         <button onClick={() => setViewingCommentsPostId(post.id)} className="transition-colors text-gray-800 hover:text-gray-500">
                                             <MessageCircle className="w-5 h-5" />
                                          </button>
                                          <button className="transition-colors text-gray-800 hover:text-gray-500">
@@ -7987,7 +8389,7 @@ export default function App() {
                                    {post.comments && post.comments.length > 0 && (
                                      <div className="mt-1 space-y-1">
                                        {post.comments.length > 2 && (
-                                         <button className="text-gray-500 text-[13px] font-medium hover:text-gray-400">Ver todos os {post.comments.length} comentários</button>
+                                         <button onClick={() => setViewingCommentsPostId(post.id)} className="text-gray-500 text-[13px] font-medium hover:text-gray-400">Ver todos os {post.comments.length} comentários</button>
                                        )}
                                        {post.comments.slice(-2).map(c => {
                                           const isOwner = c.userId === user?.id;
@@ -8545,11 +8947,26 @@ export default function App() {
                                 </div>
 
                                 {/* ── Action Buttons ── */}
-                                <div className="flex items-center gap-4 px-4 pt-3 pb-1">
-                                  <div className={`flex items-center gap-1.5 font-bold text-sm ${adoptionTab === 'available' ? 'text-green-600' : 'text-gray-500'}`}>
-                                    <CheckCircle2 className="w-6 h-6" />
-                                    {adoptionTab === 'available' ? 'Disponível' : 'Já Adotado'}
-                                  </div>
+                                <div className="flex flex-wrap items-center gap-4 px-4 pt-3 pb-1">
+                                  {/* Like button */}
+                                  <button
+                                    onClick={() => handleLikeAdoption(pet.id)}
+                                    className={`flex items-center gap-1.5 font-bold text-sm transition-all active:scale-90 ${
+                                      user && (pet.likes || []).includes(user.id) ? 'text-pink-500' : 'text-gray-500 hover:text-gray-700'
+                                    }`}
+                                  >
+                                    <Heart className={`w-6 h-6 transition-all ${user && (pet.likes || []).includes(user.id) ? 'fill-pink-500 scale-110' : ''}`} />
+                                  </button>
+                                  {/* Comment button */}
+                                  <button
+                                    onClick={() => setActiveAdoptionCommentId(activeAdoptionCommentId === pet.id ? null : pet.id)}
+                                    className={`flex items-center gap-1.5 font-bold text-sm transition-colors ${
+                                      activeAdoptionCommentId === pet.id ? 'text-pink-500' : 'text-gray-500 hover:text-gray-700'
+                                    }`}
+                                  >
+                                    <MessageCircle className="w-6 h-6" />
+                                  </button>
+                                  {/* Share button */}
                                   <button
                                     onClick={async () => {
                                       if (navigator.share) {
@@ -8568,9 +8985,86 @@ export default function App() {
                                     }}
                                     className="flex items-center gap-1.5 text-gray-500 font-bold text-sm hover:text-gray-700 transition-colors"
                                   >
-                                    <Share2 className="w-5 h-5" />
-                                    Compartilhar
+                                    <Share2 className="w-6 h-6" />
                                   </button>
+                                  
+                                  <div className={`ml-auto flex items-center gap-1.5 font-bold text-sm ${adoptionTab === 'available' ? 'text-green-600' : 'text-gray-500'}`}>
+                                    <CheckCircle2 className="w-5 h-5" />
+                                    {adoptionTab === 'available' ? 'Disponível' : 'Adotado'}
+                                  </div>
+                                </div>
+
+                                {/* Like count */}
+                                {(pet.likes?.length || 0) > 0 && (
+                                  <p className="font-bold text-gray-900 text-sm px-4 pb-1">{(pet.likes?.length || 0)} curtida{(pet.likes?.length || 0) !== 1 ? 's' : ''}</p>
+                                )}
+
+                                {/* ── Caption ── */}
+                                <div className="px-4 pb-1 space-y-1">
+                                  <p className="text-sm text-gray-800 font-medium leading-snug">
+                                    <span className="font-black text-gray-900">{pet.name}</span>{' '}
+                                    <span className="text-gray-600 font-bold">({pet.breed} • {pet.gender} • {pet.age || 'Idade desconhecida'})</span>{' '}
+                                    {pet.description}
+                                  </p>
+                                  
+                                  {/* Comments */}
+                                  {(pet.comments?.length || 0) > 0 && (
+                                    <div className="pt-1 space-y-0.5">
+                                      {(pet.comments?.length || 0) > 2 && (
+                                        <button
+                                          onClick={() => setActiveAdoptionCommentId(pet.id)}
+                                          className="text-gray-400 text-xs font-medium hover:text-gray-600 transition-colors"
+                                        >
+                                          Ver todos os {pet.comments?.length} comentários
+                                        </button>
+                                      )}
+                                      {(pet.comments || []).slice(-2).map(c => (
+                                        <p key={c.id} className="text-sm text-gray-800">
+                                          <span className="font-bold">{c.userName}</span>{' '}{c.content}
+                                        </p>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Comment input */}
+                                {activeAdoptionCommentId === pet.id && user && (
+                                  <div className="px-4 pb-3 pt-1 flex items-center gap-2 border-t border-gray-50 mt-1">
+                                    <input
+                                      type="text"
+                                      placeholder="Adicionar um comentário..."
+                                      value={adoptionCommentText}
+                                      onChange={e => setAdoptionCommentText(e.target.value)}
+                                      onKeyDown={e => {
+                                        if (e.key === 'Enter' && adoptionCommentText.trim()) {
+                                          handleCommentAdoption(pet.id, adoptionCommentText);
+                                          setAdoptionCommentText('');
+                                          setActiveAdoptionCommentId(null);
+                                        }
+                                      }}
+                                      autoFocus
+                                      className="flex-1 text-sm bg-gray-50 rounded-full px-4 py-2 outline-none border border-gray-200 focus:border-pink-400 transition-all"
+                                    />
+                                    <button
+                                      onClick={() => {
+                                        if (adoptionCommentText.trim()) {
+                                          handleCommentAdoption(pet.id, adoptionCommentText);
+                                          setAdoptionCommentText('');
+                                          setActiveAdoptionCommentId(null);
+                                        }
+                                      }}
+                                      disabled={!adoptionCommentText.trim()}
+                                      className="text-pink-500 font-bold text-sm disabled:opacity-40 transition-opacity"
+                                    >
+                                      Publicar
+                                    </button>
+                                  </div>
+                                )}
+
+                                <div className="px-4 pb-4 pt-1 flex items-center justify-between">
+                                  <p className="text-[11px] text-gray-400 font-medium">
+                                    {pet.createdAt ? new Date(pet.createdAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : 'Recentemente'}
+                                  </p>
                                   {adoptionTab === 'available' && (
                                     <button
                                       onClick={() => {
@@ -8578,24 +9072,12 @@ export default function App() {
                                         if (!phone) { alert('Este pet não possui telefone de contato.'); return; }
                                         window.open(`https://wa.me/55${phone}?text=${encodeURIComponent(`Olá! Queria falar sobre a adoção do ${pet.name}.`)}`, '_blank');
                                       }}
-                                      className="ml-auto flex items-center gap-1.5 text-pink-600 font-bold text-sm hover:text-pink-700 transition-colors"
+                                      className="flex items-center gap-1.5 text-pink-600 font-bold text-sm hover:text-pink-700 transition-colors bg-pink-50 px-3 py-1.5 rounded-full"
                                     >
-                                      <MessageCircle className="w-5 h-5" />
-                                      Adotar
+                                      <MessageCircle className="w-4 h-4" />
+                                      Quero Adotar
                                     </button>
                                   )}
-                                </div>
-
-                                {/* ── Caption ── */}
-                                <div className="px-4 pb-4 pt-1 space-y-2">
-                                  <p className="text-sm text-gray-800 font-medium leading-snug">
-                                    <span className="font-black text-gray-900">{pet.name}</span>{' '}
-                                    <span className="text-gray-600 font-bold">({pet.breed} • {pet.gender} • {pet.age || 'Idade desconhecida'})</span>{' '}
-                                    {pet.description}
-                                  </p>
-                                  <p className="text-[11px] text-gray-400 font-medium pt-1">
-                                    {pet.createdAt ? new Date(pet.createdAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : 'Recentemente'}
-                                  </p>
                                 </div>
                               </div>
                             )) : (
@@ -10939,15 +11421,21 @@ export default function App() {
             <div className="absolute inset-0 z-[150] bg-[#FFF8F0] flex flex-col overflow-y-auto">
               {/* Header */}
               <div className="relative pt-6 px-6 pb-6 bg-white border-b border-gray-100">
-                <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-r from-orange-400 via-pink-500 to-pink-500 rounded-b-[2rem]"></div>
+                <div className="absolute top-0 left-0 right-0 h-32 rounded-b-[2rem] overflow-hidden">
+                  {viewingProfileDetails?.coverUrl || viewingProfile?.coverUrl ? (
+                    <img src={viewingProfileDetails?.coverUrl || viewingProfile?.coverUrl} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-r from-orange-400 via-pink-500 to-pink-500"></div>
+                  )}
+                </div>
                 <button
                   onClick={() => setViewingProfile(null)}
-                  className="absolute top-6 left-6 p-2 bg-white/20 backdrop-blur-sm rounded-full text-white hover:bg-white/30 z-10"
+                  className="absolute top-6 left-6 p-2 bg-black/20 backdrop-blur-sm rounded-full text-white hover:bg-black/30 z-50 cursor-pointer"
                 >
                   <ChevronLeft className="w-5 h-5" />
                 </button>
 
-                <div className="relative z-10 pt-16">
+                <div className="relative z-10 pt-20">
                   <div className="flex items-end gap-4 mb-3">
                     <div className="w-[100px] h-[100px] rounded-full overflow-hidden border-4 border-white bg-white shrink-0 relative shadow-sm">
                       {viewingProfile.photoUrl ? (
@@ -10959,7 +11447,7 @@ export default function App() {
                       )}
                     </div>
                     
-                    <div className="flex-1 pb-2">
+                    <div className="flex-1 pb-0 mb-1">
                       <h2 className="text-2xl font-bold text-gray-900 leading-tight">
                         {viewingProfile.name}
                       </h2>
@@ -11056,12 +11544,12 @@ export default function App() {
                           {!isFriendStatus && (
                             <button
                               onClick={() => {
-                                 window.alert('Funcionalidade "Meus Pets" em desenvolvimento para perfis públicos.');
+                                 setShowViewingProfilePets(true);
                               }}
                               className="flex-1 bg-[#E4E6EB] hover:bg-[#D8DADF] text-gray-900 font-semibold py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors active:scale-[0.98]"
                             >
                               <Dog className="w-5 h-5" />
-                              Meus Pets
+                              Ver Pets
                             </button>
                           )}
                           {FriendBtn}
@@ -11142,7 +11630,7 @@ export default function App() {
                                   <button onClick={() => handleLikePost(post.id)} className={`transition-colors ${post.likes?.includes(user?.id || '') ? 'text-red-500' : 'text-gray-800'}`}>
                                      <Heart className={`w-7 h-7 ${post.likes?.includes(user?.id || '') ? 'fill-red-500' : ''}`} />
                                   </button>
-                                  <button className="text-gray-800">
+                                  <button onClick={() => setViewingCommentsPostId(post.id)} className="text-gray-800">
                                      <MessageCircle className="w-7 h-7" />
                                   </button>
                                   <button className="text-gray-800">
@@ -11160,6 +11648,196 @@ export default function App() {
                 </div>
               </div>
             </div>
+          )}
+        </AnimatePresence>
+
+        {/* ── Comments Modal (Instagram style) ── */}
+        <AnimatePresence>
+          {viewingCommentsPostId && (
+            <motion.div
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="fixed inset-0 z-[170] bg-[#FFF8F0] flex flex-col"
+            >
+              <div className="px-4 pt-12 pb-4 flex items-center justify-between sticky top-0 z-10 bg-white border-b border-gray-100">
+                <div className="flex items-center gap-2">
+                  <button onClick={() => setViewingCommentsPostId(null)} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+                    <ChevronLeft className="w-6 h-6 text-gray-900" />
+                  </button>
+                  <span className="font-bold text-gray-900 text-lg">Comentários</span>
+                </div>
+                <div className="w-10"></div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto px-4 py-4 space-y-5">
+                {(() => {
+                  const post = posts.find(p => p.id === viewingCommentsPostId);
+                  if (!post || !post.comments || post.comments.length === 0) {
+                    return (
+                      <div className="flex flex-col items-center justify-center py-20 text-center gap-3">
+                         <MessageCircle className="w-12 h-12 text-gray-200" />
+                         <div>
+                            <p className="text-gray-900 font-bold text-lg">Nenhum comentário ainda.</p>
+                            <p className="text-gray-400 text-sm">Seja o primeiro a comentar!</p>
+                         </div>
+                      </div>
+                    );
+                  }
+                  
+                  return post.comments.map(c => {
+                    const isOwner = c.userId === user?.id;
+                    const canEdit = isOwner && (Date.now() - new Date(c.createdAt).getTime() < 2 * 60 * 60 * 1000); // 2 hours
+                    return (
+                      <div key={c.id} className="flex gap-3 group">
+                        <div className="w-9 h-9 rounded-full overflow-hidden shrink-0 bg-gray-100 border border-gray-200">
+                           <img src={c.userPhoto || 'https://picsum.photos/seed/user/100/100'} className="w-full h-full object-cover" alt="User" />
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-[14px]">
+                            <span className="font-bold text-gray-900 mr-2">{c.userName}</span>
+                            <span className="text-gray-800">{c.content}</span>
+                          </p>
+                          <div className="flex items-center gap-4 mt-1">
+                            <span className="text-[12px] text-gray-400 font-medium">
+                              {new Date(c.createdAt).toLocaleDateString('pt-BR', { day: 'numeric', month: 'short' })}
+                            </span>
+                            <button className="text-[12px] text-gray-500 font-bold hover:text-gray-800 transition-colors">Responder</button>
+                            {isOwner && (
+                              <div className="flex items-center gap-3">
+                                {canEdit && (
+                                  <button onClick={() => { setEditingComment({ postId: post.id, commentId: c.id, text: c.content }); setViewingCommentsPostId(null); }} className="text-gray-400 hover:text-blue-500 transition-colors">
+                                    <Edit2 className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                                <button onClick={() => handleDeleteComment(post.id, c.id)} className="text-gray-400 hover:text-red-500 transition-colors">
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <button className="self-center p-2 text-gray-300 hover:text-red-500 transition-colors">
+                          <Heart className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+
+              {/* Input area */}
+              <div className="px-4 py-3 bg-white border-t border-gray-100 flex items-center gap-3 shrink-0 mb-6">
+                <div className="w-10 h-10 rounded-full overflow-hidden shrink-0 bg-gray-100">
+                  <img src={ownerProfile?.photoUrl || 'https://picsum.photos/seed/user/100/100'} className="w-full h-full object-cover" alt="Me" />
+                </div>
+                <div className="flex-1 relative">
+                  <input
+                    type="text"
+                    value={commentText}
+                    onChange={(e) => setCommentText(e.target.value)}
+                    onKeyPress={async (e) => {
+                      if (e.key === 'Enter') {
+                        if (!commentText.trim()) return;
+                        if (editingComment) {
+                          await handleEditComment(editingComment.postId, editingComment.commentId, commentText.trim());
+                        } else if (viewingCommentsPostId) {
+                          await handleCommentSubmit(viewingCommentsPostId);
+                        }
+                        setCommentText('');
+                      }
+                    }}
+                    placeholder="Adicione um comentário..."
+                    className="w-full bg-gray-50 border border-gray-200 rounded-full pl-4 pr-12 py-2.5 text-[14px] text-gray-900 focus:outline-none focus:border-orange-300 transition-colors"
+                  />
+                  <button
+                    onClick={async () => {
+                      if (!commentText.trim()) return;
+                      if (editingComment) {
+                        await handleEditComment(editingComment.postId, editingComment.commentId, commentText.trim());
+                      } else if (viewingCommentsPostId) {
+                        await handleCommentSubmit(viewingCommentsPostId);
+                      }
+                      setCommentText('');
+                    }}
+                    disabled={!commentText.trim()}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-orange-500 disabled:text-orange-200 transition-colors"
+                  >
+                    <Send className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* ── Viewing Profile Pets Modal ── */}
+        <AnimatePresence>
+          {showViewingProfilePets && viewingProfile && (
+            <motion.div
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="absolute inset-0 z-[160] bg-[#F9F7F3] flex flex-col"
+            >
+              <div className="px-6 pt-12 pb-4 flex items-center justify-between sticky top-0 z-10 bg-[#F9F7F3]">
+                <button onClick={() => setShowViewingProfilePets(false)} className="flex items-center gap-2 text-gray-900 font-medium text-[17px]">
+                  <ChevronLeft className="w-5 h-5 -ml-1" /> Voltar
+                </button>
+                <span className="font-bold text-gray-800">Pets de {viewingProfile.name}</span>
+                <div className="w-8"></div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto px-4 py-2 space-y-4">
+                {viewingProfilePets.length === 0 ? (
+                  <div className="text-center py-10 bg-white rounded-3xl border border-gray-100">
+                    <p className="text-gray-500 font-medium">Nenhum pet encontrado.</p>
+                  </div>
+                ) : (
+                  viewingProfilePets.map(pet => {
+                    const isMale = pet.gender === 'Macho';
+
+                    return (
+                      <div
+                        key={pet.id}
+                        onClick={() => { setSelectedPet(pet); setView('profile'); setShowViewingProfilePets(false); setViewingProfile(null); }}
+                        className="bg-white rounded-[1.2rem] p-4 flex items-center gap-4 shadow-[0_2px_15px_-4px_rgba(0,0,0,0.05)] cursor-pointer hover:shadow-md transition-shadow"
+                      >
+                        <div className="w-[60px] h-[60px] rounded-full overflow-hidden shrink-0 bg-gray-50 border-2 border-white shadow-sm">
+                          {pet.photoUrl ? (
+                            <img src={pet.photoUrl} alt={pet.name} className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <Dog className="w-8 h-8 text-gray-300" />
+                            </div>
+                          )}
+                        </div>
+                        
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-bold text-[17px] text-gray-900 leading-tight mb-0.5 truncate">{pet.name}</h3>
+                          <div className="flex items-center gap-1.5 text-gray-500 text-[14px] mb-1 font-medium truncate">
+                            <span className="text-orange-500">
+                              {pet.breed || 'Sem raça definida'}
+                            </span>
+                          </div>
+                        </div>
+                        
+                        <div className="shrink-0 flex items-center gap-1.5 bg-gray-50 px-2.5 py-1.5 rounded-xl">
+                          {isMale ? (
+                            <svg viewBox="0 0 24 24" className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M11 11a5 5 0 100-10 5 5 0 000 10zM21 21l-4.35-4.35M15 15l6 6M21 15v6h-6" /></svg>
+                          ) : (
+                            <svg viewBox="0 0 24 24" className="w-4 h-4 text-pink-500" fill="none" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 15a5 5 0 100-10 5 5 0 000 10zM12 15v6M9 18h6" /></svg>
+                          )}
+                          <span className="text-[13px] font-bold text-gray-600">{isMale ? 'Macho' : 'Fêmea'}</span>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </motion.div>
           )}
         </AnimatePresence>
 
