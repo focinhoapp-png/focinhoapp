@@ -796,8 +796,8 @@ function SOSAlertCard({ alert, user, onEdit, onFound, onShare, onOpenFinder, isT
   return (
     <div className="bg-white overflow-hidden mb-0 flex flex-col">
       {/* ── Header ── */}
-      <div className="flex items-center justify-between px-3 py-2.5 bg-white">
-        <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between px-2 py-2.5 bg-white">
+        <div className="flex items-center gap-2">
           <div className="relative">
             {alert.ownerPhotoUrl ? (
               <img src={alert.ownerPhotoUrl} alt="Tutor" className="w-8 h-8 rounded-full object-cover cursor-pointer flex-shrink-0" />
@@ -825,15 +825,19 @@ function SOSAlertCard({ alert, user, onEdit, onFound, onShare, onOpenFinder, isT
           </div>
         </div>
 
-        {/* 3-dot menu — only for owner */}
-        {user && alert.ownerId === user.id && (
-          <div className="relative">
-            <button
-              onClick={() => setMenuOpen(v => !v)}
-              className="p-2 rounded-full hover:bg-gray-100 transition-colors"
-            >
-              <MoreVertical className="w-5 h-5 text-gray-500" />
-            </button>
+        <div className="flex items-center gap-2">
+          {user && alert.ownerId !== user.id && (
+            <button className="bg-gray-100 text-gray-900 text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-gray-200 transition-colors">Adicionar</button>
+          )}
+          {/* 3-dot menu — only for owner */}
+          {user && alert.ownerId === user.id ? (
+            <div className="relative">
+              <button
+                onClick={() => setMenuOpen(v => !v)}
+                className="p-1 rounded-full hover:bg-gray-100 transition-colors"
+              >
+                <MoreVertical className="w-5 h-5 text-gray-500" />
+              </button>
             {menuOpen && (
               <>
                 <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
@@ -854,7 +858,12 @@ function SOSAlertCard({ alert, user, onEdit, onFound, onShare, onOpenFinder, isT
               </>
             )}
           </div>
-        )}
+          ) : (
+            <button className="p-1 rounded-full hover:bg-gray-100 transition-colors opacity-0 cursor-default pointer-events-none">
+              <MoreVertical className="w-5 h-5 text-gray-500" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* ── Caption ── */}
@@ -887,7 +896,7 @@ function SOSAlertCard({ alert, user, onEdit, onFound, onShare, onOpenFinder, isT
       {isTimeline ? (
         /* Timeline mode: like, comment, share, see alert */
         <>
-          <div className="flex items-center gap-4 px-3 pt-2 pb-1">
+          <div className="flex items-center gap-4 px-2 pt-2 pb-1">
             <button
               onClick={onLike}
               className={`flex items-center gap-1.5 font-bold text-sm transition-all active:scale-90 ${
@@ -1042,8 +1051,8 @@ function AdoptionTimelineCard({ pet, user, onShare, onLike, onComment, onOpenPro
   return (
     <div className="bg-white overflow-hidden mb-0 flex flex-col">
       {/* ── Header ── */}
-      <div className="flex items-center justify-between px-3 py-2.5 bg-white">
-        <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between px-2 py-2.5 bg-white">
+        <div className="flex items-center gap-2">
           <div className="relative">
             {pet.ownerPhotoUrl ? (
               <img src={pet.ownerPhotoUrl} alt="Tutor" className="w-8 h-8 rounded-full object-cover cursor-pointer flex-shrink-0" />
@@ -1070,6 +1079,14 @@ function AdoptionTimelineCard({ pet, user, onShare, onLike, onComment, onOpenPro
             </p>
           </div>
         </div>
+        <div className="flex items-center gap-2">
+          {user && pet.ownerId !== user.id && (
+            <button className="bg-gray-100 text-gray-900 text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-gray-200 transition-colors">Adicionar</button>
+          )}
+          <button className="p-1 rounded-full hover:bg-gray-100 transition-colors">
+            <MoreVertical className="w-5 h-5 text-gray-500" />
+          </button>
+        </div>
       </div>
 
       {/* ── Photo ── */}
@@ -1081,7 +1098,7 @@ function AdoptionTimelineCard({ pet, user, onShare, onLike, onComment, onOpenPro
       </div>
 
       {/* ── Action buttons ── */}
-      <div className="flex items-center gap-4 px-3 pt-2 pb-1">
+      <div className="flex items-center gap-4 px-2 pt-2 pb-1">
         <button
           onClick={onLike}
           className={`flex items-center gap-1.5 font-bold text-sm transition-all active:scale-90 ${
@@ -5183,8 +5200,8 @@ export default function App() {
                             return (
                                <div key={`post-${post.id}-${idx}`} className="bg-white overflow-hidden mb-0 flex flex-col">
                                   {/* Header */}
-                                  <div className="flex items-center justify-between px-3 py-2.5 bg-white">
-                                    <div className="flex items-center gap-3">
+                                  <div className="flex items-center justify-between px-2 py-2.5 bg-white">
+                                    <div className="flex items-center gap-2">
                                       <div className="relative">
                                         <div
                                           className="w-8 h-8 rounded-full overflow-hidden cursor-pointer flex-shrink-0"
@@ -5236,11 +5253,14 @@ export default function App() {
                                         </p>
                                       </div>
                                     </div>
-                                    {(isAdmin || post.userId === user?.id) && (
+                                    <div className="flex items-center gap-2">
+                                      {post.userId !== user?.id && (
+                                        <button className="bg-gray-100 text-gray-900 text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-gray-200 transition-colors">Adicionar</button>
+                                      )}
                                       <div className="relative">
                                         <button 
                                           onClick={() => setOpenMenuId(openMenuId === `post-${post.id}` ? null : `post-${post.id}`)}
-                                          className="p-2 text-gray-400 hover:text-gray-600 transition-colors rounded-full hover:bg-gray-50"
+                                          className="p-1 text-gray-400 hover:text-gray-600 transition-colors rounded-full hover:bg-gray-50"
                                         >
                                           <MoreVertical className="w-5 h-5" />
                                         </button>
@@ -5277,7 +5297,7 @@ export default function App() {
                                           </>
                                         )}
                                       </div>
-                                    )}
+                                    </div>
                                   </div>
 
                                   {/* Caption */}
@@ -5293,7 +5313,7 @@ export default function App() {
                                   </div>
 
                                   {/* Actions & Date */}
-                                  <div className="flex flex-col gap-2 px-4 pt-3 pb-4">
+                                  <div className="flex flex-col gap-2 px-2 pt-2 pb-4">
                                      <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-4">
                                            <button onClick={() => handleLikePost(post.id)} className={`transition-colors ${post.likes?.includes(user?.id || '') ? 'text-red-500' : 'text-gray-800 hover:text-gray-500'}`}>
