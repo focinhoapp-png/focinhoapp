@@ -8964,11 +8964,13 @@ export default function App() {
                                       
                                     </div>
                                     <div>
-                                      <h4 className="font-bold text-gray-900 text-sm flex items-center gap-1">
-                                        {pet.ownerUsername || pet.ownerName || 'Tutor do Pet'}
-                                        
-                                      </h4>
-                                      <p className="text-[10px] text-gray-500 font-bold">
+                                      <p className="text-[14px] text-gray-900 leading-tight">
+                                        <span className="font-bold">{pet.ownerUsername || pet.ownerName || 'Tutor do Pet'}</span> busca um lar pra{' '}
+                                        <button onClick={() => { setAdoptionFocusPet(pet.id); setLightboxImage(null); }} className="font-bold text-gray-900 hover:underline">
+                                          {pet.name}
+                                        </button>
+                                      </p>
+                                      <p className="text-[12px] text-gray-500 font-medium leading-tight mt-0.5">
                                         {pet.city || 'Desconhecido'}
                                       </p>
                                     </div>
