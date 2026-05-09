@@ -4645,7 +4645,7 @@ export default function App() {
           </header>
         )}
 
-        <main className="max-w-xl mx-auto p-4 md:p-6 pb-40">
+        <main className="max-w-xl mx-auto pt-4 pb-40 md:pt-6">
           <AnimatePresence mode="wait">
             {/* Install PWA Tutorial Page */}
             {view === 'install_pwa' && (
@@ -4654,7 +4654,7 @@ export default function App() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
-                className="flex flex-col max-w-sm mx-auto space-y-5 pt-8 pb-12"
+                className="flex flex-col max-w-sm mx-auto px-4 space-y-5 pt-8 pb-12"
               >
                 <div className="flex flex-col items-center text-center space-y-3 mb-2">
                   <div className="w-20 h-20 bg-white rounded-3xl shadow-xl p-1 flex items-center justify-center">
@@ -4938,7 +4938,7 @@ export default function App() {
                 className="space-y-6"
               >
                 {(isFetchingOwnerProfile || isFetchingUserPets) ? (
-                  <div className="flex flex-col items-center justify-center py-32 opacity-50">
+                  <div className="flex flex-col items-center justify-center py-32 px-4 opacity-50">
                     <Loader2 className="w-8 h-8 text-orange-500 animate-spin mb-4" />
                     <p className="text-gray-500 font-medium">Sincronizando seus dados...</p>
                   </div>
@@ -4947,7 +4947,7 @@ export default function App() {
 
 
                 {/* ── Pet Selector Row ─────────────────────────── */}
-                <div className="mb-2">
+                <div className="mb-2 px-4">
                   <div className="flex gap-5 overflow-x-auto pb-3 pt-3 px-2 no-scrollbar items-start">
                     <Reorder.Group as="div" axis="x" values={userPets} onReorder={handleReorderPets} className="flex gap-5 items-start">
                       {userPets.map((pet, index) => {
@@ -5062,7 +5062,7 @@ export default function App() {
 
                 {/* ── Quick Actions ─────────────────────────────── */}
                 {userPets.length > 0 && (
-                  <div className="mb-2 flex flex-col gap-5">
+                  <div className="mb-2 flex flex-col gap-5 px-4">
                     
                     {/* App Features Grid */}
                     <div className="grid grid-cols-4 gap-3 px-1">
@@ -5116,8 +5116,12 @@ export default function App() {
                     {/* Eventos Destacados pelo Admin */}
                     <MyEventsCarousel />
 
-                    {/* Timeline Feed (Alerts + Adoptions) */}
-                    <div className="flex flex-col">
+                  </div>
+                )}
+
+                {/* Timeline Feed — edge-to-edge like Instagram */}
+                {userPets.length > 0 && (
+                  <div className="flex flex-col">
                       
                       {(() => {
                         // Merge and sort alerts and available adoptions
@@ -5408,7 +5412,6 @@ export default function App() {
                         });
                       })()}
                     </div>
-                  </div>
                 )}
                 <div className="h-20" /> {/* Spacer */}
 
