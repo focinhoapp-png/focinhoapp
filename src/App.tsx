@@ -794,15 +794,15 @@ function SOSAlertCard({ alert, user, onEdit, onFound, onShare, onOpenFinder, isT
   };
 
   return (
-    <div className="bg-white border border-gray-100 rounded-[2rem] overflow-hidden shadow-sm">
+    <div className="bg-white overflow-hidden mb-0 flex flex-col">
       {/* ── Header ── */}
-      <div className="flex items-center justify-between px-4 py-3">
+      <div className="flex items-center justify-between px-3 py-2.5 bg-white">
         <div className="flex items-center gap-3">
           <div className="relative">
             {alert.ownerPhotoUrl ? (
-              <img src={alert.ownerPhotoUrl} alt="Tutor" className="w-10 h-10 rounded-full object-cover border border-gray-100" />
+              <img src={alert.ownerPhotoUrl} alt="Tutor" className="w-8 h-8 rounded-full object-cover cursor-pointer flex-shrink-0" />
             ) : (
-              <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center border border-red-100">
+              <div className="w-8 h-8 rounded-full bg-red-50 flex items-center justify-center">
                 <UserIcon className="w-5 h-5 text-red-300" />
               </div>
             )}
@@ -860,7 +860,7 @@ function SOSAlertCard({ alert, user, onEdit, onFound, onShare, onOpenFinder, isT
       </div>
 
       {/* ── Caption ── */}
-      <div className="px-4 pb-3 space-y-1">
+      <div className="px-3 pb-1">
         <p className="text-sm text-gray-800 font-medium leading-relaxed">
           Visto por último em: <span className="text-gray-600">{alert.lastSeen}</span>
         </p>
@@ -870,7 +870,7 @@ function SOSAlertCard({ alert, user, onEdit, onFound, onShare, onOpenFinder, isT
       </div>
 
       {/* ── Full-width photo ── */}
-      <div className="w-full aspect-square bg-gray-100 relative">
+      <div className="w-full bg-gray-100 relative" style={{aspectRatio:"9/16"}}>
         {mainImage ? (
           <img src={mainImage} alt={alert.petName} className="w-full h-full object-cover" />
         ) : (
@@ -889,14 +889,14 @@ function SOSAlertCard({ alert, user, onEdit, onFound, onShare, onOpenFinder, isT
       {isTimeline ? (
         /* Timeline mode: like, comment, share, see alert */
         <>
-          <div className="flex items-center gap-4 px-4 pt-3 pb-1">
+          <div className="flex items-center gap-4 px-3 pt-2 pb-1">
             <button
               onClick={onLike}
               className={`flex items-center gap-1.5 font-bold text-sm transition-all active:scale-90 ${
                 isLiked ? 'text-red-500' : 'text-gray-500 hover:text-gray-700'
               }`}
             >
-              <Heart className={`w-6 h-6 transition-all ${isLiked ? 'fill-red-500 scale-110' : ''}`} />
+              <Heart className={`w-[22px] h-[22px] transition-all ${isLiked ? 'fill-red-500 scale-110' : ''}`} />
             </button>
             <button
               onClick={() => setShowCommentInput(v => !v)}
@@ -904,13 +904,13 @@ function SOSAlertCard({ alert, user, onEdit, onFound, onShare, onOpenFinder, isT
                 showCommentInput ? 'text-orange-500' : 'text-gray-500 hover:text-gray-700'
               }`}
             >
-              <MessageCircle className="w-6 h-6" />
+              <MessageCircle className="w-[22px] h-[22px]" />
             </button>
             <button
               onClick={onShare}
               className="flex items-center gap-1.5 text-gray-500 font-bold text-sm hover:text-gray-700 transition-colors"
             >
-              <Share2 className="w-6 h-6" />
+              <Share2 className="w-[22px] h-[22px]" />
             </button>
             <button
               onClick={onGoToAlerts}
@@ -981,7 +981,7 @@ function SOSAlertCard({ alert, user, onEdit, onFound, onShare, onOpenFinder, isT
               onClick={onFound}
               className="flex items-center gap-1.5 text-green-600 font-bold text-sm hover:text-green-700 transition-colors"
             >
-              <CheckCircle2 className="w-6 h-6" />
+              <CheckCircle2 className="w-[22px] h-[22px]" />
               Encontrado
             </button>
             <button
@@ -1042,15 +1042,15 @@ function AdoptionTimelineCard({ pet, user, onShare, onLike, onComment, onOpenPro
   };
 
   return (
-    <div className="bg-white border border-gray-100 rounded-[2rem] overflow-hidden shadow-sm">
+    <div className="bg-white overflow-hidden mb-0 flex flex-col">
       {/* ── Header ── */}
-      <div className="flex items-center justify-between px-4 py-3">
+      <div className="flex items-center justify-between px-3 py-2.5 bg-white">
         <div className="flex items-center gap-3">
           <div className="relative">
             {pet.ownerPhotoUrl ? (
-              <img src={pet.ownerPhotoUrl} alt="Tutor" className="w-10 h-10 rounded-full object-cover border border-gray-100" />
+              <img src={pet.ownerPhotoUrl} alt="Tutor" className="w-8 h-8 rounded-full object-cover cursor-pointer flex-shrink-0" />
             ) : (
-              <div className="w-10 h-10 rounded-full bg-pink-50 flex items-center justify-center border border-pink-100">
+              <div className="w-8 h-8 rounded-full bg-pink-50 flex items-center justify-center">
                 <UserIcon className="w-5 h-5 text-pink-300" />
               </div>
             )}
@@ -1077,7 +1077,7 @@ function AdoptionTimelineCard({ pet, user, onShare, onLike, onComment, onOpenPro
       </div>
 
       {/* ── Photo ── */}
-      <div className="w-full aspect-square bg-gray-100 relative">
+      <div className="w-full bg-gray-100 relative" style={{aspectRatio:"9/16"}}>
         <img src={pet.photoUrl || 'https://picsum.photos/seed/pet/800/600'} alt={pet.name} className="w-full h-full object-cover" />
         <div className="absolute top-3 left-3 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-[10px] font-black px-3 py-1.5 rounded-full uppercase shadow-lg flex items-center gap-1">
           Para Adoção
@@ -1085,14 +1085,14 @@ function AdoptionTimelineCard({ pet, user, onShare, onLike, onComment, onOpenPro
       </div>
 
       {/* ── Action buttons ── */}
-      <div className="flex items-center gap-4 px-4 pt-3 pb-1">
+      <div className="flex items-center gap-4 px-3 pt-2 pb-1">
         <button
           onClick={onLike}
           className={`flex items-center gap-1.5 font-bold text-sm transition-all active:scale-90 ${
             isLiked ? 'text-pink-500' : 'text-gray-500 hover:text-gray-700'
           }`}
         >
-          <Heart className={`w-6 h-6 transition-all ${isLiked ? 'fill-pink-500 scale-110' : ''}`} />
+          <Heart className={`w-[22px] h-[22px] transition-all ${isLiked ? 'fill-pink-500 scale-110' : ''}`} />
         </button>
         <button
           onClick={() => setShowCommentInput(v => !v)}
@@ -1100,13 +1100,13 @@ function AdoptionTimelineCard({ pet, user, onShare, onLike, onComment, onOpenPro
             showCommentInput ? 'text-pink-500' : 'text-gray-500 hover:text-gray-700'
           }`}
         >
-          <MessageCircle className="w-6 h-6" />
+          <MessageCircle className="w-[22px] h-[22px]" />
         </button>
         <button
           onClick={onShare}
           className="flex items-center gap-1.5 text-gray-500 font-bold text-sm hover:text-gray-700 transition-colors"
         >
-          <Share2 className="w-6 h-6" />
+          <Share2 className="w-[22px] h-[22px]" />
         </button>
         
         {onOpenProfile && (
@@ -4481,7 +4481,7 @@ export default function App() {
 
   return (
     <ErrorBoundary>
-      <div className={`min-h-screen ${!user && view === 'home' ? 'bg-white' : 'bg-gray-50'} font-sans text-gray-900 pb-32 md:pb-0`}>
+      <div className={`min-h-screen bg-white font-sans text-gray-900 pb-32 md:pb-0`}>
 
         {/* ══════════════════════════════════════════
             EVENT INFO PAGE — Full-screen overlay
@@ -4559,7 +4559,7 @@ export default function App() {
               className="p-2 text-black hover:bg-gray-100 rounded-xl flex items-center justify-center transition-colors shrink-0"
               title="Escanear QR Code ou Tag"
             >
-              <QrCode className="w-6 h-6" />
+              <QrCode className="w-[22px] h-[22px]" />
             </button>
 
             {/* Center: name */}
@@ -4583,7 +4583,7 @@ export default function App() {
                 className="p-2 text-black hover:bg-gray-100 rounded-xl flex items-center justify-center transition-colors shrink-0 relative"
                 title="Notificações"
               >
-                <Bell className="w-6 h-6" />
+                <Bell className="w-[22px] h-[22px]" />
                 {(() => {
                   const allIds = [
                     ...lostAlerts.map(a => `sos-${a.id}`),
@@ -4617,7 +4617,7 @@ export default function App() {
                 className="w-10 h-10 bg-orange-50 text-orange-600 rounded-xl flex items-center justify-center hover:bg-orange-100 transition-colors"
                 title="Voltar ao início"
               >
-                <ChevronLeft className="w-6 h-6 -ml-1" />
+                <ChevronLeft className="w-[22px] h-[22px] -ml-1" />
               </button>
             ) : (
               <div className="w-10 h-10" />
@@ -4667,7 +4667,7 @@ export default function App() {
                   <div className="space-y-3">
                     {/* Passo 1: abrir o link */}
                     <div className="flex gap-3 items-start">
-                      <span className="bg-green-100 text-green-600 w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-black shrink-0 mt-0.5">1</span>
+                      <span className="bg-green-100 text-green-600 w-[22px] h-[22px] rounded-full flex items-center justify-center text-[11px] font-black shrink-0 mt-0.5">1</span>
                       <p className="text-[13px] text-gray-600 font-medium leading-snug">
                         Abra o FocinhoApp no Chrome:{' '}
                         <a href="/?login=true" className="text-orange-600 font-black underline underline-offset-2 hover:text-orange-700" target="_self">
@@ -4681,7 +4681,7 @@ export default function App() {
                       'Confirme o nome do app e toque em "Adicionar"',
                     ].map((step, i) => (
                       <div key={i} className="flex gap-3 items-start">
-                        <span className="bg-green-100 text-green-600 w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-black shrink-0 mt-0.5">{i + 2}</span>
+                        <span className="bg-green-100 text-green-600 w-[22px] h-[22px] rounded-full flex items-center justify-center text-[11px] font-black shrink-0 mt-0.5">{i + 2}</span>
                         <p className="text-[13px] text-gray-600 font-medium leading-snug">{step}</p>
                       </div>
                     ))}
@@ -4706,7 +4706,7 @@ export default function App() {
                   <div className="space-y-3">
                     {/* Passo 1: abrir o link */}
                     <div className="flex gap-3 items-start">
-                      <span className="bg-blue-100 text-blue-600 w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-black shrink-0 mt-0.5">1</span>
+                      <span className="bg-blue-100 text-blue-600 w-[22px] h-[22px] rounded-full flex items-center justify-center text-[11px] font-black shrink-0 mt-0.5">1</span>
                       <p className="text-[13px] text-gray-600 font-medium leading-snug">
                         Abra o FocinhoApp no Safari:{' '}
                         <a href="/?login=true" className="text-orange-600 font-black underline underline-offset-2 hover:text-orange-700" target="_self">
@@ -4720,7 +4720,7 @@ export default function App() {
                       'Confirme o nome do app e toque em "Adicionar"',
                     ].map((step, i) => (
                       <div key={i} className="flex gap-3 items-start">
-                        <span className="bg-blue-100 text-blue-600 w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-black shrink-0 mt-0.5">{i + 2}</span>
+                        <span className="bg-blue-100 text-blue-600 w-[22px] h-[22px] rounded-full flex items-center justify-center text-[11px] font-black shrink-0 mt-0.5">{i + 2}</span>
                         <p className="text-[13px] text-gray-600 font-medium leading-snug">{step}</p>
                       </div>
                     ))}
@@ -4992,7 +4992,7 @@ export default function App() {
                                   e.stopPropagation();
                                   window.open(`${window.location.origin}/?tag=${pet.tagId}`, '_blank');
                                 }}
-                                className="absolute -bottom-1 -right-1 w-6 h-6 bg-orange-500 rounded-full flex items-center justify-center shadow-md border-2 border-white hover:bg-orange-600 transition-colors"
+                                className="absolute -bottom-1 -right-1 w-[22px] h-[22px] bg-orange-500 rounded-full flex items-center justify-center shadow-md border-2 border-white hover:bg-orange-600 transition-colors"
                                 title={`Ver perfil público — ID: ${pet.tagId}`}
                               >
                                 <QrCode className="w-3 h-3 text-white" />
@@ -5058,7 +5058,7 @@ export default function App() {
                         className="bg-white py-3 px-1 rounded-[1.5rem] border border-gray-100 flex flex-col items-center text-center gap-2 cursor-pointer hover:border-orange-200 transition-all shadow-sm active:scale-95"
                       >
                         <div className="w-12 h-12 bg-orange-50 rounded-[1rem] flex items-center justify-center">
-                          <Heart className="w-6 h-6 text-orange-500" />
+                          <Heart className="w-[22px] h-[22px] text-orange-500" />
                         </div>
                         <span className="text-[10px] font-black text-gray-700 leading-tight tracking-tight">Adoção</span>
                       </div>
@@ -5068,7 +5068,7 @@ export default function App() {
                         className="bg-white py-3 px-1 rounded-[1.5rem] border border-gray-100 flex flex-col items-center text-center gap-2 cursor-pointer hover:border-emerald-200 transition-all shadow-sm active:scale-95"
                       >
                         <div className="w-12 h-12 bg-emerald-50 rounded-[1rem] flex items-center justify-center">
-                          <HeartHandshake className="w-6 h-6 text-emerald-500" />
+                          <HeartHandshake className="w-[22px] h-[22px] text-emerald-500" />
                         </div>
                         <span className="text-[10px] font-black text-gray-700 leading-tight tracking-tight">Parceiros</span>
                       </div>
@@ -5078,7 +5078,7 @@ export default function App() {
                         className="bg-white py-3 px-1 rounded-[1.5rem] border border-gray-100 flex flex-col items-center text-center gap-2 cursor-pointer hover:border-blue-200 transition-all shadow-sm active:scale-95 relative"
                       >
                         <div className="w-12 h-12 bg-blue-50 rounded-[1rem] flex items-center justify-center">
-                          <Calendar className="w-6 h-6 text-blue-500" />
+                          <Calendar className="w-[22px] h-[22px] text-blue-500" />
                         </div>
                         <span className="text-[10px] font-black text-gray-700 leading-tight tracking-tight">Eventos</span>
                       </div>
@@ -5088,7 +5088,7 @@ export default function App() {
                         className="bg-white py-3 px-1 rounded-[1.5rem] border border-gray-100 flex flex-col items-center text-center gap-2 cursor-pointer hover:border-indigo-200 transition-all shadow-sm active:scale-95"
                       >
                         <div className="w-12 h-12 bg-indigo-50 rounded-[1rem] flex items-center justify-center">
-                          <ShoppingBag className="w-6 h-6 text-indigo-500" />
+                          <ShoppingBag className="w-[22px] h-[22px] text-indigo-500" />
                         </div>
                         <span className="text-[10px] font-black text-gray-700 leading-tight tracking-tight">Lojinha</span>
                       </div>
@@ -5104,7 +5104,7 @@ export default function App() {
                     <MyEventsCarousel />
 
                     {/* Timeline Feed (Alerts + Adoptions) */}
-                    <div className="space-y-6">
+                    <div className="flex flex-col">
                       
                       {(() => {
                         // Merge and sort alerts and available adoptions
@@ -5185,13 +5185,13 @@ export default function App() {
                           } else if (item.type === 'post') {
                             const post = item.data;
                             return (
-                               <div key={`post-${post.id}-${idx}`} className="bg-white rounded-[2rem] overflow-hidden shadow-sm border border-gray-100 mb-6 flex flex-col">
+                               <div key={`post-${post.id}-${idx}`} className="bg-white overflow-hidden mb-0 flex flex-col">
                                   {/* Header */}
-                                  <div className="flex items-center justify-between p-4 bg-white/50 backdrop-blur-sm z-10 w-full rounded-t-[2rem]">
+                                  <div className="flex items-center justify-between px-3 py-2.5 bg-white">
                                     <div className="flex items-center gap-3">
                                       <div className="relative">
                                         <div
-                                          className={`w-10 h-10 rounded-full border-2 border-orange-100 overflow-hidden bg-gray-50 p-0.5 cursor-pointer`}
+                                          className="w-8 h-8 rounded-full overflow-hidden cursor-pointer flex-shrink-0"
                                           onClick={() => {
                                             if (!user) return;
                                             if (post.userId === user.id) {
@@ -5292,8 +5292,8 @@ export default function App() {
                                   </div>
 
                                   {/* Photo */}
-                                  <div className="w-full aspect-square bg-gray-100 relative">
-                                    <img src={post.imageUrl || 'https://picsum.photos/seed/passeio/800/800'} alt="Passeio" className="w-full h-full object-cover" />
+                                  <div className="w-full bg-gray-100 relative" style={{aspectRatio:"9/16"}}>
+                                    <img src={post.imageUrl} alt="Passeio" className="w-full h-full object-cover" />
                                   </div>
 
                                   {/* Actions & Date */}
@@ -5301,13 +5301,13 @@ export default function App() {
                                      <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-4">
                                            <button onClick={() => handleLikePost(post.id)} className={`transition-colors ${post.likes?.includes(user?.id || '') ? 'text-red-500' : 'text-gray-800 hover:text-gray-500'}`}>
-                                              <Heart className={`w-6 h-6 ${post.likes?.includes(user?.id || '') ? 'fill-red-500' : ''}`} />
+                                              <Heart className={`w-[22px] h-[22px] ${post.likes?.includes(user?.id || '') ? 'fill-red-500' : ''}`} />
                                            </button>
                                            <button onClick={() => setViewingCommentsPostId(post.id)} className="transition-colors text-gray-800 hover:text-gray-500">
-                                              <MessageCircle className="w-6 h-6" />
+                                              <MessageCircle className="w-[22px] h-[22px]" />
                                            </button>
                                            <button className="transition-colors text-gray-800 hover:text-gray-500">
-                                              <Share2 className="w-6 h-6" />
+                                              <Share2 className="w-[22px] h-[22px]" />
                                            </button>
                                         </div>
                                      </div>
@@ -5349,19 +5349,19 @@ export default function App() {
                                        </div>
                                      )}
                                      
-                                     <p className="text-[10px] text-gray-500 mt-1 uppercase tracking-wider">
+                                     <p className="text-[11px] text-gray-400 mt-1 uppercase tracking-wide">
                                        {post.createdAt ? new Date(post.createdAt).toLocaleDateString('pt-BR', { month: 'long', day: 'numeric' }) : 'Recentemente'}
                                      </p>
 
                                      {/* Add Comment Input */}
                                      {(activeCommentPostId === post.id || editingComment?.postId === post.id) && (
-                                       <div className="flex gap-2 mt-3 items-center relative">
+                                       <div className="flex gap-2 mt-2 items-center border-t border-gray-100 pt-2">
                                          <input
                                            type="text"
                                            value={editingComment?.postId === post.id ? editingComment.text : (activeCommentPostId === post.id ? commentText : '')}
                                            onChange={(e) => editingComment?.postId === post.id ? setEditingComment({ ...editingComment, text: e.target.value }) : setCommentText(e.target.value)}
                                            placeholder="Adicione um comentário..."
-                                           className="flex-1 text-sm outline-none placeholder-gray-500 py-1"
+                                           className="flex-1 text-sm outline-none placeholder-gray-400 py-1 bg-transparent"
                                            onKeyDown={(e) => {
                                              if (e.key === 'Enter') {
                                                 if (editingComment?.postId === post.id) {
@@ -5564,7 +5564,7 @@ export default function App() {
                     {/* Header */}
                     <div className="bg-white border-b border-gray-100 px-4 pt-safe-top pb-3 flex items-center gap-3 sticky top-0 z-10 shadow-sm">
                       <button onClick={() => { setView('dashboard'); }} className="p-2 -ml-1">
-                        <ChevronLeft className="w-6 h-6 text-gray-800" />
+                        <ChevronLeft className="w-[22px] h-[22px] text-gray-800" />
                       </button>
                       <h1 className="text-[18px] font-bold text-gray-900 flex-1">Mensagens</h1>
                       <span className="text-xs text-gray-400 font-medium">{conversations.length} conversa{conversations.length !== 1 ? 's' : ''}</span>
@@ -5654,7 +5654,7 @@ export default function App() {
                       {/* Header */}
                       <div className="bg-white border-b border-gray-100 px-3 pb-3 pt-safe-top flex items-center gap-3 sticky top-0 z-10 shadow-sm">
                         <button onClick={() => { setActiveChat(null); loadConversations(); }} className="p-2 -ml-1 shrink-0">
-                          <ChevronLeft className="w-6 h-6 text-gray-800" />
+                          <ChevronLeft className="w-[22px] h-[22px] text-gray-800" />
                         </button>
                         <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-100 border border-gray-200 shrink-0">
                           {other?.photoUrl ? (
@@ -5795,7 +5795,7 @@ export default function App() {
                     onClick={() => setIsAddingReminder(true)}
                     className="p-2 bg-orange-100 text-orange-600 rounded-xl hover:bg-orange-200 transition-colors shadow-sm"
                   >
-                    <Plus className="w-6 h-6" />
+                    <Plus className="w-[22px] h-[22px]" />
                   </button>
                 </div>
 
@@ -5815,7 +5815,7 @@ export default function App() {
                     >
                       <div className="flex items-center gap-4">
                         <div className="w-12 h-12 bg-purple-50 rounded-2xl flex items-center justify-center shadow-sm shrink-0">
-                          <Cake className="w-6 h-6 text-purple-500" />
+                          <Cake className="w-[22px] h-[22px] text-purple-500" />
                         </div>
                         <div>
                           <h4 className="font-black text-sm text-gray-800">Aniversário</h4>
@@ -5931,7 +5931,7 @@ export default function App() {
                           <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${rem.type === 'Saúde' ? 'bg-red-50 text-red-500' :
                               rem.type === 'Medicação' ? 'bg-blue-50 text-blue-500' : 'bg-green-50 text-green-500'
                             }`}>
-                            <Calendar className="w-6 h-6" />
+                            <Calendar className="w-[22px] h-[22px]" />
                           </div>
                           <div className="flex-1">
                             <h4 className="font-bold text-gray-800 text-sm">{rem.title}</h4>
@@ -6068,7 +6068,7 @@ export default function App() {
               >
                 <div className="flex items-center gap-4 mb-2">
                   <button onClick={() => setView('dashboard')} className="p-2 bg-white rounded-xl shadow-sm border border-gray-100">
-                    <ChevronLeft className="w-6 h-6" />
+                    <ChevronLeft className="w-[22px] h-[22px]" />
                   </button>
                   <h2 className="text-2xl font-bold">Passeio</h2>
                 </div>
@@ -6165,7 +6165,7 @@ export default function App() {
                         <div key={walk.id} onClick={() => setWalkSummary(walk)} className="bg-white p-5 rounded-[2rem] border border-gray-100 shadow-sm flex items-center justify-between cursor-pointer hover:border-orange-200 transition-colors">
                           <div className="flex gap-4 items-center">
                             <div className="w-12 h-12 bg-orange-50 rounded-2xl flex items-center justify-center text-orange-500">
-                              <PawPrint className="w-6 h-6" />
+                              <PawPrint className="w-[22px] h-[22px]" />
                             </div>
                             <div>
                               <p className="font-bold text-gray-800">{new Date(walk.startTime).toLocaleDateString('pt-BR')}</p>
@@ -6303,7 +6303,7 @@ export default function App() {
                                       <span className="font-black text-gray-700 block text-lg">{pet.name}</span>
                                     </div>
                                   </div>
-                                  <div className="flex items-center justify-center w-6 h-6 mr-1">
+                                  <div className="flex items-center justify-center w-[22px] h-[22px] mr-1">
                                     <input 
                                       type="checkbox" 
                                       className="w-5 h-5 accent-orange-500 rounded cursor-pointer scale-125 transition-transform"
@@ -6342,7 +6342,7 @@ export default function App() {
                 ) : (
                   <div className="flex-1 flex flex-col gap-6 overflow-y-auto pb-32">
                     {generatedWalkImage ? (
-                      <div className="space-y-6">
+                      <div className="flex flex-col">
                         <div className="bg-white p-4 rounded-[3rem] shadow-2xl border-4 border-orange-100 overflow-hidden">
                           <img src={generatedWalkImage} alt="Resumo do Passeio" className="w-full h-auto rounded-[2rem]" />
                         </div>
@@ -6668,7 +6668,7 @@ export default function App() {
                             const taggedPets = userPets.filter(p => !!p.tagId);
                             if (taggedPets.length === 0) {
                               return (
-                                <div className="space-y-6">
+                                <div className="flex flex-col">
                                   <div className="bg-red-50 border border-red-100 rounded-2xl p-4 text-center space-y-2">
                                     <AlertCircle className="w-8 h-8 text-red-400 mx-auto" />
                                     <p className="text-sm font-bold text-red-600">Nenhum pet com Pingente ativado</p>
@@ -6820,7 +6820,7 @@ export default function App() {
                       onClick={() => setAccountSubView('store')}
                       className="p-5 md:p-6 flex items-center gap-4 hover:bg-gray-50 transition-all text-left border-b border-gray-50 last:border-b-0 relative group"
                     >
-                      <ShoppingBag className="w-6 h-6 text-gray-900 shrink-0 group-hover:scale-110 transition-transform" />
+                      <ShoppingBag className="w-[22px] h-[22px] text-gray-900 shrink-0 group-hover:scale-110 transition-transform" />
                       <div className="flex-1">
                         <h4 className="font-bold text-gray-800">Loja</h4>
                         <p className="text-xs text-gray-400">Acessórios e novas tags</p>
@@ -6832,7 +6832,7 @@ export default function App() {
                       onClick={() => setAccountSubView('family')}
                       className="p-5 md:p-6 flex items-center gap-4 hover:bg-gray-50 transition-all text-left border-b border-gray-50 last:border-b-0 relative group"
                     >
-                      <Users className="w-6 h-6 text-gray-900 shrink-0 group-hover:scale-110 transition-transform" />
+                      <Users className="w-[22px] h-[22px] text-gray-900 shrink-0 group-hover:scale-110 transition-transform" />
                       <div className="flex-1">
                         <h4 className="font-bold text-gray-800">Minha Família</h4>
                         <p className="text-xs text-gray-400">Gerenciar membros e convites</p>
@@ -6844,7 +6844,7 @@ export default function App() {
                       onClick={() => setAccountSubView('adoption')}
                       className="p-5 md:p-6 flex items-center gap-4 hover:bg-gray-50 transition-all text-left border-b border-gray-50 last:border-b-0 relative group"
                     >
-                      <Heart className="w-6 h-6 text-gray-900 shrink-0 group-hover:scale-110 transition-transform" />
+                      <Heart className="w-[22px] h-[22px] text-gray-900 shrink-0 group-hover:scale-110 transition-transform" />
                       <div className="flex-1">
                         <h4 className="font-bold text-gray-800">Adoção</h4>
                         <p className="text-xs text-gray-400">Encontre um novo amigo</p>
@@ -6858,7 +6858,7 @@ export default function App() {
                       className="p-5 md:p-6 flex items-center gap-4 hover:bg-gray-50 transition-all text-left border-b border-gray-50 last:border-b-0 relative group"
                     >
                       <div className="relative">
-                        <Bell className="w-6 h-6 text-gray-900 shrink-0 group-hover:scale-110 transition-transform" />
+                        <Bell className="w-[22px] h-[22px] text-gray-900 shrink-0 group-hover:scale-110 transition-transform" />
                         {reminders.length > 0 && (
                           <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center shadow">
                             {reminders.length > 9 ? '9+' : reminders.length}
@@ -6878,7 +6878,7 @@ export default function App() {
                       onClick={() => setAccountSubView('events')}
                       className="p-5 md:p-6 flex items-center gap-4 hover:bg-gray-50 transition-all text-left border-b border-gray-50 last:border-b-0 relative group"
                     >
-                      <Calendar className="w-6 h-6 text-gray-900 shrink-0 group-hover:scale-110 transition-transform" />
+                      <Calendar className="w-[22px] h-[22px] text-gray-900 shrink-0 group-hover:scale-110 transition-transform" />
                       <div className="flex-1">
                         <h4 className="font-bold text-gray-800">Eventos</h4>
                         <p className="text-xs text-gray-400">Encontros na comunidade</p>
@@ -6890,7 +6890,7 @@ export default function App() {
                       onClick={() => setAccountSubView('partners')}
                       className="p-5 md:p-6 flex items-center gap-4 hover:bg-gray-50 transition-all text-left border-b border-gray-50 last:border-b-0 relative group"
                     >
-                      <Briefcase className="w-6 h-6 text-gray-900 shrink-0 group-hover:scale-110 transition-transform" />
+                      <Briefcase className="w-[22px] h-[22px] text-gray-900 shrink-0 group-hover:scale-110 transition-transform" />
                       <div className="flex-1">
                         <h4 className="font-bold text-gray-800">Parceiros</h4>
                         <p className="text-xs text-gray-400">Apoiam a causa animal</p>
@@ -6915,7 +6915,7 @@ export default function App() {
                           className="p-5 md:p-6 flex items-center gap-4 hover:bg-gray-50 transition-all text-left border-b border-gray-50 last:border-b-0 relative group"
                         >
                           <div className="relative">
-                            <Bell className="w-6 h-6 text-gray-900 shrink-0 group-hover:scale-110 transition-transform" />
+                            <Bell className="w-[22px] h-[22px] text-gray-900 shrink-0 group-hover:scale-110 transition-transform" />
                             {unseenCount > 0 && (
                               <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center shadow">
                                 {unseenCount > 9 ? '9+' : unseenCount}
@@ -6946,7 +6946,7 @@ export default function App() {
                   >
                     <div className="flex items-center gap-4 mb-6">
                       <button onClick={() => setAccountSubView('menu')} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-                        <ChevronLeft className="w-6 h-6 text-gray-600" />
+                        <ChevronLeft className="w-[22px] h-[22px] text-gray-600" />
                       </button>
                       <h2 className="text-2xl font-bold text-gray-800">Minha Família Criada</h2>
                     </div>
@@ -7047,7 +7047,7 @@ export default function App() {
                               >
                                 <div className="flex items-center gap-4 mb-8">
                                   <button onClick={() => setShowInviteModal(false)} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-                                    <ChevronLeft className="w-6 h-6 text-gray-600" />
+                                    <ChevronLeft className="w-[22px] h-[22px] text-gray-600" />
                                   </button>
                                   <h2 className="text-2xl font-bold text-gray-800">Convidar Membros</h2>
                                 </div>
@@ -7143,7 +7143,7 @@ export default function App() {
                 )}
 
                 {accountSubView === 'profile' && (
-                  <div className="space-y-6">
+                  <div className="flex flex-col">
                     <button onClick={() => setAccountSubView('menu')} className="flex items-center gap-2 text-orange-500 font-bold text-sm">
                       <ChevronLeft className="w-4 h-4" /> Voltar ao menu
                     </button>
@@ -7297,7 +7297,7 @@ export default function App() {
                 )}
 
                 {accountSubView === 'partners' && (
-                  <div className="space-y-6">
+                  <div className="flex flex-col">
                     <button onClick={() => setAccountSubView('menu')} className="flex items-center gap-2 text-orange-500 font-bold text-sm">
                       <ChevronLeft className="w-4 h-4" /> Voltar ao menu
                     </button>
@@ -7437,7 +7437,7 @@ export default function App() {
                         onClick={() => setAccountSubView('menu')}
                         className="p-1.5 hover:bg-gray-100 rounded-full transition-colors"
                       >
-                        <ChevronLeft className="w-6 h-6 text-gray-800" />
+                        <ChevronLeft className="w-[22px] h-[22px] text-gray-800" />
                       </button>
                       <h1 className="text-[17px] font-bold text-gray-900">Configurações e atividade</h1>
                     </div>
@@ -7649,7 +7649,7 @@ export default function App() {
                     {/* Header */}
                     <div className="sticky top-0 bg-white/80 backdrop-blur-xl z-10 flex items-center gap-4 px-4 py-4 border-b border-gray-100">
                       <button onClick={() => setAccountSubView('settingsPage')} className="p-1 -ml-1 active:scale-95 transition-transform">
-                        <ChevronLeft className="w-6 h-6 text-gray-800" />
+                        <ChevronLeft className="w-[22px] h-[22px] text-gray-800" />
                       </button>
                       <h1 className="text-[17px] font-bold text-gray-900">Notificações</h1>
                     </div>
@@ -7700,7 +7700,7 @@ export default function App() {
                 )}
 
                 {accountSubView === 'config' && (
-                  <div className="space-y-6">
+                  <div className="flex flex-col">
                     <button onClick={() => setAccountSubView('menu')} className="flex items-center gap-2 text-orange-500 font-bold text-sm">
                       <ChevronLeft className="w-4 h-4" /> Voltar ao menu
                     </button>
@@ -7769,7 +7769,7 @@ export default function App() {
                 )}
 
                 {accountSubView === 'sobre' && (
-                  <div className="space-y-6">
+                  <div className="flex flex-col">
                     <button onClick={() => setAccountSubView('menu')} className="flex items-center gap-2 text-orange-500 font-bold text-sm">
                       <ChevronLeft className="w-4 h-4" /> Voltar ao menu
                     </button>
@@ -7907,14 +7907,14 @@ export default function App() {
                 )}
 
                 {accountSubView === 'support' && (
-                  <div className="space-y-6">
+                  <div className="flex flex-col">
                     <button onClick={() => setAccountSubView('menu')} className="flex items-center gap-2 text-orange-500 font-bold text-sm">
                       <ChevronLeft className="w-4 h-4" /> Voltar ao menu
                     </button>
                     <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 space-y-6">
                       <div className="flex items-center gap-3">
                         <div className="w-12 h-12 bg-green-50 rounded-2xl flex items-center justify-center">
-                          <HelpCircle className="w-6 h-6 text-green-500" />
+                          <HelpCircle className="w-[22px] h-[22px] text-green-500" />
                         </div>
                         <h3 className="font-bold text-xl">Suporte Pingente Inteligente</h3>
                       </div>
@@ -7942,14 +7942,14 @@ export default function App() {
                 )}
 
                 {accountSubView === 'store' && (
-                  <div className="space-y-6">
+                  <div className="flex flex-col">
                     <button onClick={() => setAccountSubView('menu')} className="flex items-center gap-2 text-orange-500 font-bold text-sm">
                       <ChevronLeft className="w-4 h-4" /> Voltar ao menu
                     </button>
                     <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 space-y-6">
                       <div className="flex items-center gap-3">
                         <div className="w-12 h-12 bg-purple-50 rounded-2xl flex items-center justify-center">
-                          <ShoppingBag className="w-6 h-6 text-purple-500" />
+                          <ShoppingBag className="w-[22px] h-[22px] text-purple-500" />
                         </div>
                         <h3 className="font-bold text-xl">Loja FocinhoApp</h3>
                       </div>
@@ -8001,10 +8001,10 @@ export default function App() {
 
                 {/* --- DM Inbox View --- */}
                 {accountSubView === 'messages' && (
-                  <div className="space-y-6">
+                  <div className="flex flex-col">
                     <div className="flex items-center gap-4">
                       <button onClick={() => setAccountSubView('menu')} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-                        <ChevronLeft className="w-6 h-6 text-gray-800" />
+                        <ChevronLeft className="w-[22px] h-[22px] text-gray-800" />
                       </button>
                       <h2 className="text-2xl font-bold text-gray-900">Mensagens</h2>
                     </div>
@@ -8033,7 +8033,7 @@ export default function App() {
                                     <img src={conv.other_user.photoUrl} alt="avatar" className="w-full h-full object-cover" />
                                   ) : (
                                     <div className="w-full h-full flex items-center justify-center">
-                                      <UserIcon className="w-6 h-6 text-gray-300" />
+                                      <UserIcon className="w-[22px] h-[22px] text-gray-300" />
                                     </div>
                                   )}
                                 </div>
@@ -8072,7 +8072,7 @@ export default function App() {
                         }} 
                         className="p-2 -ml-2 hover:bg-gray-50 rounded-full transition-colors"
                       >
-                        <ChevronLeft className="w-6 h-6 text-gray-800" />
+                        <ChevronLeft className="w-[22px] h-[22px] text-gray-800" />
                       </button>
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full border border-gray-100 bg-gray-50 overflow-hidden shrink-0">
@@ -8171,7 +8171,7 @@ export default function App() {
                 )}
 
                 {accountSubView === 'events' && (
-                  <div className="space-y-6">
+                  <div className="flex flex-col">
                     <button onClick={() => setAccountSubView('menu')} className="flex items-center gap-2 text-orange-500 font-bold text-sm">
                       <ChevronLeft className="w-4 h-4" /> Voltar ao menu
                     </button>
@@ -8269,7 +8269,7 @@ export default function App() {
                                             'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=50&h=50&fit=crop',
                                             'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=50&h=50&fit=crop',
                                           ].map((picUrl, i) => (
-                                            <div key={i} className="w-6 h-6 rounded-full bg-gray-100 border-2 border-white overflow-hidden shrink-0">
+                                            <div key={i} className="w-[22px] h-[22px] rounded-full bg-gray-100 border-2 border-white overflow-hidden shrink-0">
                                               <img src={picUrl} alt="Interessado" className="w-full h-full object-cover" />
                                             </div>
                                           ))}
@@ -8330,7 +8330,7 @@ export default function App() {
                   const eventPosts = posts.filter(p => p.content?.includes(hashtag));
 
                   return (
-                    <div className="space-y-6">
+                    <div className="flex flex-col">
                       <div className="flex items-center justify-between pb-2">
                         <button onClick={() => { setSelectedEventId(null); setAccountSubView('events'); }} className="flex items-center gap-1 text-gray-800 font-bold text-lg">
                           <ChevronLeft className="w-5 h-5" />
@@ -8351,7 +8351,7 @@ export default function App() {
                               'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=50&h=50&fit=crop',
                               'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=50&h=50&fit=crop',
                             ].map((picUrl, i) => (
-                              <div key={i} className="w-6 h-6 rounded-full bg-gray-100 border border-white overflow-hidden shrink-0">
+                              <div key={i} className="w-[22px] h-[22px] rounded-full bg-gray-100 border border-white overflow-hidden shrink-0">
                                 <img src={picUrl} alt="Interessado" className="w-full h-full object-cover" />
                               </div>
                             ))}
@@ -8380,18 +8380,18 @@ export default function App() {
                       </div>
 
                       {/* Timeline */}
-                      <div className="flex flex-col gap-6">
+                      <div className="flex flex-col">
                         {eventPosts.length === 0 ? (
                            <div className="text-center py-6 text-gray-400 text-sm border-2 border-dashed border-gray-100 rounded-xl">Seja o primeiro a postar neste evento!</div>
                         ) : (
                            eventPosts.map((post, idx) => (
-                              <div key={`${post.id}-${idx}`} className="bg-white rounded-xl overflow-hidden border-b border-gray-100 pb-4">
+                              <div key={`${post.id}-${idx}`} className="bg-white overflow-hidden mb-0 flex flex-col">
                                 {/* Header */}
-                                <div className="pb-3 flex items-center justify-between">
+                                <div className="flex items-center justify-between px-3 py-2.5 bg-white">
                                   <div className="flex items-center gap-3">
                                      <img 
                                         src={(post.userId === user?.id && ownerProfile?.photoUrl ? ownerProfile.photoUrl : post.userPhoto) || 'https://ui-avatars.com/api/?name=User&background=FFEDD5&color=EA580C'} 
-                                        className="w-10 h-10 rounded-full border border-gray-100 cursor-pointer"
+                                        className="w-8 h-8 rounded-full object-cover cursor-pointer flex-shrink-0"
                                         onClick={() => {
                                           if (!user) return;
                                           if (post.userId === user.id) {
@@ -8405,7 +8405,7 @@ export default function App() {
                                      />
                                      <div>
                                         <p 
-                                           className="text-base font-semibold m-0 text-gray-900 cursor-pointer"
+                                           className="text-[14px] font-semibold text-gray-900 leading-tight cursor-pointer"
                                            onClick={() => {
                                              if (!user) return;
                                              if (post.userId === user.id) {
@@ -8417,25 +8417,66 @@ export default function App() {
                                              }
                                            }}
                                         >{post.userName}</p>
-                                        <p className="text-[11px] text-gray-400 m-0">{new Date(post.createdAt).toLocaleDateString()}</p>
+                                        <p className="text-[12px] text-gray-400 leading-tight mt-0.5">{new Date(post.createdAt).toLocaleDateString()}</p>
                                      </div>
                                   </div>
-                                  <button className="flex items-center gap-1 text-[#0B3B8B] text-sm font-semibold border border-[#0B3B8B] px-3 py-1 rounded-full">
-                                    <Plus className="w-3.5 h-3.5" /> Seguir
-                                  </button>
+                                  {(isAdmin || post.userId === user?.id) && (
+                                    <div className="relative">
+                                      <button
+                                        onClick={() => setOpenMenuId(openMenuId === `event-post-${post.id}` ? null : `event-post-${post.id}`)}
+                                        className="p-2 text-gray-400 hover:text-gray-600 transition-colors rounded-full hover:bg-gray-50"
+                                      >
+                                        <MoreVertical className="w-5 h-5" />
+                                      </button>
+                                      {openMenuId === `event-post-${post.id}` && (
+                                        <>
+                                          <div className="fixed inset-0 z-40" onClick={() => setOpenMenuId(null)} />
+                                          <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 z-50">
+                                            <button
+                                              onClick={async () => {
+                                                setOpenMenuId(null);
+                                                const newCaption = window.prompt('Editar legenda:', post.content);
+                                                if (newCaption !== null && newCaption.trim() !== '' && newCaption !== post.content) {
+                                                  await supabase.from('posts').update({ content: newCaption }).eq('id', post.id);
+                                                  setPosts(prev => prev.map(p => p.id === post.id ? { ...p, content: newCaption } : p));
+                                                }
+                                              }}
+                                              className="w-full px-4 py-2 text-left text-sm font-bold text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                                            >
+                                              <Edit2 className="w-4 h-4" /> Editar Legenda
+                                            </button>
+                                            <button
+                                              onClick={async () => {
+                                                setOpenMenuId(null);
+                                                if (window.confirm('Deseja excluir esta postagem?')) {
+                                                  await supabase.from('posts').delete().eq('id', post.id);
+                                                  setPosts(prev => prev.filter(p => p.id !== post.id));
+                                                }
+                                              }}
+                                              className="w-full px-4 py-2 text-left text-sm font-bold text-red-600 hover:bg-red-50 flex items-center gap-2"
+                                            >
+                                              <Trash2 className="w-4 h-4" /> Excluir
+                                            </button>
+                                          </div>
+                                        </>
+                                      )}
+                                    </div>
+                                  )}
                                 </div>
                                 {/* Post Content */}
-                                <div className="pb-3 text-sm text-[#0B3B8B] font-medium break-words whitespace-pre-wrap">
-                                   {renderPostContent(post.content)}
+                                <div className="px-4 pb-3">
+                                   <p className="text-[15px] text-gray-800 font-medium leading-snug whitespace-pre-wrap">
+                                     {renderPostContent(post.content)}
+                                   </p>
                                 </div>
                                 {/* Image Grid mockup depending on content or single image */}
                                 {post.imageUrl && (
-                                   <div className="w-full bg-gray-50 h-[300px] rounded-xl overflow-hidden mb-3">
+                                   <div className="w-full bg-gray-100 overflow-hidden" style={{aspectRatio:"9/16"}}>
                                      <img src={post.imageUrl} className="w-full h-full object-cover" />
                                    </div>
                                 )}
                                 {/* Footer actions */}
-                                <div className="flex flex-col gap-2 px-4 pt-3 pb-4 border-t border-gray-100">
+                                <div className="flex flex-col gap-1 px-3 pt-2 pb-3">
                                    <div className="flex items-center justify-between">
                                       <div className="flex items-center gap-4">
                                          <button onClick={() => handleLikePost(post.id)} className={`transition-colors ${post.likes?.includes(user?.id || '') ? 'text-red-500' : 'text-gray-800 hover:text-gray-500'}`}>
@@ -8689,7 +8730,7 @@ export default function App() {
                       {/* Header */}
                       <div className="flex items-center gap-3 px-4 pt-4 pb-2 border-b border-gray-100 sticky top-0 bg-white/80 backdrop-blur-xl z-10">
                         <button onClick={() => setView('dashboard')} className="p-1 -ml-1 active:scale-95 transition-transform">
-                          <ChevronLeft className="w-6 h-6 text-gray-800" />
+                          <ChevronLeft className="w-[22px] h-[22px] text-gray-800" />
                         </button>
                         <h2 className="text-[17px] font-bold text-gray-900 leading-tight">Notificações</h2>
                       </div>
@@ -8712,7 +8753,7 @@ export default function App() {
                                       <img src={req.fromUserPhoto} alt={req.fromUserName} className="w-full h-full object-cover" />
                                     ) : (
                                       <div className="w-full h-full flex items-center justify-center bg-orange-100">
-                                        <UserIcon className="w-6 h-6 text-orange-400" />
+                                        <UserIcon className="w-[22px] h-[22px] text-orange-400" />
                                       </div>
                                     )}
                                   </div>
@@ -8772,7 +8813,7 @@ export default function App() {
                                         <img src={n.avatarUrl} className="w-full h-full object-cover" alt="Avatar" />
                                       ) : (
                                         <div className="w-full h-full bg-orange-500 flex items-center justify-center text-white">
-                                          <PawPrint className="w-6 h-6" />
+                                          <PawPrint className="w-[22px] h-[22px]" />
                                         </div>
                                       )}
                                     </div>
@@ -8805,7 +8846,7 @@ export default function App() {
                 })()}
 
                 {accountSubView === 'adoption' && (
-                  <div className="space-y-6">
+                  <div className="flex flex-col">
                     <div className="flex items-center justify-between">
                       <button onClick={() => setAccountSubView('menu')} className="flex items-center gap-2 text-orange-500 font-bold text-sm">
                         <ChevronLeft className="w-4 h-4" /> Voltar ao menu
@@ -8832,7 +8873,7 @@ export default function App() {
                             </button>
                           </div>
                           {/* Photo */}
-                          <div className="w-full aspect-square bg-gray-100 relative">
+                          <div className="w-full bg-gray-100 relative" style={{aspectRatio:"9/16"}}>
                             <img src={fp.photoUrl || 'https://picsum.photos/seed/pet/800/600'} alt={fp.name} className="w-full h-full object-cover" />
                             <div className="absolute top-3 left-3 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-[10px] font-black px-3 py-1.5 rounded-full uppercase shadow-lg">
                               Para Adoção
@@ -8871,7 +8912,7 @@ export default function App() {
                     <div className="space-y-5">
                       <div className="flex items-center gap-3">
                         <div className="w-12 h-12 bg-pink-50 rounded-2xl flex items-center justify-center">
-                          <Heart className="w-6 h-6 text-pink-500" />
+                          <Heart className="w-[22px] h-[22px] text-pink-500" />
                         </div>
                         <h3 className="font-bold text-xl">Adoção Responsável</h3>
                       </div>
@@ -8918,7 +8959,7 @@ export default function App() {
                                   <div className="flex items-center gap-3">
                                     <div className="relative">
                                       {pet.ownerPhotoUrl ? (
-                                        <img src={pet.ownerPhotoUrl} alt="Tutor" className="w-10 h-10 rounded-full object-cover border border-gray-100" />
+                                        <img src={pet.ownerPhotoUrl} alt="Tutor" className="w-8 h-8 rounded-full object-cover cursor-pointer flex-shrink-0" />
                                       ) : (
                                         <div className="w-10 h-10 rounded-full bg-pink-50 flex items-center justify-center border border-pink-100">
                                           <UserIcon className="w-5 h-5 text-pink-300" />
@@ -9024,7 +9065,7 @@ export default function App() {
                                       user && (pet.likes || []).includes(user.id) ? 'text-pink-500' : 'text-gray-500 hover:text-gray-700'
                                     }`}
                                   >
-                                    <Heart className={`w-6 h-6 transition-all ${user && (pet.likes || []).includes(user.id) ? 'fill-pink-500 scale-110' : ''}`} />
+                                    <Heart className={`w-[22px] h-[22px] transition-all ${user && (pet.likes || []).includes(user.id) ? 'fill-pink-500 scale-110' : ''}`} />
                                   </button>
                                   {/* Comment button */}
                                   <button
@@ -9033,7 +9074,7 @@ export default function App() {
                                       activeAdoptionCommentId === pet.id ? 'text-pink-500' : 'text-gray-500 hover:text-gray-700'
                                     }`}
                                   >
-                                    <MessageCircle className="w-6 h-6" />
+                                    <MessageCircle className="w-[22px] h-[22px]" />
                                   </button>
                                   {/* Share button */}
                                   <button
@@ -9054,7 +9095,7 @@ export default function App() {
                                     }}
                                     className="flex items-center gap-1.5 text-gray-500 font-bold text-sm hover:text-gray-700 transition-colors"
                                   >
-                                    <Share2 className="w-6 h-6" />
+                                    <Share2 className="w-[22px] h-[22px]" />
                                   </button>
                                   
                                   <div className={`ml-auto flex items-center gap-1.5 font-bold text-sm ${adoptionTab === 'available' ? 'text-green-600' : 'text-gray-500'}`}>
@@ -9175,7 +9216,7 @@ export default function App() {
 
 
                 {accountSubView === 'admin' && isAdmin && (
-                  <div className="space-y-6">
+                  <div className="flex flex-col">
                     <button onClick={() => setAccountSubView('menu')} className="flex items-center gap-2 text-orange-500 font-bold text-sm">
                       <ChevronLeft className="w-4 h-4" /> Voltar ao menu
                     </button>
@@ -9184,7 +9225,7 @@ export default function App() {
                     <div className="bg-white p-6 md:p-8 rounded-[2.5rem] border border-gray-100 space-y-8 mb-10 overflow-hidden">
                       <div className="flex items-center gap-3">
                         <div className="w-12 h-12 bg-orange-100 rounded-2xl flex items-center justify-center">
-                          <ShieldCheck className="w-6 h-6 text-orange-600" />
+                          <ShieldCheck className="w-[22px] h-[22px] text-orange-600" />
                         </div>
                         <div>
                           <h3 className="font-bold text-xl text-gray-900">Painel Administrador</h3>
@@ -9590,7 +9631,7 @@ export default function App() {
                                   {pet.photoUrl ? (
                                     <img src={pet.photoUrl} alt={pet.name} className="w-full h-full object-cover" />
                                   ) : (
-                                    <Dog className="w-6 h-6 text-gray-300 m-auto h-full" />
+                                    <Dog className="w-[22px] h-[22px] text-gray-300 m-auto h-full" />
                                   )}
                                 </div>
                                 <div className="flex-1 min-w-0 pr-2">
@@ -9981,7 +10022,7 @@ export default function App() {
                                   <img src={ev.imageUrl} className="w-14 h-14 rounded-2xl object-cover border border-gray-100 shrink-0" alt={ev.title} />
                                 ) : (
                                   <div className="w-14 h-14 rounded-2xl bg-blue-50 border border-gray-100 flex items-center justify-center shrink-0">
-                                    <Calendar className="w-6 h-6 text-blue-300" />
+                                    <Calendar className="w-[22px] h-[22px] text-blue-300" />
                                   </div>
                                 )}
                                 <div className="min-w-0 flex-1">
@@ -10137,7 +10178,7 @@ export default function App() {
                                   <img src={ev.image_url} className="w-14 h-14 rounded-2xl object-cover border border-gray-100 shrink-0" alt={ev.title} />
                                 ) : (
                                   <div className="w-14 h-14 rounded-2xl bg-indigo-50 border border-gray-100 flex items-center justify-center shrink-0">
-                                    <Star className="w-6 h-6 text-indigo-300" />
+                                    <Star className="w-[22px] h-[22px] text-indigo-300" />
                                   </div>
                                 )}
                                 <div className="min-w-0 flex-1">
@@ -10410,7 +10451,7 @@ export default function App() {
                                   {(newAdoptionPet.gallery?.length || 0) < 5 && (
                                     <label className="aspect-square bg-gray-50 rounded-2xl flex flex-col items-center justify-center border-2 border-dashed border-gray-200 hover:border-orange-300 transition-all cursor-pointer">
                                       <input type="file" accept="image/*" multiple className="hidden" onChange={handleAdoptionPhotoUpload} />
-                                      <Camera className="w-6 h-6 text-gray-300" />
+                                      <Camera className="w-[22px] h-[22px] text-gray-300" />
                                       <span className="text-[8px] text-gray-400 font-bold uppercase mt-1">Adicionar</span>
                                     </label>
                                   )}
@@ -10477,7 +10518,7 @@ export default function App() {
                         transition={{ delay: 0.5 }}
                         className="bg-orange-50 border border-orange-200 rounded-2xl px-6 py-4 flex items-center gap-3"
                       >
-                        <QrCode className="w-6 h-6 text-orange-500 shrink-0" />
+                        <QrCode className="w-[22px] h-[22px] text-orange-500 shrink-0" />
                         <div className="text-left">
                           <p className="text-[11px] text-orange-400 font-bold uppercase tracking-wider">ID do Pingente</p>
                           <p className="text-xl font-black text-orange-700 tracking-widest">{tagIdToActivate}</p>
@@ -10514,7 +10555,7 @@ export default function App() {
                         <h2 className="text-3xl font-bold">Ativar Pingente</h2>
                         <p className="text-gray-400">Insira o ID que veio com o seu Pingente</p>
                       </div>
-                      <div className="space-y-6">
+                      <div className="flex flex-col">
                         <Input
                           label="ID do Pingente"
                           placeholder="Ex: CAF943"
@@ -10557,7 +10598,7 @@ export default function App() {
                       }}
                       className="p-2 bg-white rounded-xl shadow-sm"
                     >
-                      <ChevronRight className="w-6 h-6 rotate-180" />
+                      <ChevronRight className="w-[22px] h-[22px] rotate-180" />
                     </button>
                   )}
                   <h2 className="text-2xl font-bold">
@@ -10565,7 +10606,7 @@ export default function App() {
                   </h2>
                 </div>
 
-                <div className="space-y-6 pb-24">
+                <div className="flex flex-col pb-24">
                   {selectedPet && lostAlerts.some(a => a.petId === selectedPet.id) && (
                     <motion.div
                       initial={{ scale: 0.9, opacity: 0 }}
@@ -10621,7 +10662,7 @@ export default function App() {
                       {(selectedPet?.gallery?.length || 0) < (selectedPet?.tagId ? 10 : 3) && (
                         <label className="aspect-square rounded-2xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center gap-1 cursor-pointer hover:border-orange-300 hover:bg-orange-50 transition-all text-gray-400 hover:text-orange-500">
                           <input type="file" accept="image/*" multiple className="hidden" onChange={handleGalleryUpload} />
-                          <Plus className="w-6 h-6" />
+                          <Plus className="w-[22px] h-[22px]" />
                           <span className="text-[8px] font-bold uppercase">Adicionar</span>
                         </label>
                       )}
@@ -11063,7 +11104,7 @@ export default function App() {
                         htmlFor="picker-gallery-input"
                         className="w-20 h-20 shrink-0 rounded-xl bg-gray-100 border-2 border-dashed border-gray-300 flex items-center justify-center cursor-pointer hover:bg-gray-200 transition-colors"
                       >
-                        <Plus className="w-6 h-6 text-gray-400" />
+                        <Plus className="w-[22px] h-[22px] text-gray-400" />
                       </label>
                     </div>
                   )}
@@ -11077,7 +11118,7 @@ export default function App() {
                         className="aspect-square bg-gray-900 flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-gray-800 transition-colors"
                       >
                         <div className="w-12 h-12 rounded-full border-2 border-white/40 flex items-center justify-center">
-                          <Camera className="w-6 h-6 text-white" />
+                          <Camera className="w-[22px] h-[22px] text-white" />
                         </div>
                         <span className="text-white text-[11px] font-semibold">Câmera</span>
                       </label>
@@ -11191,7 +11232,7 @@ export default function App() {
                     onClick={() => { setIsAddingPost(false); setNewPost({ content: '', type: 'photo', imageUrl: '' }); setPostHashtag(''); setPickerPhotos([]); }}
                     className="p-1"
                   >
-                    <ChevronLeft className="w-6 h-6 text-gray-800" />
+                    <ChevronLeft className="w-[22px] h-[22px] text-gray-800" />
                   </button>
                   <h2 className="flex-1 font-bold text-gray-900 text-lg">Compartilhar Foto</h2>
                 </div>
@@ -11284,7 +11325,7 @@ export default function App() {
                               onClick={() => setNewPost(prev => ({ ...prev, petId: newPost.petId === pet.id ? undefined : pet.id, petName: newPost.petId === pet.id ? undefined : pet.name }))}
                               className={`flex items-center gap-1.5 pl-1.5 pr-3 py-1.5 rounded-full border-2 transition-all ${newPost.petId === pet.id ? 'border-[#0B3B8B] bg-blue-50' : 'border-gray-200 bg-white'}`}
                             >
-                              <div className="w-6 h-6 rounded-full bg-gray-100 overflow-hidden shrink-0">
+                              <div className="w-[22px] h-[22px] rounded-full bg-gray-100 overflow-hidden shrink-0">
                                 {pet.photoUrl ? (
                                   <img src={pet.photoUrl} className="w-full h-full object-cover" />
                                 ) : (
@@ -11406,7 +11447,7 @@ export default function App() {
               onDoubleClick={() => window.location.reload()}
               className={`flex flex-col items-center gap-1 transition-colors flex-1 min-h-[44px] justify-center ${view === 'dashboard' ? 'text-orange-500' : 'text-gray-300'}`}
             >
-              <Home className="w-6 h-6" />
+              <Home className="w-[22px] h-[22px]" />
               <span translate="no" className="text-[11px] font-bold uppercase">Início</span>
             </button>
 
@@ -11418,7 +11459,7 @@ export default function App() {
               }}
               className={`flex flex-col items-center gap-1 transition-colors flex-1 min-h-[44px] justify-center relative ${view === 'chat' ? 'text-orange-500' : 'text-gray-300'}`}
             >
-              <MessageSquare className="w-6 h-6" />
+              <MessageSquare className="w-[22px] h-[22px]" />
               <span translate="no" className="text-[11px] font-bold uppercase">Chat</span>
               {unreadConvCount > 0 && (
                 <span className="absolute top-1 right-1/2 translate-x-4 min-w-[18px] h-[18px] bg-red-500 rounded-full border-2 border-white text-white text-[9px] font-black flex items-center justify-center px-1">
@@ -11444,7 +11485,7 @@ export default function App() {
               }}
               className={`flex flex-col items-center gap-1 transition-colors flex-1 min-h-[44px] justify-center relative ${view === 'lost_pets' ? 'text-orange-500' : 'text-gray-300'}`}
             >
-              <Megaphone className={`w-6 h-6 ${hasNewUnreadSOS && view !== 'lost_pets' ? 'text-red-500 animate-pulse' : ''}`} />
+              <Megaphone className={`w-[22px] h-[22px] ${hasNewUnreadSOS && view !== 'lost_pets' ? 'text-red-500 animate-pulse' : ''}`} />
               <span translate="no" className="text-[11px] font-bold uppercase">Alertas</span>
               {hasNewUnreadSOS && view !== 'lost_pets' && (
                 <span className="absolute top-1 right-1/2 translate-x-4 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white animate-bounce" />
@@ -11650,7 +11691,7 @@ export default function App() {
                 <h3 className="font-semibold text-lg text-gray-900 mb-4">Posts</h3>
                 
                 {/* Timeline */}
-                <div className="space-y-6 pb-24">
+                <div className="flex flex-col pb-24">
                   {(() => {
                     const userPosts = viewingProfilePosts;
                     if (userPosts.length === 0) {
@@ -11689,8 +11730,8 @@ export default function App() {
                            </p>
                          </div>
 
-                         <div className="w-full aspect-square bg-gray-100 relative">
-                           <img src={post.imageUrl || 'https://picsum.photos/seed/passeio/800/800'} alt="Post" className="w-full h-full object-cover" />
+                         <div className="w-full bg-gray-100 relative" style={{aspectRatio:"9/16"}}>
+                           <img src={post.imageUrl || ''} alt="Post" className="w-full h-full object-cover" />
                          </div>
 
                          <div className="flex flex-col gap-2 px-4 pt-4 pb-5">
@@ -11733,7 +11774,7 @@ export default function App() {
               <div className="px-4 pt-12 pb-4 flex items-center justify-between sticky top-0 z-10 bg-white border-b border-gray-100">
                 <div className="flex items-center gap-2">
                   <button onClick={() => setViewingCommentsPostId(null)} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-                    <ChevronLeft className="w-6 h-6 text-gray-900" />
+                    <ChevronLeft className="w-[22px] h-[22px] text-gray-900" />
                   </button>
                   <span className="font-bold text-gray-900 text-lg">Comentários</span>
                 </div>
@@ -11938,7 +11979,7 @@ export default function App() {
                 className="absolute top-8 right-8 p-3 bg-white/10 text-white rounded-full hover:bg-white/20 transition-colors"
                 onClick={() => setLightboxImage(null)}
               >
-                <X className="w-6 h-6" />
+                <X className="w-[22px] h-[22px]" />
               </button>
               <motion.img
                 initial={{ scale: 0.9, opacity: 0 }}
@@ -11963,7 +12004,7 @@ export default function App() {
             >
               <div className="bg-white rounded-3xl p-4 shadow-2xl border border-orange-100 flex items-center gap-4 max-w-md w-full pointer-events-auto">
                 <div className="w-12 h-12 bg-orange-50 rounded-2xl flex items-center justify-center shrink-0">
-                  <Bell className="w-6 h-6 text-orange-500" />
+                  <Bell className="w-[22px] h-[22px] text-orange-500" />
                 </div>
                 <div className="flex-1">
                   <h4 className="font-bold text-sm text-gray-800">{activeNotification.title}</h4>
@@ -12008,7 +12049,7 @@ export default function App() {
                         <img src={friendAcceptedToast.photo} alt={friendAcceptedToast.name} className="w-full h-full object-cover" />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center bg-orange-100">
-                          <UserIcon className="w-6 h-6 text-orange-400" />
+                          <UserIcon className="w-[22px] h-[22px] text-orange-400" />
                         </div>
                       )}
                     </div>
