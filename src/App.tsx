@@ -8168,16 +8168,10 @@ export default function App() {
 
                 {accountSubView === 'events' && (
                   <div className="flex flex-col">
-                    <button onClick={() => setAccountSubView('menu')} className="flex items-center gap-2 text-orange-500 font-bold text-sm">
-                      <ChevronLeft className="w-4 h-4" /> Voltar ao menu
+                    <button onClick={() => setAccountSubView('menu')} className="flex items-center gap-2 text-black font-bold text-lg mb-4">
+                      <ChevronLeft className="w-5 h-5" /> Eventos
                     </button>
                     <div className="space-y-4">
-                      <div className="flex items-center gap-3 mb-2">
-                        <div className="w-10 h-10 bg-blue-50 rounded-2xl flex items-center justify-center">
-                          <Calendar className="w-5 h-5 text-blue-500" />
-                        </div>
-                        <h3 className="font-bold text-xl">Eventos da Comunidade</h3>
-                      </div>
 
                       {petEvents.filter(ev => {
                         if (!ev.event_date) return false;
@@ -8843,17 +8837,13 @@ export default function App() {
 
                 {accountSubView === 'adoption' && (
                   <div className="flex flex-col">
-                    <div className="flex items-center justify-between">
-                      <button onClick={() => setAccountSubView('menu')} className="flex items-center gap-2 text-orange-500 font-bold text-sm">
-                        <ChevronLeft className="w-4 h-4" /> Voltar ao menu
+                    <div className="flex items-center justify-between mb-4">
+                      <button onClick={() => setAccountSubView('menu')} className="flex items-center gap-2 text-black font-bold text-lg">
+                        <ChevronLeft className="w-5 h-5" /> Adoção
                       </button>
-                      <Button
-                        onClick={() => setIsAddingAdoptionPet(true)}
-                        variant="secondary"
-                        className="!px-4 !py-2 text-xs"
-                      >
-                        <Plus className="w-4 h-4" /> Divulgar Pet
-                      </Button>
+                      <button onClick={() => setIsAddingAdoptionPet(true)} className="text-black p-2">
+                        <Plus className="w-6 h-6" strokeWidth={2.5} />
+                      </button>
                     </div>
 
                     {/* ── Focused Pet Profile (when coming from feed) ── */}
@@ -8906,18 +8896,6 @@ export default function App() {
                     })()}
 
                     <div className="space-y-5">
-                      <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 bg-pink-50 rounded-2xl flex items-center justify-center">
-                          <Heart className="w-[22px] h-[22px] text-pink-500" />
-                        </div>
-                        <h3 className="font-bold text-xl">Adoção Responsável</h3>
-                      </div>
-
-
-                      <div className="bg-gradient-to-r from-pink-500 to-rose-500 p-5 rounded-2xl text-center shadow-lg shadow-pink-100">
-                        <p className="text-white font-black text-sm">Mude uma vida! 💖</p>
-                        <p className="text-white/90 text-[11px] mt-1">Adote um pet e ganhe um Pingente Inteligente do FocinhoApp.</p>
-                      </div>
 
                       <div className="space-y-8">
                         {/* Tabs */}
