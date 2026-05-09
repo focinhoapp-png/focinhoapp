@@ -11758,27 +11758,41 @@ export default function App() {
           )}
         </AnimatePresence>
 
-        {/* ── Comments Modal (Instagram style) ── */}
+        {/* ── Comments Modal (Instagram style Bottom Sheet) ── */}
         <AnimatePresence>
           {viewingCommentsPostId && (
-            <motion.div
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="fixed inset-0 z-[170] bg-[#FFF8F0] flex flex-col"
-            >
-              <div className="px-4 pt-12 pb-4 flex items-center justify-between sticky top-0 z-10 bg-white border-b border-gray-100">
-                <div className="flex items-center gap-2">
-                  <button onClick={() => setViewingCommentsPostId(null)} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-                    <ChevronLeft className="w-[22px] h-[22px] text-gray-900" />
-                  </button>
-                  <span className="font-bold text-gray-900 text-lg">Comentários</span>
-                </div>
-                <div className="w-10"></div>
-              </div>
+            <>
+              {/* Overlay dimmed background */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setViewingCommentsPostId(null)}
+                className="fixed inset-0 z-[160] bg-black/60"
+              />
 
-              <div className="flex-1 overflow-y-auto px-4 py-4 space-y-5">
+              <motion.div
+                initial={{ y: '100%' }}
+                animate={{ y: 0 }}
+                exit={{ y: '100%' }}
+                transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                drag="y"
+                dragConstraints={{ top: 0 }}
+                dragElastic={0.2}
+                onDragEnd={(e, info) => {
+                  if (info.offset.y > 100 || info.velocity.y > 500) {
+                    setViewingCommentsPostId(null);
+                  }
+                }}
+                className="fixed inset-x-0 bottom-0 z-[170] bg-[#FFFFFF] flex flex-col rounded-t-[24px] h-[85vh] shadow-[0_-4px_20px_rgba(0,0,0,0.15)]"
+              >
+                {/* Drag Handle & Header */}
+                <div className="flex flex-col items-center pt-3 pb-3 sticky top-0 z-10 bg-[#FFFFFF] rounded-t-[24px] border-b border-gray-100 shrink-0">
+                  <div className="w-10 h-1 bg-gray-300 rounded-full mb-3" />
+                  <span className="font-bold text-gray-900 text-[15px]">Comentários</span>
+                </div>
+
+                <div className="flex-1 overflow-y-auto px-4 py-4 space-y-5 pb-6">
                 {(() => {
                   let post: any = posts.find(p => p.id === viewingCommentsPostId);
                   if (!post) post = lostAlerts.find(a => a.id === viewingCommentsPostId);
@@ -11891,6 +11905,7 @@ export default function App() {
                 </div>
               </div>
             </motion.div>
+            </>
           )}
         </AnimatePresence>
 
