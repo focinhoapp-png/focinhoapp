@@ -870,7 +870,7 @@ function SOSAlertCard({ alert, user, onEdit, onFound, onShare, onOpenFinder, isT
       </div>
 
       {/* ── Full-width photo ── */}
-      <div className="w-full bg-gray-100 relative" style={{aspectRatio:"9/16"}}>
+      <div className="w-full bg-gray-100 relative" style={{aspectRatio:"4/5"}}>
         {mainImage ? (
           <img src={mainImage} alt={alert.petName} className="w-full h-full object-cover" />
         ) : (
@@ -1077,7 +1077,7 @@ function AdoptionTimelineCard({ pet, user, onShare, onLike, onComment, onOpenPro
       </div>
 
       {/* ── Photo ── */}
-      <div className="w-full bg-gray-100 relative" style={{aspectRatio:"9/16"}}>
+      <div className="w-full bg-gray-100 relative" style={{aspectRatio:"4/5"}}>
         <img src={pet.photoUrl || 'https://picsum.photos/seed/pet/800/600'} alt={pet.name} className="w-full h-full object-cover" />
         <div className="absolute top-3 left-3 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-[10px] font-black px-3 py-1.5 rounded-full uppercase shadow-lg flex items-center gap-1">
           Para Adoção
@@ -5292,7 +5292,7 @@ export default function App() {
                                   </div>
 
                                   {/* Photo */}
-                                  <div className="w-full bg-gray-100 relative" style={{aspectRatio:"9/16"}}>
+                                  <div className="w-full bg-gray-100 relative" style={{aspectRatio:"4/5"}}>
                                     <img src={post.imageUrl} alt="Passeio" className="w-full h-full object-cover" />
                                   </div>
 
@@ -8471,7 +8471,7 @@ export default function App() {
                                 </div>
                                 {/* Image Grid mockup depending on content or single image */}
                                 {post.imageUrl && (
-                                   <div className="w-full bg-gray-100 overflow-hidden" style={{aspectRatio:"9/16"}}>
+                                   <div className="w-full bg-gray-100 overflow-hidden" style={{aspectRatio:"4/5"}}>
                                      <img src={post.imageUrl} className="w-full h-full object-cover" />
                                    </div>
                                 )}
@@ -8873,7 +8873,7 @@ export default function App() {
                             </button>
                           </div>
                           {/* Photo */}
-                          <div className="w-full bg-gray-100 relative" style={{aspectRatio:"9/16"}}>
+                          <div className="w-full bg-gray-100 relative" style={{aspectRatio:"4/5"}}>
                             <img src={fp.photoUrl || 'https://picsum.photos/seed/pet/800/600'} alt={fp.name} className="w-full h-full object-cover" />
                             <div className="absolute top-3 left-3 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-[10px] font-black px-3 py-1.5 rounded-full uppercase shadow-lg">
                               Para Adoção
@@ -11730,7 +11730,7 @@ export default function App() {
                            </p>
                          </div>
 
-                         <div className="w-full bg-gray-100 relative" style={{aspectRatio:"9/16"}}>
+                         <div className="w-full bg-gray-100 relative" style={{aspectRatio:"4/5"}}>
                            <img src={post.imageUrl || ''} alt="Post" className="w-full h-full object-cover" />
                          </div>
 
