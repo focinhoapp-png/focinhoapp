@@ -806,9 +806,7 @@ function SOSAlertCard({ alert, user, onEdit, onFound, onShare, onOpenFinder, isT
                 <UserIcon className="w-5 h-5 text-red-300" />
               </div>
             )}
-            <div className="absolute -bottom-1 -right-1 bg-red-500 rounded-full p-1 border-2 border-white">
-              <AlertCircle className="w-2.5 h-2.5 text-white" />
-            </div>
+            
           </div>
           <div>
             <p className="text-[14px] text-gray-900 leading-tight">
@@ -1054,9 +1052,7 @@ function AdoptionTimelineCard({ pet, user, onShare, onLike, onComment, onOpenPro
                 <UserIcon className="w-5 h-5 text-pink-300" />
               </div>
             )}
-            <div className="absolute -bottom-1 -right-1 bg-gradient-to-r from-pink-500 to-rose-500 rounded-full p-1 border-2 border-white">
-              <Heart className="w-2.5 h-2.5 text-white" />
-            </div>
+            
           </div>
           <div>
             <p className="text-[14px] text-gray-900 leading-tight">
@@ -8965,14 +8961,12 @@ export default function App() {
                                           <UserIcon className="w-5 h-5 text-pink-300" />
                                         </div>
                                       )}
-                                      <div className="absolute -bottom-1 -right-1 bg-pink-500 rounded-full p-1 border-2 border-white">
-                                        <Heart className="w-2.5 h-2.5 text-white" />
-                                      </div>
+                                      
                                     </div>
                                     <div>
                                       <h4 className="font-bold text-gray-900 text-sm flex items-center gap-1">
                                         {pet.ownerUsername || pet.ownerName || 'Tutor do Pet'}
-                                        <CheckCircle2 className="w-4 h-4 text-pink-500" />
+                                        
                                       </h4>
                                       <p className="text-[10px] text-gray-500 font-bold">
                                         {pet.city || 'Desconhecido'}
