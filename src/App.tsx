@@ -8865,9 +8865,9 @@ export default function App() {
                       const fp = adoptionPets.find(p => p.id === adoptionFocusPet);
                       if (!fp) return null;
                       return (
-                        <div className="bg-white rounded-[2rem] overflow-hidden shadow-sm border border-pink-100">
+                        <div className="bg-white overflow-hidden mb-0 flex flex-col">
                           {/* Back button */}
-                          <div className="flex items-center gap-2 px-4 pt-4 pb-2">
+                          <div className="flex items-center gap-2 px-3 py-2.5 bg-white">
                             <button onClick={() => setAdoptionFocusPet(null)} className="flex items-center gap-1.5 text-pink-500 font-bold text-sm">
                               <ChevronLeft className="w-4 h-4" /> Voltar para lista
                             </button>
@@ -8943,7 +8943,7 @@ export default function App() {
                         {/* Pets Loop */}
                         <div className="space-y-4">
                           <h4 className="font-black text-xs text-gray-400 uppercase tracking-widest ml-1">{adoptionTab === 'available' ? 'Pets Disponíveis' : 'Finais Felizes 🎉'}</h4>
-                          <div className="grid grid-cols-1 gap-6">
+                          <div className="flex flex-col">
                             {(() => {
                               const cityName = selectedCity && !isAdmin ? selectedCity.split(' - ')[0].trim().toLowerCase() : '';
                               const visiblePets = adoptionPets.filter(p => {
@@ -8953,9 +8953,9 @@ export default function App() {
                                 return (p.location || '').toLowerCase().includes(cityName) || (p.city || '').toLowerCase().includes(cityName);
                               });
                               return visiblePets.length > 0 ? visiblePets.map((pet, i) => (
-                              <div key={i} className={`bg-white rounded-[2rem] overflow-hidden shadow-sm mb-6 ${adoptionTab === 'adopted' ? 'opacity-80 grayscale-[0.2]' : ''}`}>
+                              <div key={i} className={`bg-white overflow-hidden mb-0 flex flex-col ${adoptionTab === 'adopted' ? 'opacity-80 grayscale-[0.2]' : ''}`}>
                                 {/* ── Header: Owner Info ── */}
-                                <div className="flex items-center justify-between px-4 py-3 border-b border-gray-50">
+                                <div className="flex items-center justify-between px-3 py-2.5 bg-white">
                                   <div className="flex items-center gap-3">
                                     <div className="relative">
                                       {pet.ownerPhotoUrl ? (
@@ -9032,7 +9032,7 @@ export default function App() {
                                 </div>
 
                                 {/* ── Full-width Photo ── */}
-                                <div className="w-full aspect-square bg-gray-100 relative cursor-pointer" onClick={() => setLightboxImage(pet.gallery && pet.gallery.length > 0 ? pet.gallery[0] : pet.photoUrl || '')}>
+                                <div className="w-full bg-gray-100 relative cursor-pointer" style={{aspectRatio:"4/5"}} onClick={() => setLightboxImage(pet.gallery && pet.gallery.length > 0 ? pet.gallery[0] : pet.photoUrl || '')}>
                                   {pet.gallery && pet.gallery.length > 1 ? (
                                     <div className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] h-full">
                                       {pet.gallery.map((url, idx) => (
@@ -9057,7 +9057,7 @@ export default function App() {
                                 </div>
 
                                 {/* ── Action Buttons ── */}
-                                <div className="flex flex-wrap items-center gap-4 px-4 pt-3 pb-1">
+                                <div className="flex items-center gap-4 px-3 pt-2 pb-1">
                                   {/* Like button */}
                                   <button
                                     onClick={() => handleLikeAdoption(pet.id)}
