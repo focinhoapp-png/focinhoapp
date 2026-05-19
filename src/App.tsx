@@ -70,7 +70,8 @@ import {
   Reply,
   Check,
   CheckCheck,
-  Image as ImgIcon
+  Image as ImgIcon,
+  Eye
 } from 'lucide-react';
 import { motion, AnimatePresence, Reorder } from 'motion/react';
 import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap } from 'react-leaflet';
@@ -817,9 +818,7 @@ function SOSAlertCard({ alert, user, onEdit, onFound, onShare, onOpenFinder, isT
         </div>
 
         <div className="flex items-center gap-2">
-          {user && alert.ownerId !== user.id && (
-            <button className="bg-gray-100 text-gray-900 text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-gray-200 transition-colors">Adicionar</button>
-          )}
+
           {/* 3-dot menu — only for owner */}
           {user && alert.ownerId === user.id ? (
             <div className="relative">
@@ -1071,9 +1070,7 @@ function AdoptionTimelineCard({ pet, user, onShare, onLike, onComment, onOpenPro
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {user && pet.ownerId !== user.id && (
-            <button className="bg-gray-100 text-gray-900 text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-gray-200 transition-colors">Adicionar</button>
-          )}
+
           <button className="p-1 rounded-full hover:bg-gray-100 transition-colors">
             <MoreVertical className="w-5 h-5 text-gray-500" />
           </button>
@@ -1428,6 +1425,8 @@ export default function App() {
   // Family State
   const [userFamilies, setUserFamilies] = useState<any[]>([]);
   const [familyMembersInfo, setFamilyMembersInfo] = useState<any[]>([]);
+  const [photoMenuOpen, setPhotoMenuOpen] = useState(false);
+  const [viewingOwnPhoto, setViewingOwnPhoto] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteCodeInput, setInviteCodeInput] = useState('');
   const [creatingFamily, setCreatingFamily] = useState(false);
@@ -5168,9 +5167,7 @@ export default function App() {
                                       </div>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                      {post.userId !== user?.id && (
-                                        <button className="bg-gray-100 text-gray-900 text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-gray-200 transition-colors">Adicionar</button>
-                                      )}
+
                                       <div className="relative">
                                         <button 
                                           onClick={() => setOpenMenuId(openMenuId === `post-${post.id}` ? null : `post-${post.id}`)}
@@ -6671,186 +6668,249 @@ export default function App() {
               <motion.div key="account" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="pb-24">
                 
                 {accountSubView === 'menu' && (
-                  <div className="bg-white rounded-[2rem] shadow-sm border border-gray-100 flex flex-col overflow-hidden mb-6">
-                    {/* Facebook-style Profile Header */}
-                    <div className="relative">
-                      {/* Cover Photo */}
-                      <div className="h-32 w-full relative">
-                        {ownerProfile?.coverUrl ? (
-                          <img src={ownerProfile.coverUrl} className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="w-full h-full bg-gradient-to-r from-orange-400 to-pink-500" />
-                        )}
-                        {/* Settings Button → opens full-page settings */}
-                        <div className="absolute top-4 right-4 z-20">
+                  <div className="bg-[#F2F2F6] -mx-4 -mt-6 px-4 pt-6 pb-24 min-h-screen">
+                    {/* Lightbox: ver foto completa */}
+                    {viewingOwnPhoto && ownerProfile?.photoUrl && (
+                      <div
+                        className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center"
+                        onClick={() => setViewingOwnPhoto(false)}
+                      >
+                        <img
+                          src={ownerProfile.photoUrl}
+                          alt="Foto de perfil"
+                          className="max-w-full max-h-full object-contain rounded-xl"
+                          onClick={e => e.stopPropagation()}
+                        />
+                        <button
+                          className="absolute top-4 right-4 text-white p-2"
+                          onClick={() => setViewingOwnPhoto(false)}
+                        >
+                          <X className="w-7 h-7" />
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Photo action bottom-sheet */}
+                    {photoMenuOpen && (
+                      <div
+                        className="fixed inset-0 z-40 bg-black/40"
+                        onClick={() => setPhotoMenuOpen(false)}
+                      >
+                        <div
+                          className="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl pb-8 pt-4 px-4"
+                          onClick={e => e.stopPropagation()}
+                        >
+                          <div className="w-12 h-1 bg-gray-200 rounded-full mx-auto mb-4" />
+                          <p className="text-center font-bold text-gray-800 text-lg mb-4">Foto de Perfil</p>
+
+                          {ownerProfile?.photoUrl && (
+                            <button
+                              className="w-full flex items-center gap-4 py-4 px-2 border-b border-gray-100 text-gray-800 hover:bg-gray-50 rounded-xl transition-colors"
+                              onClick={() => { setPhotoMenuOpen(false); setViewingOwnPhoto(true); }}
+                            >
+                              <Eye className="w-5 h-5 text-gray-500" />
+                              <span className="text-[17px]">Ver foto</span>
+                            </button>
+                          )}
+
+                          <label className="w-full flex items-center gap-4 py-4 px-2 border-b border-gray-100 text-gray-800 hover:bg-gray-50 rounded-xl transition-colors cursor-pointer">
+                            <Camera className="w-5 h-5 text-gray-500" />
+                            <span className="text-[17px]">Trocar foto</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={e => { setPhotoMenuOpen(false); handleOwnerPhotoUpload(e); }}
+                            />
+                          </label>
+
+                          {ownerProfile?.photoUrl && (
+                            <button
+                              className="w-full flex items-center gap-4 py-4 px-2 text-red-500 hover:bg-red-50 rounded-xl transition-colors"
+                              onClick={() => {
+                                setPhotoMenuOpen(false);
+                                setOwnerProfile((prev: any) => ({ ...prev, photoUrl: '' }));
+                              }}
+                            >
+                              <Trash2 className="w-5 h-5" />
+                              <span className="text-[17px]">Remover foto</span>
+                            </button>
+                          )}
+
                           <button
-                            onClick={() => setAccountSubView('settingsPage')}
-                            className="w-10 h-10 bg-black/20 backdrop-blur-md rounded-full flex items-center justify-center text-white hover:bg-black/30 transition-colors"
-                            title="Configurações"
+                            className="w-full mt-2 py-3 text-center text-gray-400 font-semibold"
+                            onClick={() => setPhotoMenuOpen(false)}
                           >
-                            <Settings className="w-5 h-5" />
+                            Cancelar
                           </button>
                         </div>
                       </div>
-                      
-                      <div className="px-4 pt-0 pb-6 border-b border-gray-100">
-                        {/* Profile Photo and Name/Stats row */}
-                        <div className="flex items-end gap-4 -mt-6 mb-3 relative z-10">
-                          <div className="w-[104px] h-[104px] rounded-full border-4 border-white bg-gray-100 overflow-hidden shrink-0 shadow-sm relative">
-                            {ownerProfile?.photoUrl ? (
-                              <img src={ownerProfile.photoUrl} alt="Perfil" className="w-full h-full object-cover" />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center bg-gray-50">
-                                <UserIcon className="w-12 h-12 text-gray-300" />
-                              </div>
-                            )}
-                          </div>
-                          
-                          <div className="flex-1 pb-0 mb-1">
-                            <h2 className="text-2xl font-bold text-gray-900 leading-tight">
-                              {ownerProfile?.name || user?.user_metadata?.full_name || 'Tutor do Pet'}
-                            </h2>
-                            <div className="text-[15px] font-semibold text-gray-800 mt-0.5">
-                              {friendships.length} {friendships.length === 1 ? 'amigo' : 'amigos'} <span className="font-normal text-gray-500 mx-1">•</span> {myPostsCount} posts
-                            </div>
-                          </div>
-                        </div>
+                    )}
 
-                        {/* Bio */}
-                        <div className="text-[15px] text-gray-900 mb-2 px-1 whitespace-pre-wrap">
-                          {ownerProfile?.bio || (ownerProfile?.username ? `INSTAGRAM @${ownerProfile.username}` : 'Escreva algo sobre você...')}
-                        </div>
-                        
-                        {/* Location */}
-                        {ownerProfile?.city && (
-                          <div className="flex items-center gap-1.5 mb-4 px-1 text-[15px] font-semibold text-gray-900">
-                            <MapPin className="w-5 h-5 text-gray-900" style={{ fill: 'currentColor', stroke: 'white', strokeWidth: 1.5 }} />
-                            {ownerProfile.city}
+                    {/* Header (WhatsApp Style) */}
+                    <div className="flex flex-col items-center pt-8 pb-6 relative">
+                      {/* QR Code icon */}
+                      <div className="absolute top-4 right-2 p-2">
+                        <QrCode className="w-6 h-6 text-orange-500" />
+                      </div>
+
+                      {/* Profile Photo — clicável */}
+                      <button
+                        className="w-[100px] h-[100px] rounded-full overflow-hidden bg-gray-200 mb-3 relative focus:outline-none active:opacity-80 transition-opacity"
+                        onClick={() => setPhotoMenuOpen(true)}
+                      >
+                        {ownerProfile?.photoUrl ? (
+                          <img src={ownerProfile.photoUrl} alt="Perfil" className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center bg-gray-100">
+                            <UserIcon className="w-12 h-12 text-gray-300" />
                           </div>
                         )}
-
-                        {/* Buttons (Full Width) — own profile: only Meus Pets */}
-                        <div className="flex gap-2 px-1 mt-4">
-                          <button 
-                            onClick={() => setAccountSubView('pets')} 
-                            className="flex-1 bg-[#E4E6EB] hover:bg-[#D8DADF] text-gray-900 font-semibold py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors active:scale-[0.98]"
-                          >
-                            <Dog className="w-5 h-5" />
-                            Meus Pets
-                          </button>
+                        {/* camera badge */}
+                        <div className="absolute bottom-0 right-0 w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center border-2 border-white">
+                          <Camera className="w-4 h-4 text-white" />
                         </div>
+                      </button>
+
+                      <h2 className="text-2xl font-bold text-gray-900">
+                        {ownerProfile?.name || user?.user_metadata?.full_name || 'Tutor do Pet'}
+                      </h2>
+
+                      <div className="text-[15px] text-gray-500 text-center max-w-[280px] mt-1 px-4 truncate">
+                        {ownerProfile?.bio || (ownerProfile?.username ? `@${ownerProfile.username}` : 'Como está o seu pet hoje?')}
                       </div>
                     </div>
 
-                    {/* Menu List */}
-                    <div className="flex flex-col">
+                    {/* Cards Container */}
+                    <div className="flex flex-col gap-6">
 
-                    <button
-                      onClick={() => setAccountSubView('store')}
-                      className="p-5 md:p-6 flex items-center gap-4 hover:bg-gray-50 transition-all text-left border-b border-gray-50 last:border-b-0 relative group"
-                    >
-                      <ShoppingBag className="w-[22px] h-[22px] text-gray-900 shrink-0 group-hover:scale-110 transition-transform" />
-                      <div className="flex-1">
-                        <h4 className="font-bold text-gray-800">Loja</h4>
-                        <p className="text-xs text-gray-400">Acessórios e novas tags</p>
-                      </div>
-                      <ChevronRight className="text-gray-300" />
-                    </button>
-
-                    <button
-                      onClick={() => setAccountSubView('family')}
-                      className="p-5 md:p-6 flex items-center gap-4 hover:bg-gray-50 transition-all text-left border-b border-gray-50 last:border-b-0 relative group"
-                    >
-                      <Users className="w-[22px] h-[22px] text-gray-900 shrink-0 group-hover:scale-110 transition-transform" />
-                      <div className="flex-1">
-                        <h4 className="font-bold text-gray-800">Minha Família</h4>
-                        <p className="text-xs text-gray-400">Gerenciar membros e convites</p>
-                      </div>
-                      <ChevronRight className="text-gray-300" />
-                    </button>
-
-                    <button
-                      onClick={() => setAccountSubView('adoption')}
-                      className="p-5 md:p-6 flex items-center gap-4 hover:bg-gray-50 transition-all text-left border-b border-gray-50 last:border-b-0 relative group"
-                    >
-                      <Heart className="w-[22px] h-[22px] text-gray-900 shrink-0 group-hover:scale-110 transition-transform" />
-                      <div className="flex-1">
-                        <h4 className="font-bold text-gray-800">Adoção</h4>
-                        <p className="text-xs text-gray-400">Encontre um novo amigo</p>
-                      </div>
-                      <ChevronRight className="text-gray-300" />
-                    </button>
-
-                    {/* ── Lembretes ── */}
-                    <button
-                      onClick={() => setView('reminders')}
-                      className="p-5 md:p-6 flex items-center gap-4 hover:bg-gray-50 transition-all text-left border-b border-gray-50 last:border-b-0 relative group"
-                    >
-                      <div className="relative">
-                        <Bell className="w-[22px] h-[22px] text-gray-900 shrink-0 group-hover:scale-110 transition-transform" />
-                        {reminders.length > 0 && (
-                          <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center shadow">
-                            {reminders.length > 9 ? '9+' : reminders.length}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="font-bold text-gray-800">Lembretes</h4>
-                        <p className="text-xs text-gray-400">
-                          {reminders.length > 0 ? `${reminders.length} lembrete${reminders.length > 1 ? 's' : ''}` : 'Vacinas, consultas e cuidados'}
-                        </p>
-                      </div>
-                      <ChevronRight className="text-gray-300" />
-                    </button>
-
-                    <button
-                      onClick={() => setAccountSubView('events')}
-                      className="p-5 md:p-6 flex items-center gap-4 hover:bg-gray-50 transition-all text-left border-b border-gray-50 last:border-b-0 relative group"
-                    >
-                      <Calendar className="w-[22px] h-[22px] text-gray-900 shrink-0 group-hover:scale-110 transition-transform" />
-                      <div className="flex-1">
-                        <h4 className="font-bold text-gray-800">Eventos</h4>
-                        <p className="text-xs text-gray-400">Encontros na comunidade</p>
-                      </div>
-                      <ChevronRight className="text-gray-300" />
-                    </button>
-
-                    
-
-                    {/* ── Notificações ── */}
-                    {(() => {
-                      // Count unseen notifications
-                      const allIds = [
-                        ...lostAlerts.map(a => `sos-${a.id}`),
-                        ...adoptionPets.filter(p => p.status === 'available' || !p.status).map(p => `adop-${p.id}`),
-                        ...petEvents.map(e => `evt-${e.id}`),
-                        ...products.map(p => `prod-${p.id}`),
-
-                      ];
-                      const unseenCount = allIds.filter(id => !seenNotifIds.has(id)).length + friendRequests.length;
-                      return (
+                      {/* Card 1: Acesso Rápido */}
+                      <div className="bg-white rounded-[1.25rem] overflow-hidden shadow-sm">
                         <button
-                          onClick={() => { setAccountSubView('notifications'); markAllSeen(allIds); }}
-                          className="p-5 md:p-6 flex items-center gap-4 hover:bg-gray-50 transition-all text-left border-b border-gray-50 last:border-b-0 relative group"
+                          onClick={() => setAccountSubView('pets')}
+                          className="w-full px-4 py-4 flex items-center gap-4 hover:bg-gray-50 active:bg-gray-100 transition-colors text-left border-b border-gray-100"
                         >
-                          <div className="relative">
-                            <PawPrint className="w-[22px] h-[22px] text-gray-900 shrink-0 group-hover:scale-110 transition-transform" />
-                            {unseenCount > 0 && (
-                              <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center shadow">
-                                {unseenCount > 9 ? '9+' : unseenCount}
+                          <Dog className="w-[22px] h-[22px] text-gray-500 shrink-0" />
+                          <div className="flex-1">
+                            <h4 className="text-[17px] text-gray-900">Meus Pets</h4>
+                          </div>
+                          <ChevronRight className="w-5 h-5 text-gray-300" />
+                        </button>
+
+                        <button
+                          onClick={() => setAccountSubView('family')}
+                          className="w-full px-4 py-4 flex items-center gap-4 hover:bg-gray-50 active:bg-gray-100 transition-colors text-left border-b border-gray-100"
+                        >
+                          <Users className="w-[22px] h-[22px] text-gray-500 shrink-0" />
+                          <div className="flex-1">
+                            <h4 className="text-[17px] text-gray-900">Minha Família</h4>
+                          </div>
+                          <ChevronRight className="w-5 h-5 text-gray-300" />
+                        </button>
+
+                        <button
+                          onClick={() => setAccountSubView('store')}
+                          className="w-full px-4 py-4 flex items-center gap-4 hover:bg-gray-50 active:bg-gray-100 transition-colors text-left"
+                        >
+                          <ShoppingBag className="w-[22px] h-[22px] text-gray-500 shrink-0" />
+                          <div className="flex-1">
+                            <h4 className="text-[17px] text-gray-900">Loja FocinhoApp</h4>
+                          </div>
+                          <ChevronRight className="w-5 h-5 text-gray-300" />
+                        </button>
+                      </div>
+
+                      {/* Card 2: Comunidade */}
+                      <div className="bg-white rounded-[1.25rem] overflow-hidden shadow-sm">
+                        <button
+                          onClick={() => setAccountSubView('adoption')}
+                          className="w-full px-4 py-4 flex items-center gap-4 hover:bg-gray-50 active:bg-gray-100 transition-colors text-left border-b border-gray-100"
+                        >
+                          <Heart className="w-[22px] h-[22px] text-gray-500 shrink-0" />
+                          <div className="flex-1">
+                            <h4 className="text-[17px] text-gray-900">Adoção</h4>
+                          </div>
+                          <ChevronRight className="w-5 h-5 text-gray-300" />
+                        </button>
+
+                        <button
+                          onClick={() => setView('reminders')}
+                          className="w-full px-4 py-4 flex items-center gap-4 hover:bg-gray-50 active:bg-gray-100 transition-colors text-left border-b border-gray-100"
+                        >
+                          <div className="relative shrink-0">
+                            <Bell className="w-[22px] h-[22px] text-gray-500" />
+                            {reminders.length > 0 && (
+                              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold min-w-[16px] h-[16px] px-0.5 rounded-full flex items-center justify-center">
+                                {reminders.length > 9 ? '9+' : reminders.length}
                               </span>
                             )}
                           </div>
-                          <div className="flex-1">
-                            <h4 className="font-bold text-gray-800">Notificações</h4>
-                            <p className="text-xs text-gray-400">
-                              {unseenCount > 0 ? `${unseenCount} nova${unseenCount > 1 ? 's' : ''}` : 'Tudo em dia'}
-                            </p>
+                          <div className="flex-1 flex items-center">
+                            <h4 className="text-[17px] text-gray-900 flex-1">Lembretes</h4>
+                            {reminders.length > 0 && (
+                              <span className="text-[15px] text-gray-400 mr-1">{reminders.length}</span>
+                            )}
                           </div>
-                          <ChevronRight className="text-gray-300" />
+                          <ChevronRight className="w-5 h-5 text-gray-300" />
                         </button>
-                      );
-                    })()}
+
+                        <button
+                          onClick={() => setAccountSubView('events')}
+                          className="w-full px-4 py-4 flex items-center gap-4 hover:bg-gray-50 active:bg-gray-100 transition-colors text-left border-b border-gray-100"
+                        >
+                          <Calendar className="w-[22px] h-[22px] text-gray-500 shrink-0" />
+                          <div className="flex-1">
+                            <h4 className="text-[17px] text-gray-900">Eventos</h4>
+                          </div>
+                          <ChevronRight className="w-5 h-5 text-gray-300" />
+                        </button>
+
+                        {(() => {
+                          const allIds = [
+                            ...lostAlerts.map(a => `sos-${a.id}`),
+                            ...adoptionPets.filter(p => p.status === 'available' || !p.status).map(p => `adop-${p.id}`),
+                            ...petEvents.map(e => `evt-${e.id}`),
+                            ...products.map(p => `prod-${p.id}`),
+                          ];
+                          const unseenCount = allIds.filter(id => !seenNotifIds.has(id)).length + friendRequests.length;
+                          return (
+                            <button
+                              onClick={() => { setAccountSubView('notifications'); markAllSeen(allIds); }}
+                              className="w-full px-4 py-4 flex items-center gap-4 hover:bg-gray-50 active:bg-gray-100 transition-colors text-left"
+                            >
+                              <div className="relative shrink-0">
+                                <PawPrint className="w-[22px] h-[22px] text-gray-500" />
+                                {unseenCount > 0 && (
+                                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold min-w-[16px] h-[16px] px-0.5 rounded-full flex items-center justify-center">
+                                    {unseenCount > 9 ? '9+' : unseenCount}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex-1 flex items-center">
+                                <h4 className="text-[17px] text-gray-900 flex-1">Notificações</h4>
+                                {unseenCount > 0 && (
+                                  <span className="text-[15px] text-gray-400 mr-1">{unseenCount}</span>
+                                )}
+                              </div>
+                              <ChevronRight className="w-5 h-5 text-gray-300" />
+                            </button>
+                          );
+                        })()}
+                      </div>
+
+                      {/* Card 3: Configurações */}
+                      <div className="bg-white rounded-[1.25rem] overflow-hidden shadow-sm">
+                        <button
+                          onClick={() => setAccountSubView('settingsPage')}
+                          className="w-full px-4 py-4 flex items-center gap-4 hover:bg-gray-50 active:bg-gray-100 transition-colors text-left"
+                        >
+                          <Settings className="w-[22px] h-[22px] text-gray-500 shrink-0" />
+                          <div className="flex-1">
+                            <h4 className="text-[17px] text-gray-900">Configurações</h4>
+                          </div>
+                          <ChevronRight className="w-5 h-5 text-gray-300" />
+                        </button>
+                      </div>
 
                     </div>
                   </div>
