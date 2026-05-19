@@ -11091,27 +11091,27 @@ export default function App() {
             </button>
 
             <button
-              onClick={() => setView('walk')}
-              className="flex flex-col items-center -mt-12 flex-1 min-h-[44px] justify-center"
-            >
-              <div className="w-[60px] h-[60px] bg-orange-500 rounded-full flex items-center justify-center shadow-lg shadow-orange-200 border-4 border-white active:scale-90 transition-transform">
-                <PawPrint className="w-7 h-7 text-white" />
-              </div>
-              <span translate="no" className="text-[11px] font-bold uppercase text-orange-500 mt-1">Passeio</span>
-            </button>
-
-            <button
               onClick={() => {
                 setView('lost_pets');
                 setHasNewUnreadSOS(false);
               }}
-              className={`flex flex-col items-center gap-1 transition-colors flex-1 min-h-[44px] justify-center relative ${view === 'lost_pets' ? 'text-orange-500' : 'text-gray-300'}`}
+              className="flex flex-col items-center -mt-12 flex-1 min-h-[44px] justify-center relative"
             >
-              <Megaphone className={`w-[22px] h-[22px] ${hasNewUnreadSOS && view !== 'lost_pets' ? 'text-red-500 animate-pulse' : ''}`} />
-              <span translate="no" className="text-[11px] font-bold uppercase">Alertas</span>
-              {hasNewUnreadSOS && view !== 'lost_pets' && (
-                <span className="absolute top-1 right-1/2 translate-x-4 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white animate-bounce" />
-              )}
+              <div className={`w-[60px] h-[60px] ${hasNewUnreadSOS && view !== 'lost_pets' ? 'bg-red-500 animate-pulse' : 'bg-red-500'} rounded-full flex items-center justify-center shadow-lg shadow-red-200 border-4 border-white active:scale-90 transition-transform`}>
+                <Megaphone className="w-7 h-7 text-white" />
+                {hasNewUnreadSOS && view !== 'lost_pets' && (
+                  <span className="absolute top-0 right-0 w-3 h-3 bg-white rounded-full border-2 border-red-500 animate-bounce" />
+                )}
+              </div>
+              <span translate="no" className="text-[11px] font-bold uppercase text-red-500 mt-1">Alertas</span>
+            </button>
+
+            <button
+              onClick={() => setView('reminders')}
+              className={`flex flex-col items-center gap-1 transition-colors flex-1 min-h-[44px] justify-center relative ${view === 'reminders' ? 'text-orange-500' : 'text-gray-300'}`}
+            >
+              <Bell className="w-[22px] h-[22px]" />
+              <span translate="no" className="text-[11px] font-bold uppercase">Lembretes</span>
             </button>
 
             <button
