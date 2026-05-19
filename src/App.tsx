@@ -1269,7 +1269,7 @@ export default function App() {
   const [adoptionTab, setAdoptionTab] = useState<'available'|'adopted'>('available');
   const [adoptionFocusPet, setAdoptionFocusPet] = useState<string | null>(null);
   const [ownerProfile, setOwnerProfile] = useState<OwnerProfile | null>(null);
-  const [isFetchingOwnerProfile, setIsFetchingOwnerProfile] = useState(true);
+  const [isFetchingOwnerProfile, setIsFetchingOwnerProfile] = useState(false);
   const [currentPetIndex, setCurrentPetIndex] = useState(0);
 
   // SOS State
@@ -4846,13 +4846,6 @@ export default function App() {
                 animate={{ opacity: 1 }}
                 className="space-y-6"
               >
-                {(isFetchingOwnerProfile || isFetchingUserPets) ? (
-                  <div className="flex flex-col items-center justify-center py-32 px-4 opacity-50">
-                    <Loader2 className="w-8 h-8 text-orange-500 animate-spin mb-4" />
-                    <p className="text-gray-500 font-medium">Sincronizando seus dados...</p>
-                  </div>
-                ) : (
-                  <>
 
 
                 {/* ── Pet Selector Row ─────────────────────────── */}
@@ -4953,7 +4946,7 @@ export default function App() {
                   </div>
 
                   {/* Empty state — when user has zero pets, show centered add circle */}
-                  {userPets.length === 0 && (
+                  {userPets.length === 0 && !isFetchingUserPets && (
                     <div className="flex flex-col items-center justify-center py-10 gap-3">
                       <motion.button
                         whileTap={{ scale: 0.9 }}
@@ -5320,10 +5313,9 @@ export default function App() {
                       })()}
                     </div>
                 )}
+
                 <div className="h-20" /> {/* Spacer */}
 
-                  </>
-                )}
               </motion.div>
             )}
 
