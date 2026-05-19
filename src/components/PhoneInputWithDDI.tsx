@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { COUNTRIES, Country } from '../utils/countries';
+import { COUNTRIES } from '../utils/countries';
 import { Search, X } from 'lucide-react';
 
 interface PhoneInputProps {

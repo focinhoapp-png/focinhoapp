@@ -23,7 +23,9 @@ export function BannerCarousel() {
           .order('created_at', { ascending: false });
           
         if (error) throw error;
-        setBanners(data || []);
+        // Filter out the Instagram banner as requested by the user
+        const filteredData = (data || []).filter(b => b.id !== '4642102f-65ce-4514-9a6c-0a61b2907232');
+        setBanners(filteredData);
       } catch (err) {
         console.error('Error fetching banners:', err);
       } finally {

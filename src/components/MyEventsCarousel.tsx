@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { supabase } from '../supabase';
+import { Calendar } from 'lucide-react';
 
 interface PromoEvent {
   id: string;
@@ -11,21 +12,19 @@ interface PromoEvent {
 
 export function MyEventsCarousel() {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [events, setEvents] = useState<PromoEvent[]>([]);
+  const [promoEvents, setPromoEvents] = useState<PromoEvent[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Load events from Supabase
   useEffect(() => {
-    const fetchEvents = async () => {
+    const fetchPromo = async () => {
       try {
         const { data, error } = await supabase
           .from('promo_events')
           .select('*')
           .gte('expires_at', new Date().toISOString())
           .order('created_at', { ascending: false });
-          
         if (error) throw error;
-        setEvents(data || []);
+        setPromoEvents(data || []);
       } catch (err) {
         console.error('Error fetching promo events:', err);
       } finally {
@@ -33,64 +32,59 @@ export function MyEventsCarousel() {
       }
     };
 
-    fetchEvents();
+    fetchPromo();
 
-    // Setup realtime subscription
-    const subscription = supabase.channel('promo_events_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'promo_events' }, () => {
-        fetchEvents();
-      })
+    const subscription = supabase
+      .channel('promo_events_carousel_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'promo_events' }, fetchPromo)
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(subscription);
-    };
+    return () => { supabase.removeChannel(subscription); };
   }, []);
 
-  // Auto-scroll logic com efeito de slide contínuo
+  // Auto-scroll
   useEffect(() => {
-    if (events.length <= 1) return;
+    if (promoEvents.length <= 1) return;
     const interval = setInterval(() => {
       if (scrollRef.current) {
-        const currentScroll = scrollRef.current.scrollLeft;
+        const cur = scrollRef.current.scrollLeft;
         const width = scrollRef.current.clientWidth;
-        const maxScroll = scrollRef.current.scrollWidth - width;
-        
-        if (currentScroll >= maxScroll - 10) {
-          scrollRef.current.scrollTo({ left: 0, behavior: 'smooth' });
-        } else {
-          scrollRef.current.scrollTo({ left: currentScroll + width, behavior: 'smooth' });
-        }
+        const max = scrollRef.current.scrollWidth - width;
+        scrollRef.current.scrollTo({
+          left: cur >= max - 10 ? 0 : cur + width,
+          behavior: 'smooth',
+        });
       }
-    }, 4500); // 4.5 seconds delay
+    }, 5000);
     return () => clearInterval(interval);
-  }, [events]);
+  }, [promoEvents]);
 
-  if (loading || events.length === 0) return null;
+  if (loading || promoEvents.length === 0) return null;
 
   return (
     <div className="w-full">
-      <div 
+      <div className="flex items-center justify-between px-0 mb-2">
+        <span className="text-[13px] font-black text-gray-800 flex items-center gap-1.5">
+          <Calendar className="w-4 h-4 text-indigo-500" /> Destaques
+        </span>
+      </div>
+      <div
         ref={scrollRef}
         className="flex gap-4 overflow-x-auto snap-x snap-mandatory no-scrollbar"
         style={{ scrollBehavior: 'smooth' }}
       >
-        {events.map(ev => (
-          <div 
-            key={ev.id} 
-            className="shrink-0 w-full snap-center px-1"
-          >
-            <div 
-              onClick={() => window.open(ev.link_url, '_blank')}
-              className="w-full h-[240px] rounded-[24px] overflow-hidden cursor-pointer shadow-md border border-gray-100/50 flex items-center justify-center bg-gray-100 relative group"
+        {promoEvents.map(promo => (
+          <div key={promo.id} className="shrink-0 w-full snap-center">
+            <div
+              onClick={() => window.open(promo.link_url, '_blank')}
+              className="w-full h-[150px] sm:h-[160px] rounded-[20px] overflow-hidden cursor-pointer shadow-sm border border-gray-100 flex items-center justify-center bg-gray-100 relative group"
             >
-              <img 
-                src={ev.image_url} 
-                alt={ev.title || "Meu Evento"} 
-                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+              <img
+                src={promo.image_url}
+                alt={promo.title || 'Destaque'}
+                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
               />
-              {/* Gradiente sutil em cima da imagem */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-80 transition-opacity group-hover:opacity-100"></div>
+              <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors" />
             </div>
           </div>
         ))}

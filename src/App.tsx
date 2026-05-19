@@ -219,16 +219,7 @@ interface LostAlert {
   comments?: { id: string; userId: string; userName: string; content: string; createdAt: string }[];
 }
 
-interface Partner {
-  id: string;
-  name: string;
-  category: string;
-  description: string;
-  location: string;
-  logo: string;
-  url: string;
-  created_at: any;
-}
+
 
 interface PetEvent {
   id: string;
@@ -445,7 +436,7 @@ const DOG_BREEDS = ['Vira-lata (SRD)', 'Golden Retriever', 'Labrador', 'Poodle',
 const CAT_BREEDS = ['Vira-lata (SRD)', 'Persa', 'Siamês', 'Maine Coon', 'Angorá', 'Bengal', 'Ragdoll', 'Sphynx', 'Munchkin', 'Outro'];
 const COLORS = ['Branco', 'Preto', 'Marrom', 'Cinza', 'Dourado', 'Creme', 'Malhado', 'Caramelo', 'Chocolate', 'Cinza Azulado', 'Outro'];
 
-const PARTNER_CATEGORIES = ['Todos', 'Pet Shops', 'Clínicas Veterinárias', 'ONGs', 'Adestradores', 'Hotéis para Pets', 'Casas de Ração', 'Marcas Pet'];
+
 
 const ESTADOS_BR = [
   'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'
@@ -1208,10 +1199,10 @@ export default function App() {
   const [pickerCitySearch, setPickerCitySearch] = useState('');
   const [pickerStateSearch, setPickerStateSearch] = useState('');
   const [isLoadingCities, setIsLoadingCities] = useState(false);
-  const [accountSubView, setAccountSubView] = useState('menu'); // menu, profile, pets, support, store, admin, partners
+  const [accountSubView, setAccountSubView] = useState('menu'); // menu, profile, pets, support, store, admin
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [eventInfoEvent, setEventInfoEvent] = useState<PetEvent | null>(null);
-  const [activePartnerFilter, setActivePartnerFilter] = useState('Todos');
+  
 
   // ── Notification Preferences (stored in localStorage) ──
   const [notifPrefs, setNotifPrefs] = useState<Record<string, boolean>>(() => {
@@ -1224,9 +1215,9 @@ export default function App() {
         reminders: true,
         events: true,
         products: true,
-        partners: true,
+        
       };
-    } catch { return { sos: true, adoption: true, friends: true, reminders: true, events: true, products: true, partners: true }; }
+    } catch { return { sos: true, adoption: true, friends: true, reminders: true, events: true, products: true }; }
   });
   const toggleNotifPref = (key: string) => {
     setNotifPrefs(prev => {
@@ -1292,10 +1283,7 @@ export default function App() {
   const [hasNewUnreadSOS, setHasNewUnreadSOS] = useState(false);
   const lastLostAlertsCount = useRef(0);
 
-  // Partners State
-  const [partners, setPartners] = useState<Partner[]>([]); // DB Partners
-  const [partnerForm, setPartnerForm] = useState<Partial<Partner>>({ id: '', name: '', category: 'Pet Shops', description: '', location: '', logo: '', url: '' }); // Admin
-  const [partnerMessage, setPartnerMessage] = useState<string | null>(null); // Admin
+
 
   // Events State
   const [petEvents, setPetEvents] = useState<PetEvent[]>([]);
@@ -2714,19 +2702,6 @@ export default function App() {
     return () => { supabase.removeChannel(channel); };
   }, []);
 
-  // Fetch Partners
-  useEffect(() => {
-    const fetchPartners = async () => {
-      const { data } = await supabase.from('partners').select('*').order('created_at', { ascending: false });
-      setPartners((data || []) as Partner[]);
-    };
-    fetchPartners();
-    const channel = supabase.channel('partners-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'partners' }, fetchPartners)
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, []);
-
   // Fetch Events
   useEffect(() => {
     const fetchEvents = async () => {
@@ -4032,68 +4007,6 @@ export default function App() {
     }
   };
 
-  const handleSavePartner = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!partnerForm.name || !partnerForm.category) return;
-    setLoading(true);
-    setPartnerMessage(null);
-    try {
-      if (partnerForm.id) {
-        const { error } = await supabase.from('partners').update(partnerForm).eq('id', partnerForm.id);
-        if (error) throw error;
-      } else {
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { id: _id, ...insertData } = partnerForm;
-        const { error } = await supabase.from('partners').insert(insertData as any);
-        if (error) throw error;
-      }
-      const { data } = await supabase.from('partners').select('*').order('created_at', { ascending: false });
-      setPartners(data || []);
-      setPartnerForm({ id: '', name: '', category: 'Pet Shops', description: '', location: '', logo: '', url: '' });
-      setPartnerMessage(partnerForm.id ? 'Parceiro atualizado!' : 'Parceiro adicionado!');
-      setTimeout(() => setPartnerMessage(null), 3000);
-    } catch (err) {
-      setPartnerMessage('Erro ao salvar parceiro.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDeletePartner = async (id: string) => {
-    if(!window.confirm('Excluir este parceiro?')) return;
-    setLoading(true);
-    try {
-      await supabase.from('partners').delete().eq('id', id);
-      setPartners(prev => prev.filter(p => p.id !== id));
-    } catch (err) {
-      alert('Erro ao deletar parceiro.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handlePartnerLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setLoading(true);
-    try {
-      if (file.size > 5000000) {
-        setError('A logo é muito grande. Escolha uma foto menor que 5MB.');
-        return;
-      }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPartnerForm(prev => ({ ...prev, logo: reader.result as string }));
-      };
-      reader.readAsDataURL(file);
-    } catch (err) {
-      setError('Erro ao carregar logo.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleSaveOwnerProfile = async () => {
     if (!user || !ownerProfile) return;
     setLoading(true);
@@ -4450,10 +4363,7 @@ export default function App() {
     [posts, viewingProfile?.userId]
   );
 
-  const filteredPartners = useMemo(() => {
-    if (activePartnerFilter === 'Todos') return partners;
-    return partners.filter(p => p.category === activePartnerFilter);
-  }, [partners, activePartnerFilter]);
+  
 
   const friendshipStatusMap = useMemo(() => {
     const map: Record<string, 'none' | 'pending_sent' | 'pending_received' | 'friends'> = {};
@@ -4587,7 +4497,7 @@ export default function App() {
                     ...adoptionPets.filter(p => p.status === 'available' || !p.status).map(p => `adop-${p.id}`),
                     ...petEvents.map(e => `evt-${e.id}`),
                     ...products.map(p => `prod-${p.id}`),
-                    ...partners.map(p => `part-${p.id}`),
+                    
                   ];
                   setView('account');
                   setAccountSubView('notifications');
@@ -4596,14 +4506,14 @@ export default function App() {
                 className="p-2 text-black hover:bg-gray-100 rounded-xl flex items-center justify-center transition-colors shrink-0 relative"
                 title="Notificações"
               >
-                <Bell className="w-[22px] h-[22px]" />
+                <PawPrint className="w-[22px] h-[22px]" />
                 {(() => {
                   const allIds = [
                     ...lostAlerts.map(a => `sos-${a.id}`),
                     ...adoptionPets.filter(p => p.status === 'available' || !p.status).map(p => `adop-${p.id}`),
                     ...petEvents.map(e => `evt-${e.id}`),
                     ...products.map(p => `prod-${p.id}`),
-                    ...partners.map(p => `part-${p.id}`),
+
                   ];
                   const unseenCount = allIds.filter(id => !seenNotifIds.has(id)).length + friendRequests.length;
                   return unseenCount > 0 ? (
@@ -5077,13 +4987,13 @@ export default function App() {
                       </div>
                       
                       <div 
-                        onClick={() => { setView('account'); setAccountSubView('partners'); }}
-                        className="bg-white py-3 px-1 rounded-[1.5rem] border border-gray-100 flex flex-col items-center text-center gap-2 cursor-pointer hover:border-emerald-200 transition-all shadow-sm active:scale-95"
+                        onClick={() => setView('walk')}
+                        className="bg-white py-3 px-1 rounded-[1.5rem] border border-gray-100 flex flex-col items-center text-center gap-2 cursor-pointer hover:border-orange-200 transition-all shadow-sm active:scale-95"
                       >
-                        <div className="w-12 h-12 bg-emerald-50 rounded-[1rem] flex items-center justify-center">
-                          <HeartHandshake className="w-[22px] h-[22px] text-emerald-500" />
+                        <div className="w-12 h-12 bg-orange-50 rounded-[1rem] flex items-center justify-center">
+                          <PawPrint className="w-[22px] h-[22px] text-orange-500" />
                         </div>
-                        <span className="text-[10px] font-black text-gray-700 leading-tight tracking-tight">Parceiros</span>
+                        <span className="text-[10px] font-black text-gray-700 leading-tight tracking-tight">Passeio</span>
                       </div>
 
                       <div 
@@ -6877,7 +6787,7 @@ export default function App() {
                       className="p-5 md:p-6 flex items-center gap-4 hover:bg-gray-50 transition-all text-left border-b border-gray-50 last:border-b-0 relative group"
                     >
                       <div className="relative">
-                        <Bell className="w-[22px] h-[22px] text-gray-900 shrink-0 group-hover:scale-110 transition-transform" />
+                        <PawPrint className="w-[22px] h-[22px] text-gray-900 shrink-0 group-hover:scale-110 transition-transform" />
                         {reminders.length > 0 && (
                           <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center shadow">
                             {reminders.length > 9 ? '9+' : reminders.length}
@@ -6905,17 +6815,7 @@ export default function App() {
                       <ChevronRight className="text-gray-300" />
                     </button>
 
-                    <button
-                      onClick={() => setAccountSubView('partners')}
-                      className="p-5 md:p-6 flex items-center gap-4 hover:bg-gray-50 transition-all text-left border-b border-gray-50 last:border-b-0 relative group"
-                    >
-                      <Briefcase className="w-[22px] h-[22px] text-gray-900 shrink-0 group-hover:scale-110 transition-transform" />
-                      <div className="flex-1">
-                        <h4 className="font-bold text-gray-800">Parceiros</h4>
-                        <p className="text-xs text-gray-400">Apoiam a causa animal</p>
-                      </div>
-                      <ChevronRight className="text-gray-300" />
-                    </button>
+                    
 
                     {/* ── Notificações ── */}
                     {(() => {
@@ -6925,7 +6825,7 @@ export default function App() {
                         ...adoptionPets.filter(p => p.status === 'available' || !p.status).map(p => `adop-${p.id}`),
                         ...petEvents.map(e => `evt-${e.id}`),
                         ...products.map(p => `prod-${p.id}`),
-                        ...partners.map(p => `part-${p.id}`),
+
                       ];
                       const unseenCount = allIds.filter(id => !seenNotifIds.has(id)).length + friendRequests.length;
                       return (
@@ -7315,136 +7215,6 @@ export default function App() {
                   </div>
                 )}
 
-                {accountSubView === 'partners' && (
-                  <div className="flex flex-col">
-                    <button onClick={() => setAccountSubView('menu')} className="flex items-center gap-2 text-orange-500 font-bold text-sm">
-                      <ChevronLeft className="w-4 h-4" /> Voltar ao menu
-                    </button>
-
-                    <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100 space-y-6 pb-24">
-                      {/* Header */}
-                      <div className="text-center space-y-3">
-                        <div className="w-16 h-16 bg-blue-50 rounded-[2rem] flex items-center justify-center mx-auto mb-4">
-                          <HeartHandshake className="w-8 h-8 text-blue-500" />
-                        </div>
-                        <h2 className="text-2xl font-black text-gray-800">Nossos Parceiros</h2>
-                        <p className="text-sm text-gray-500 font-medium leading-relaxed max-w-xs mx-auto">
-                          Empresas e profissionais que apoiam a proteção e o bem-estar dos animais junto com o FocinhoApp.
-                        </p>
-
-                      </div>
-
-                      {/* Filters */}
-                      <div className="flex gap-2 overflow-x-auto py-2 scrollbar-hide -mx-6 px-6">
-                        {PARTNER_CATEGORIES.map(category => (
-                          <button
-                            key={category}
-                            onClick={() => setActivePartnerFilter(category)}
-                            className={`whitespace-nowrap px-5 py-2.5 rounded-2xl text-sm font-bold transition-all ${activePartnerFilter === category ? 'bg-orange-500 text-white shadow-md shadow-orange-500/20' : 'bg-gray-100 text-gray-600 hover:bg-orange-50 hover:text-orange-500'}`}
-                          >
-                            {category}
-                          </button>
-                        ))}
-                      </div>
-
-                      {/* Partner Cards Grid */}
-                      <div className="gap-4 flex flex-col mt-2">
-                        <AnimatePresence mode="popLayout">
-                          {partners
-                            .filter(p => {
-                              if (isAdmin || !selectedCity || !p.location) return true;
-                              const cityName = selectedCity.split(' - ')[0].trim().toLowerCase();
-                              return p.location.toLowerCase().includes(cityName);
-                            })
-                            .filter(p => activePartnerFilter === 'Todos' || p.category === activePartnerFilter)
-                            .map(partner => (
-                            <motion.div
-                              key={partner.id}
-                              initial={{ opacity: 0, scale: 0.95 }}
-                              animate={{ opacity: 1, scale: 1 }}
-                              exit={{ opacity: 0, scale: 0.95 }}
-                              className="bg-gray-50 rounded-3xl p-5 border border-gray-100 flex flex-col gap-4"
-                            >
-                              <div className="flex items-center gap-4">
-                                <img src={partner.logo} alt={partner.name} className="w-16 h-16 rounded-2xl object-cover bg-white shadow-sm" />
-                                <div>
-                                  <h4 className="font-bold text-gray-800 text-lg">{partner.name}</h4>
-                                  <p className="text-xs font-bold text-orange-500 uppercase tracking-wide">{partner.category}</p>
-                                </div>
-                              </div>
-                              <p className="text-sm text-gray-500 leading-relaxed font-medium">
-                                {partner.description}
-                              </p>
-                              <div className="flex items-center justify-between mt-2">
-                                <div className="flex items-center gap-1.5 text-gray-400">
-                                  <MapPin className="w-4 h-4" />
-                                  <span className="text-xs font-bold">{partner.location}</span>
-                                </div>
-                                <a
-                                  href={partner.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="bg-orange-100 text-orange-600 px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 hover:bg-orange-200 transition-colors"
-                                >
-                                  Conhecer <ExternalLink className="w-3 h-3" />
-                                </a>
-                              </div>
-                            </motion.div>
-                          ))}
-                        </AnimatePresence>
-                        {partners
-                          .filter(p => {
-                            if (isAdmin || !selectedCity || !p.location) return true;
-                            const cityName = selectedCity.split(' - ')[0].trim().toLowerCase();
-                            return p.location.toLowerCase().includes(cityName);
-                          })
-                          .filter(p => activePartnerFilter === 'Todos' || p.category === activePartnerFilter).length === 0 && (
-                          <div className="text-center py-8 text-gray-400 font-medium">
-                            Nenhum parceiro encontrado nesta categoria em sua cidade.
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Benefits Section */}
-                      <div className="bg-orange-50 rounded-[2rem] p-6 space-y-4 border border-orange-100 mt-8">
-                        <h3 className="font-black text-orange-800 text-lg">Por que ser parceiro do FocinhoApp?</h3>
-                        <ul className="space-y-3">
-                          {[
-                            'Divulgação dentro do aplicativo',
-                            'Apoio à causa animal',
-                            'Aumento de visibilidade para amantes de pets',
-                            'Participação em campanhas de adoção',
-                            'Conexão com a comunidade pet'
-                          ].map((benefit, i) => (
-                            <li key={i} className="flex items-start gap-3">
-                              <CheckCircle2 className="w-5 h-5 text-orange-500 shrink-0 mt-0.5" />
-                              <span className="text-sm text-orange-900 font-medium leading-relaxed">{benefit}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-
-                      {/* Call to Action for new partners */}
-                      <div className="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-[2rem] p-8 text-center space-y-6 shadow-lg shadow-blue-500/20 text-white mt-8 mx-[-1rem]">
-                        <h3 className="font-black text-2xl">Quer se tornar um parceiro do FocinhoApp?</h3>
-                        <p className="text-blue-100 text-sm font-medium leading-relaxed">
-                          Junte-se a nós para proteger os animais e aumente o alcance da sua marca para um público apaixonado por pets!
-                        </p>
-                        <a
-                          href="https://wa.me/"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="bg-white text-blue-600 font-black px-6 py-4 rounded-2xl w-full flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-md mt-4"
-                        >
-                          <HeartHandshake className="w-5 h-5" />
-                          Quero ser parceiro
-                        </a>
-                      </div>
-
-                    </div>
-                  </div>
-                )}
-
                 {/* ═══════════════════════════════════════
                     SETTINGS PAGE — Instagram-style layout
                 ═══════════════════════════════════════ */}
@@ -7496,7 +7266,7 @@ export default function App() {
                           className="w-full flex items-center gap-4 px-4 py-3.5 hover:bg-gray-50 transition-colors text-left"
                         >
                           <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
-                            <Bell className="w-5 h-5 text-gray-600" />
+                            <PawPrint className="w-5 h-5 text-gray-600" />
                           </div>
                           <span className="flex-1 text-[15px] text-gray-900 font-normal">Notificações</span>
                           <ChevronRight className="w-4 h-4 text-gray-400" />
@@ -7577,16 +7347,7 @@ export default function App() {
                           <ChevronRight className="w-4 h-4 text-gray-400" />
                         </button>
 
-                        <button
-                          onClick={() => setAccountSubView('partners')}
-                          className="w-full flex items-center gap-4 px-4 py-3.5 hover:bg-gray-50 transition-colors text-left"
-                        >
-                          <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
-                            <Briefcase className="w-5 h-5 text-gray-600" />
-                          </div>
-                          <span className="flex-1 text-[15px] text-gray-900 font-normal">Parceiros</span>
-                          <ChevronRight className="w-4 h-4 text-gray-400" />
-                        </button>
+
                       </div>
                     </div>
 
@@ -7687,7 +7448,7 @@ export default function App() {
                             { key: 'reminders', label: 'Lembretes', desc: 'Vacinas, consultas e cuidados', icon: <Bell className="w-5 h-5" />, color: 'text-orange-500', bg: 'bg-orange-50' },
                             { key: 'events', label: 'Eventos', desc: 'Novos eventos na comunidade', icon: <Calendar className="w-5 h-5" />, color: 'text-violet-500', bg: 'bg-violet-50' },
                             { key: 'products', label: 'Produtos da Loja', desc: 'Novos produtos e promoções', icon: <Package className="w-5 h-5" />, color: 'text-indigo-500', bg: 'bg-indigo-50' },
-                            { key: 'partners', label: 'Lojas Parceiras', desc: 'Novos parceiros na sua cidade', icon: <Store className="w-5 h-5" />, color: 'text-emerald-500', bg: 'bg-emerald-50' },
+                            
                           ].map(cat => (
                             <div key={cat.key} className="flex items-center gap-4 px-5 py-4">
                               <div className={`w-10 h-10 rounded-2xl ${cat.bg} flex items-center justify-center shrink-0`}>
@@ -8675,22 +8436,8 @@ export default function App() {
                       action: () => { setAccountSubView('store'); },
                       rightImage: p.image_url,
                     })),
-                    // Partners
-                    ...partners.filter(() => notifPrefs.partners).map(p => ({
-                      id: `part-${p.id}`,
-                      avatarUrl: undefined,
-                      titleNode: (
-                        <>
-                          <span className="font-bold">FocinhoApp</span>
-                          {' tem uma nova loja parceira: '}
-                          <span className="font-bold">{p.name}</span>
-                          {'. Confira os benefícios!'}
-                        </>
-                      ),
-                      time: new Date(p.created_at || Date.now()),
-                      action: () => { setAccountSubView('partners'); },
-                      rightImage: p.logo,
-                    })),
+
+                    
                     // Social Notifications (Like, Comment, Friend, Message)
                     ...(notifPrefs.friends ? friendNotifications.map(n => {
                       let textNode = null;
@@ -8805,7 +8552,7 @@ export default function App() {
                         {feed.length === 0 ? (
                           <div className="flex flex-col items-center justify-center py-12 px-6 gap-3">
                             <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center">
-                              <BellOff className="w-8 h-8 text-gray-300" />
+                              <PawPrint className="w-8 h-8 text-gray-300" />
                             </div>
                             <p className="text-gray-500 font-medium text-[15px] text-center">Nenhuma notificação</p>
                           </div>
@@ -9685,128 +9432,6 @@ export default function App() {
                         </div>
                       </div>
 
-
-                      {/* Partners Management */}
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between mb-4">
-                          <h4 className="font-bold text-gray-800 flex items-center gap-2">
-                            <Briefcase className="w-5 h-5 text-gray-400" /> Parceiros ({partners.length})
-                          </h4>
-                        </div>
-                        <div className="bg-gray-50/50 border border-gray-100 rounded-[2rem] p-4">
-                          <form onSubmit={handleSavePartner} className="flex flex-col gap-3 mb-6">
-                            <div className="flex gap-3">
-                              <Input 
-                                placeholder="Nome da Empresa" 
-                                icon={Briefcase} 
-                                value={partnerForm.name || ''}
-                                onChange={(v: string) => setPartnerForm(prev => ({ ...prev, name: v }))}
-                              />
-                              <div className="w-1/2">
-                                <Select
-                                  value={partnerForm.category || ''}
-                                  onChange={(v: string) => setPartnerForm(prev => ({ ...prev, category: v }))}
-                                  options={PARTNER_CATEGORIES.filter(c => c !== 'Todos')}
-                                />
-                              </div>
-                            </div>
-                            
-                            <Input 
-                              placeholder="Breve descrição" 
-                              value={partnerForm.description || ''}
-                              onChange={(v: string) => setPartnerForm(prev => ({ ...prev, description: v }))}
-                            />
-
-                            <div className="flex gap-3">
-                              <Input 
-                                placeholder="Cidade-UF (ex: Guapimirim-RJ)" 
-                                icon={MapPin}
-                                value={partnerForm.location || ''}
-                                onChange={(v: string) => setPartnerForm(prev => ({ ...prev, location: v }))}
-                              />
-                              <Input 
-                                placeholder="Link / Instagram" 
-                                icon={ExternalLink}
-                                value={partnerForm.url || ''}
-                                onChange={(v: string) => setPartnerForm(prev => ({ ...prev, url: v }))}
-                              />
-                            </div>
-                            
-                            <div className="flex flex-col gap-1.5">
-                              <label className="text-sm font-medium text-gray-600 ml-1">Logo do Parceiro (1)</label>
-                              <div className="flex gap-2">
-                                {partnerForm.logo && (
-                                  <div className="w-16 h-16 rounded-xl overflow-hidden relative group shrink-0 border border-gray-200">
-                                    <img src={partnerForm.logo} className="w-full h-full object-cover" />
-                                    <button
-                                      type="button"
-                                      onClick={() => setPartnerForm(prev => ({ ...prev, logo: '' }))}
-                                      className="absolute inset-0 bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                                    >
-                                      <X className="w-5 h-5" />
-                                    </button>
-                                  </div>
-                                )}
-                                {!partnerForm.logo && (
-                                  <label className="w-16 h-16 bg-gray-50 rounded-xl flex flex-col items-center justify-center border-2 border-dashed border-gray-200 hover:border-orange-300 transition-all cursor-pointer shrink-0">
-                                    <input type="file" accept="image/*" className="hidden" onChange={handlePartnerLogoUpload} />
-                                    <Camera className="w-5 h-5 text-gray-300" />
-                                    <span className="text-[8px] text-gray-400 font-bold uppercase mt-1">Logo</span>
-                                  </label>
-                                )}
-                              </div>
-                            </div>
-
-                            {partnerMessage && (
-                              <div className="bg-green-50 text-green-600 p-3 rounded-xl text-center text-sm font-bold border border-green-200 mt-1">
-                                {partnerMessage}
-                              </div>
-                            )}
-
-                            <div className="flex gap-2 mt-2">
-                              <Button type="submit" className="w-full bg-blue-500 hover:bg-blue-600 shadow-blue-100">
-                                {partnerForm.id ? 'Atualizar Parceiro' : 'Salvar Parceiro'}
-                              </Button>
-                              {partnerForm.id && (
-                                <button type="button" onClick={() => setPartnerForm({ id: '', name: '', category: 'Pet Shops', description: '', location: '', logo: '', url: '' })} className="px-6 rounded-2xl border-2 border-gray-100 text-gray-500 font-bold hover:bg-gray-50">
-                                  Cancelar
-                                </button>
-                              )}
-                            </div>
-                          </form>
-                          
-                          <div className="flex flex-col gap-3">
-                            {partners.map(partner => (
-                              <div key={partner.id} className="bg-white p-4 rounded-3xl border border-gray-200 flex justify-between items-center shadow-sm">
-                                <div className="flex items-center gap-3 w-full pr-2 overflow-hidden">
-                                  {partner.logo ? (
-                                     <img src={partner.logo} className="w-10 h-10 rounded-lg object-cover border border-gray-100 shrink-0" />
-                                  ) : (
-                                     <div className="w-10 h-10 rounded-lg bg-gray-50 border border-gray-100 flex items-center justify-center shrink-0">
-                                       <Briefcase className="w-4 h-4 text-gray-300" />
-                                     </div>
-                                  )}
-                                  <div className="min-w-0 flex-1">
-                                    <h5 className="font-bold text-gray-900 truncate text-sm">{partner.name}</h5>
-                                    <p className="text-[10px] text-gray-500 font-bold truncate">
-                                      {partner.category} {partner.location && `• ${partner.location}`}
-                                    </p>
-                                  </div>
-                                </div>
-                                <div className="flex gap-2 shrink-0">
-                                  <button onClick={() => setPartnerForm({ ...partner })} className="p-2.5 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-colors">
-                                    <Edit2 className="w-4 h-4" />
-                                  </button>
-                                  <button onClick={() => handleDeletePartner(partner.id)} className="p-2.5 bg-red-50 text-red-500 rounded-xl hover:bg-red-100 transition-colors">
-                                    <Trash2 className="w-4 h-4" />
-                                  </button>
-                                </div>
-                              </div>
-                            ))}
-                            {partners.length === 0 && <p className="text-center text-xs text-gray-400 font-medium py-4">Nenhum parceiro cadastrado.</p>}
-                          </div>
-                        </div>
-                      </div>
 
                       {/* Events Management */}
                       <div className="space-y-4">
@@ -12016,7 +11641,7 @@ export default function App() {
             >
               <div className="bg-white rounded-3xl p-4 shadow-2xl border border-orange-100 flex items-center gap-4 max-w-md w-full pointer-events-auto">
                 <div className="w-12 h-12 bg-orange-50 rounded-2xl flex items-center justify-center shrink-0">
-                  <Bell className="w-[22px] h-[22px] text-orange-500" />
+                  <PawPrint className="w-[22px] h-[22px] text-orange-500" />
                 </div>
                 <div className="flex-1">
                   <h4 className="font-bold text-sm text-gray-800">{activeNotification.title}</h4>
